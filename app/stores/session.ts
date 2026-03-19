@@ -5,19 +5,32 @@ import type {
   LoginPayload,
 } from "~~/shared/schemas";
 
+type SessionStatus = "idle" | "loading" | "loaded";
+
+type SessionState = {
+  barber: BarberProfile | null;
+  status: SessionStatus;
+  user: BarberUser | null;
+};
+
+type SessionSnapshot = {
+  barber: BarberProfile | null;
+  user: BarberUser | null;
+};
+
 export const useSessionStore = defineStore("session", {
-  state: () => ({
+  state: (): SessionState => ({
     barber: null as BarberProfile | null,
     user: null as BarberUser | null,
-    status: "idle" as "idle" | "loading" | "loaded",
+    status: "idle" as SessionStatus,
   }),
 
   getters: {
-    isAuthenticated: (state) => Boolean(state.user),
+    isAuthenticated: (state: SessionState): boolean => Boolean(state.user),
   },
 
   actions: {
-    async ensureLoaded(options: { force?: boolean } = {}) {
+    async ensureLoaded(options: { force?: boolean } = {}): Promise<SessionSnapshot> {
       if (this.status === "loaded" && !options.force) {
         return { barber: this.barber, user: this.user };
       }
@@ -59,10 +72,7 @@ export const useSessionStore = defineStore("session", {
       }
     },
 
-    setSession(payload: {
-      barber: BarberProfile | null;
-      user: BarberUser | null;
-    }) {
+    setSession(payload: SessionSnapshot) {
       this.barber = payload.barber;
       this.user = payload.user;
       this.status = "loaded";

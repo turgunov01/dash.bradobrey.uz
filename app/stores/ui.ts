@@ -5,6 +5,12 @@ type StatisticsRange = {
   start: string
 }
 
+type UiState = {
+  apiDebugEntries: DebugEntry[]
+  barberHistoryStatus: string
+  statisticsRange: StatisticsRange
+}
+
 export type DebugEntry = {
   at: string
   error?: any
@@ -42,7 +48,7 @@ export const useUiStore = defineStore('ui', {
       this.statisticsRange = range
     }
   },
-  state: () => ({
+  state: (): UiState => ({
     apiDebugEntries: [] as DebugEntry[],
     barberHistoryStatus: '',
     statisticsRange: getDefaultRange()

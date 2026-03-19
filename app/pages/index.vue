@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Branch } from '~~/shared/schemas'
+
 import { formatCount } from '~/utils/format'
 import { asNumber, pickValue, toKeyLabel } from '~/utils/normalize'
 
@@ -57,7 +59,7 @@ const promoItems = computed(() => {
 })
 
 const branchSummaries = computed(() =>
-  branchStore.branches.map(branch => ({
+  branchStore.branches.map((branch: Branch) => ({
     id: branch.id,
     isActive: branch.id === branchStore.activeBranchId,
     name: branch.name

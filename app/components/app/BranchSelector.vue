@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Branch } from '~~/shared/schemas'
+
 defineProps<{
   collapsed?: boolean
 }>()
@@ -8,7 +10,7 @@ const branchStore = useBranchStore()
 await branchStore.ensureLoaded()
 
 const options = computed(() =>
-  branchStore.branches.map(branch => ({
+  branchStore.branches.map((branch: Branch) => ({
     label: branch.name,
     value: branch.id
   }))

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Branch } from '~~/shared/schemas'
 import type { FlatServiceItem } from '~/utils/services'
 
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
@@ -305,15 +306,15 @@ const { data, pending, refresh } = await useAsyncData('statistics-dashboard-rich
   }
 })
 
-const serviceMap = computed(() =>
-  new Map(
-    (data.value?.services || []).map(service => [String(service.id), service])
+const serviceMap = computed<Map<string, FlatServiceItem>>(() =>
+  new Map<string, FlatServiceItem>(
+    (data.value?.services || []).map((service): [string, FlatServiceItem] => [String(service.id), service])
   )
 )
 
-const branchMap = computed(() =>
-  new Map(
-    branchStore.branches.map(branch => [branch.id, branch])
+const branchMap = computed<Map<string, Branch>>(() =>
+  new Map<string, Branch>(
+    branchStore.branches.map((branch: Branch): [string, Branch] => [branch.id, branch])
   )
 )
 

@@ -3,6 +3,12 @@ import { defineStore } from 'pinia'
 import type { Branch } from '~~/shared/schemas'
 import { branchSchema } from '~~/shared/schemas'
 
+type BranchState = {
+  activeBranchId: string | null
+  branches: Branch[]
+  loaded: boolean
+}
+
 function extractBranchItems(response: unknown): unknown[] {
   if (Array.isArray(response)) {
     return response
@@ -54,7 +60,7 @@ function extractBranchItems(response: unknown): unknown[] {
 
 export const useBranchStore = defineStore('branch', {
   actions: {
-    async ensureLoaded() {
+    async ensureLoaded(): Promise<Branch[]> {
       if (this.loaded) {
         return this.branches
       }
@@ -86,9 +92,9 @@ export const useBranchStore = defineStore('branch', {
     }
   },
   getters: {
-    activeBranch: state => state.branches.find(branch => branch.id === state.activeBranchId) || null
+    activeBranch: (state: BranchState): Branch | null => state.branches.find((branch: Branch) => branch.id === state.activeBranchId) || null
   },
-  state: () => ({
+  state: (): BranchState => ({
     activeBranchId: null as string | null,
     branches: [] as Branch[],
     loaded: false
