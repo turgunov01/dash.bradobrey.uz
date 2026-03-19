@@ -80,6 +80,7 @@ export function useApiClient() {
     try {
       const data = await $fetch<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
+        credentials: "include",
         headers: buildRequestHeaders(options.headers),
         method: options.method || "GET",
         query: options.query,
@@ -129,6 +130,7 @@ export function useApiClient() {
     try {
       const response = await $fetch.raw<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
+        credentials: "include",
         headers: buildRequestHeaders(options.headers),
         method: options.method || "GET",
         query: options.query,

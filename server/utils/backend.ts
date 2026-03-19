@@ -30,6 +30,7 @@ type BackendRequestOptions = {
 }
 
 const backendMethods = new Set<BackendMethod>(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'])
+const forwardedHeaderNames = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'user-agent', 'accept-language'] as const
 
 function normalizeMethod(method?: string): BackendMethod {
   const normalizedMethod = method?.toUpperCase() as BackendMethod | undefined
@@ -39,6 +40,20 @@ function normalizeMethod(method?: string): BackendMethod {
   }
 
   return 'GET'
+}
+
+function buildForwardedHeaders(event: H3Event, headers?: HeadersInit) {
+  const mergedHeaders = new Headers(headers)
+
+  for (const headerName of forwardedHeaderNames) {
+    const headerValue = getHeader(event, headerName)
+
+    if (headerValue && !mergedHeaders.has(headerName)) {
+      mergedHeaders.set(headerName, headerValue)
+    }
+  }
+
+  return Object.fromEntries(mergedHeaders.entries())
 }
 
 export async function readIncomingBody(event: H3Event): Promise<BackendBody> {
@@ -79,7 +94,7 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
       baseURL: config.public.apiBase,
       body: options.body,
       headers: {
-        ...options.headers,
+        ...buildForwardedHeaders(event, options.headers),
         ...(authMode !== 'none' && token ? { Authorization: `Bearer ${token}` } : {})
       },
       method: normalizeMethod(options.method || getMethod(event)),

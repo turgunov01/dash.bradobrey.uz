@@ -1,6 +1,6 @@
 import { deleteCookie, getCookie, setCookie, type H3Event } from 'h3'
 
-const shouldUseSecureCookie = !import.meta.dev
+import { shouldUseSecureCookie } from './cookie-security'
 
 export function getBarberTokenCookieName(event: H3Event) {
   return String(useRuntimeConfig(event).barberTokenCookieName)
@@ -16,7 +16,7 @@ export function setBarberToken(event: H3Event, token: string) {
     maxAge: 60 * 60 * 12,
     path: '/',
     sameSite: 'lax',
-    secure: shouldUseSecureCookie
+    secure: shouldUseSecureCookie(event)
   })
 }
 
@@ -25,6 +25,6 @@ export function clearBarberToken(event: H3Event) {
     httpOnly: true,
     path: '/',
     sameSite: 'lax',
-    secure: shouldUseSecureCookie
+    secure: shouldUseSecureCookie(event)
   })
 }

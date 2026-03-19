@@ -5,6 +5,8 @@ import { resolve } from 'node:path'
 
 const routeBlockPlugin = 'vue-router/volar/sfc-route-blocks'
 const env = process.env
+const apiBase = String(env.NUXT_PUBLIC_API_BASE || env.API_BASE || 'https://api.turgunovsardor.uz').trim().replace(/\/+$/, '')
+const nitroPreset = env.SERVER_PRESET || env.NITRO_PRESET || (env.NETLIFY ? 'netlify' : '')
 
 async function stripRouteBlockPlugin(directory: string, fileName: string) {
   const filePath = resolve(directory, fileName)
@@ -93,10 +95,11 @@ export default defineNuxtConfig({
     adminSessionCookieName: 'brado_admin_session',
     adminSessionSecret: env.NUXT_ADMIN_SESSION_SECRET || env.NUXT_SESSION_SECRET || env.ADMIN_SESSION_SECRET || '',
     barberTokenCookieName: 'brado_barber_token',
+    cookieSecure: env.NUXT_COOKIE_SECURE || env.COOKIE_SECURE || '',
     supabaseServiceRoleKey: env.NUXT_SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '',
     supabaseUrl: env.NUXT_SUPABASE_URL || env.SUPABASE_URL || '',
     public: {
-      apiBase: env.NUXT_PUBLIC_API_BASE || env.API_BASE || 'http://localhost:4000'
+      apiBase
     }
   },
 
@@ -107,6 +110,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-07-11',
 
   nitro: {
+    preset: nitroPreset || undefined,
     externals: {
       trace: false
     }

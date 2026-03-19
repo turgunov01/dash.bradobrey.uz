@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, setCookie, type H3Event } from 'h3'
 import { z } from 'zod'
 
-const shouldUseSecureCookie = !import.meta.dev
+import { shouldUseSecureCookie } from './cookie-security'
 
 const adminSessionSchema = z.object({
   id: z.string().trim().min(1),
@@ -79,7 +79,7 @@ export function setAdminSession(event: H3Event, payload: AdminSession) {
     maxAge: 60 * 60 * 12,
     path: '/',
     sameSite: 'lax',
-    secure: shouldUseSecureCookie
+    secure: shouldUseSecureCookie(event)
   })
 }
 
@@ -88,6 +88,6 @@ export function clearAdminSession(event: H3Event) {
     httpOnly: true,
     path: '/',
     sameSite: 'lax',
-    secure: shouldUseSecureCookie
+    secure: shouldUseSecureCookie(event)
   })
 }
