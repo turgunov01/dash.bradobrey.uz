@@ -112,7 +112,13 @@ export default defineNuxtConfig({
   nitro: {
     preset: nitroPreset || undefined,
     externals: {
-      trace: false
+      trace: false,
+      inline: [
+        // Inline deps to avoid absolute file://node_modules paths in Netlify functions
+        'zod',
+        '@iconify/utils',
+        'consola'
+      ]
     }
   },
 

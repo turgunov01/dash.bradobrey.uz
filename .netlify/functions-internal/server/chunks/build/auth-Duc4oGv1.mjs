@@ -1,5 +1,5 @@
-globalThis.__timing__.logStart('Load chunks/build/auth-Duc4oGv1');import { useSSRContext, mergeProps } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/index.mjs';
-import { ssrRenderAttrs, ssrRenderSlot } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/server-renderer/index.mjs';
+globalThis.__timing__.logStart('Load chunks/build/auth-Duc4oGv1');import { useSSRContext, mergeProps } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/index.mjs';
+import { ssrRenderAttrs, ssrRenderSlot } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/server-renderer/index.mjs';
 
 const _export_sfc = (sfc, props) => {
   const target = sfc.__vccOpts || sfc;

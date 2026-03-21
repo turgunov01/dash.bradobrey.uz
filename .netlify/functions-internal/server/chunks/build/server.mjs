@@ -1,31 +1,17 @@
-import process from 'node:process';globalThis._importMeta_=globalThis._importMeta_||{url:"file:///_entry.js",env:process.env};globalThis.__timing__.logStart('Load chunks/build/server');import { inject, computed, toRef as toRef$1, isRef, useModel, unref, mergeProps, withCtx, renderSlot, createVNode, openBlock, createBlock, createTextVNode, toDisplayString, createCommentVNode, mergeModels, ref, toValue, watch, nextTick, useSlots, Fragment, renderList, getCurrentScope, onScopeDispose, provide, resolveDynamicComponent, shallowRef, hasInjectionContext, getCurrentInstance, readonly, defineComponent, h, resolveComponent, customRef, onServerPrefetch, reactive, createElementBlock, cloneVNode, defineAsyncComponent, toRefs, useSSRContext, shallowReactive, Suspense, createApp, useId, onErrorCaptured, effectScope, useTemplateRef, withModifiers, markRaw, isReadonly, toRaw, isShallow, isReactive } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/index.mjs';
-import { G as serialize, H as defu, I as isEqual, J as klona, K as hasProtocol, L as isScriptProtocol, F as joinURL, M as defuFn, N as withQuery, O as sanitizeStatusCode, P as parseURL, Q as encodePath, R as decodePath, S as getContext, T as parseQuery, U as getRequestHeaders, V as withTrailingSlash, W as withoutTrailingSlash, $ as $fetch$1, X as baseURL, Y as hash, c as createError$1, Z as executeAsync } from '../_/nitro.mjs';
-import { defineStore, setActivePinia, createPinia, shouldHydrate } from 'file://D:/projects/bradobrey-dashboard/node_modules/pinia/dist/pinia.prod.cjs';
+import process from 'node:process';globalThis._importMeta_=globalThis._importMeta_||{url:"file:///_entry.js",env:process.env};globalThis.__timing__.logStart('Load chunks/build/server');import { isRef, toValue, hasInjectionContext, inject, ref, watchEffect, getCurrentInstance, onBeforeUnmount, onDeactivated, onActivated, computed, toRef as toRef$1, useModel, unref, mergeProps, withCtx, renderSlot, createVNode, openBlock, createBlock, createTextVNode, toDisplayString, createCommentVNode, mergeModels, watch, nextTick, useSlots, Fragment, renderList, getCurrentScope, onScopeDispose, provide, resolveDynamicComponent, shallowRef, readonly, defineComponent, h, resolveComponent, customRef, onServerPrefetch, reactive, createElementBlock, cloneVNode, defineAsyncComponent, toRefs, useSSRContext, shallowReactive, Suspense, createApp, useId, onErrorCaptured, effectScope, useTemplateRef, withModifiers, markRaw, isReadonly, toRaw, isShallow, isReactive } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/index.mjs';
+import { G as serialize$2, H as isEqual$1, I as defuFn, J as getIconCSS, $ as $fetch$1, K as baseURL, L as defu$1, M as executeAsync$1 } from '../_/nitro.mjs';
+import { defineStore, setActivePinia, createPinia, shouldHydrate } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/pinia@3.0.4_typescript@5.9.3_vue@3.5.30_typescript@5.9.3_/node_modules/pinia/dist/pinia.prod.cjs';
 import { useRoute as useRoute$1, RouterView, createMemoryHistory, createRouter, START_LOCATION } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue-router/vue-router.node.mjs';
-import { debounce } from 'file://D:/projects/bradobrey-dashboard/node_modules/perfect-debounce/dist/index.mjs';
-import { isPlainObject } from 'file://D:/projects/bradobrey-dashboard/node_modules/@vue/shared/dist/shared.cjs.prod.js';
-import colors from 'file://D:/projects/bradobrey-dashboard/node_modules/tailwindcss/dist/colors.mjs';
+import { debounce } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/perfect-debounce@2.1.0/node_modules/perfect-debounce/dist/index.mjs';
+import { createHash } from 'node:crypto';
+import { isPlainObject as isPlainObject$1 } from 'file://D:/projects/bradobrey-dashboard/node_modules/@vue/shared/dist/shared.cjs.prod.js';
+import colors from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/tailwindcss@4.2.1/node_modules/tailwindcss/dist/colors.mjs';
 import { Icon, getIcon, loadIcon as loadIcon$1, _api, addAPIProvider, setCustomIconsLoader } from 'file://D:/projects/bradobrey-dashboard/node_modules/@iconify/vue/dist/iconify.mjs';
-import { ssrRenderComponent, ssrRenderSlot, ssrRenderClass, ssrInterpolate, ssrRenderList, ssrRenderVNode, ssrRenderSuspense, ssrRenderStyle } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/server-renderer/index.mjs';
-import { Primitive, Slot, useForwardProps, createContext, ToastProvider, ToastPortal, ToastViewport, ConfigProvider, TooltipProvider, useForwardPropsEmits, ToastRoot, ToastTitle, ToastDescription, ToastAction, ToastClose, ProgressRoot, ProgressIndicator } from 'file://D:/projects/bradobrey-dashboard/node_modules/reka-ui/dist/index.js';
+import { ssrRenderComponent, ssrRenderSlot, ssrRenderClass, ssrInterpolate, ssrRenderList, ssrRenderVNode, ssrRenderSuspense, ssrRenderStyle } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/server-renderer/index.mjs';
+import { Primitive, Slot, useForwardProps, createContext as createContext$1, ToastProvider, ToastPortal, ToastViewport, ConfigProvider, TooltipProvider, useForwardPropsEmits, ToastRoot, ToastTitle, ToastDescription, ToastAction, ToastClose, ProgressRoot, ProgressIndicator } from 'file://D:/projects/bradobrey-dashboard/node_modules/reka-ui/dist/index.js';
 import { createTV } from 'file://D:/projects/bradobrey-dashboard/node_modules/tailwind-variants/dist/index.js';
-import { getIconCSS } from 'file://D:/projects/bradobrey-dashboard/node_modules/@iconify/utils/lib/css/icon.js';
-import { u as useHead$1, h as headSymbol, a as useSeoMeta$1 } from '../routes/renderer.mjs';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/zod/index.js';
-import 'node:crypto';
-import 'node:http';
-import 'node:https';
-import 'node:events';
-import 'node:buffer';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/@iconify/utils/lib/index.js';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/consola/dist/index.mjs';
-import 'node:fs';
-import 'node:path';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/vue-bundle-renderer/dist/runtime.mjs';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/server.mjs';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/devalue/index.js';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/plugins.mjs';
-import 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/utils.mjs';
+import { FlatMetaPlugin } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/unhead@2.1.12/node_modules/unhead/dist/plugins.mjs';
+import { walkResolver } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/unhead@2.1.12/node_modules/unhead/dist/utils.mjs';
 
 //#region src/utils.ts
 function flatHooks(configHooks, hooks = {}, parentName) {
@@ -238,6 +224,985 @@ function createDebugger(hooks, _options = {}) {
 	} };
 }
 
+function createContext(opts = {}) {
+  let currentInstance;
+  let isSingleton = false;
+  const checkConflict = (instance) => {
+    if (currentInstance && currentInstance !== instance) {
+      throw new Error("Context conflict");
+    }
+  };
+  let als;
+  if (opts.asyncContext) {
+    const _AsyncLocalStorage = opts.AsyncLocalStorage || globalThis.AsyncLocalStorage;
+    if (_AsyncLocalStorage) {
+      als = new _AsyncLocalStorage();
+    } else {
+      console.warn("[unctx] `AsyncLocalStorage` is not provided.");
+    }
+  }
+  const _getCurrentInstance = () => {
+    if (als) {
+      const instance = als.getStore();
+      if (instance !== void 0) {
+        return instance;
+      }
+    }
+    return currentInstance;
+  };
+  return {
+    use: () => {
+      const _instance = _getCurrentInstance();
+      if (_instance === void 0) {
+        throw new Error("Context is not available");
+      }
+      return _instance;
+    },
+    tryUse: () => {
+      return _getCurrentInstance();
+    },
+    set: (instance, replace) => {
+      if (!replace) {
+        checkConflict(instance);
+      }
+      currentInstance = instance;
+      isSingleton = true;
+    },
+    unset: () => {
+      currentInstance = void 0;
+      isSingleton = false;
+    },
+    call: (instance, callback) => {
+      checkConflict(instance);
+      currentInstance = instance;
+      try {
+        return als ? als.run(instance, callback) : callback();
+      } finally {
+        if (!isSingleton) {
+          currentInstance = void 0;
+        }
+      }
+    },
+    async callAsync(instance, callback) {
+      currentInstance = instance;
+      const onRestore = () => {
+        currentInstance = instance;
+      };
+      const onLeave = () => currentInstance === instance ? onRestore : void 0;
+      asyncHandlers.add(onLeave);
+      try {
+        const r = als ? als.run(instance, callback) : callback();
+        if (!isSingleton) {
+          currentInstance = void 0;
+        }
+        return await r;
+      } finally {
+        asyncHandlers.delete(onLeave);
+      }
+    }
+  };
+}
+function createNamespace(defaultOpts = {}) {
+  const contexts = {};
+  return {
+    get(key, opts = {}) {
+      if (!contexts[key]) {
+        contexts[key] = createContext({ ...defaultOpts, ...opts });
+      }
+      return contexts[key];
+    }
+  };
+}
+const _globalThis = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : typeof global !== "undefined" ? global : {};
+const globalKey = "__unctx__";
+const defaultNamespace = _globalThis[globalKey] || (_globalThis[globalKey] = createNamespace());
+const getContext = (key, opts = {}) => defaultNamespace.get(key, opts);
+const asyncHandlersKey = "__unctx_async_handlers__";
+const asyncHandlers = _globalThis[asyncHandlersKey] || (_globalThis[asyncHandlersKey] = /* @__PURE__ */ new Set());
+function executeAsync(function_) {
+  const restores = [];
+  for (const leaveHandler of asyncHandlers) {
+    const restore2 = leaveHandler();
+    if (restore2) {
+      restores.push(restore2);
+    }
+  }
+  const restore = () => {
+    for (const restore2 of restores) {
+      restore2();
+    }
+  };
+  let awaitable = function_();
+  if (awaitable && typeof awaitable === "object" && "catch" in awaitable) {
+    awaitable = awaitable.catch((error) => {
+      restore();
+      throw error;
+    });
+  }
+  return [awaitable, restore];
+}
+
+const HASH_RE = /#/g;
+const AMPERSAND_RE = /&/g;
+const SLASH_RE = /\//g;
+const EQUAL_RE = /=/g;
+const IM_RE = /\?/g;
+const PLUS_RE = /\+/g;
+const ENC_CARET_RE = /%5e/gi;
+const ENC_BACKTICK_RE = /%60/gi;
+const ENC_PIPE_RE = /%7c/gi;
+const ENC_SPACE_RE = /%20/gi;
+const ENC_SLASH_RE = /%2f/gi;
+const ENC_ENC_SLASH_RE = /%252f/gi;
+function encode(text) {
+  return encodeURI("" + text).replace(ENC_PIPE_RE, "|");
+}
+function encodeQueryValue(input) {
+  return encode(typeof input === "string" ? input : JSON.stringify(input)).replace(PLUS_RE, "%2B").replace(ENC_SPACE_RE, "+").replace(HASH_RE, "%23").replace(AMPERSAND_RE, "%26").replace(ENC_BACKTICK_RE, "`").replace(ENC_CARET_RE, "^").replace(SLASH_RE, "%2F");
+}
+function encodeQueryKey(text) {
+  return encodeQueryValue(text).replace(EQUAL_RE, "%3D");
+}
+function encodePath(text) {
+  return encode(text).replace(HASH_RE, "%23").replace(IM_RE, "%3F").replace(ENC_ENC_SLASH_RE, "%2F").replace(AMPERSAND_RE, "%26").replace(PLUS_RE, "%2B");
+}
+function decode$1(text = "") {
+  try {
+    return decodeURIComponent("" + text);
+  } catch {
+    return "" + text;
+  }
+}
+function decodePath(text) {
+  return decode$1(text.replace(ENC_SLASH_RE, "%252F"));
+}
+function decodeQueryKey(text) {
+  return decode$1(text.replace(PLUS_RE, " "));
+}
+function decodeQueryValue(text) {
+  return decode$1(text.replace(PLUS_RE, " "));
+}
+
+function parseQuery(parametersString = "") {
+  const object = /* @__PURE__ */ Object.create(null);
+  if (parametersString[0] === "?") {
+    parametersString = parametersString.slice(1);
+  }
+  for (const parameter of parametersString.split("&")) {
+    const s = parameter.match(/([^=]+)=?(.*)/) || [];
+    if (s.length < 2) {
+      continue;
+    }
+    const key = decodeQueryKey(s[1]);
+    if (key === "__proto__" || key === "constructor") {
+      continue;
+    }
+    const value = decodeQueryValue(s[2] || "");
+    if (object[key] === void 0) {
+      object[key] = value;
+    } else if (Array.isArray(object[key])) {
+      object[key].push(value);
+    } else {
+      object[key] = [object[key], value];
+    }
+  }
+  return object;
+}
+function encodeQueryItem(key, value) {
+  if (typeof value === "number" || typeof value === "boolean") {
+    value = String(value);
+  }
+  if (!value) {
+    return encodeQueryKey(key);
+  }
+  if (Array.isArray(value)) {
+    return value.map(
+      (_value) => `${encodeQueryKey(key)}=${encodeQueryValue(_value)}`
+    ).join("&");
+  }
+  return `${encodeQueryKey(key)}=${encodeQueryValue(value)}`;
+}
+function stringifyQuery(query) {
+  return Object.keys(query).filter((k) => query[k] !== void 0).map((k) => encodeQueryItem(k, query[k])).filter(Boolean).join("&");
+}
+
+const PROTOCOL_STRICT_REGEX = /^[\s\w\0+.-]{2,}:([/\\]{1,2})/;
+const PROTOCOL_REGEX = /^[\s\w\0+.-]{2,}:([/\\]{2})?/;
+const PROTOCOL_RELATIVE_REGEX = /^([/\\]\s*){2,}[^/\\]/;
+const PROTOCOL_SCRIPT_RE = /^[\s\0]*(blob|data|javascript|vbscript):$/i;
+const TRAILING_SLASH_RE = /\/$|\/\?|\/#/;
+const JOIN_LEADING_SLASH_RE = /^\.?\//;
+function hasProtocol(inputString, opts = {}) {
+  if (typeof opts === "boolean") {
+    opts = { acceptRelative: opts };
+  }
+  if (opts.strict) {
+    return PROTOCOL_STRICT_REGEX.test(inputString);
+  }
+  return PROTOCOL_REGEX.test(inputString) || (opts.acceptRelative ? PROTOCOL_RELATIVE_REGEX.test(inputString) : false);
+}
+function isScriptProtocol(protocol) {
+  return !!protocol && PROTOCOL_SCRIPT_RE.test(protocol);
+}
+function hasTrailingSlash(input = "", respectQueryAndFragment) {
+  if (!respectQueryAndFragment) {
+    return input.endsWith("/");
+  }
+  return TRAILING_SLASH_RE.test(input);
+}
+function withoutTrailingSlash(input = "", respectQueryAndFragment) {
+  if (!respectQueryAndFragment) {
+    return (hasTrailingSlash(input) ? input.slice(0, -1) : input) || "/";
+  }
+  if (!hasTrailingSlash(input, true)) {
+    return input || "/";
+  }
+  let path = input;
+  let fragment = "";
+  const fragmentIndex = input.indexOf("#");
+  if (fragmentIndex !== -1) {
+    path = input.slice(0, fragmentIndex);
+    fragment = input.slice(fragmentIndex);
+  }
+  const [s0, ...s] = path.split("?");
+  const cleanPath = s0.endsWith("/") ? s0.slice(0, -1) : s0;
+  return (cleanPath || "/") + (s.length > 0 ? `?${s.join("?")}` : "") + fragment;
+}
+function withTrailingSlash(input = "", respectQueryAndFragment) {
+  if (!respectQueryAndFragment) {
+    return input.endsWith("/") ? input : input + "/";
+  }
+  if (hasTrailingSlash(input, true)) {
+    return input || "/";
+  }
+  let path = input;
+  let fragment = "";
+  const fragmentIndex = input.indexOf("#");
+  if (fragmentIndex !== -1) {
+    path = input.slice(0, fragmentIndex);
+    fragment = input.slice(fragmentIndex);
+    if (!path) {
+      return fragment;
+    }
+  }
+  const [s0, ...s] = path.split("?");
+  return s0 + "/" + (s.length > 0 ? `?${s.join("?")}` : "") + fragment;
+}
+function withQuery(input, query) {
+  const parsed = parseURL(input);
+  const mergedQuery = { ...parseQuery(parsed.search), ...query };
+  parsed.search = stringifyQuery(mergedQuery);
+  return stringifyParsedURL(parsed);
+}
+function isNonEmptyURL(url) {
+  return url && url !== "/";
+}
+function joinURL(base, ...input) {
+  let url = base || "";
+  for (const segment of input.filter((url2) => isNonEmptyURL(url2))) {
+    if (url) {
+      const _segment = segment.replace(JOIN_LEADING_SLASH_RE, "");
+      url = withTrailingSlash(url) + _segment;
+    } else {
+      url = segment;
+    }
+  }
+  return url;
+}
+
+const protocolRelative = Symbol.for("ufo:protocolRelative");
+function parseURL(input = "", defaultProto) {
+  const _specialProtoMatch = input.match(
+    /^[\s\0]*(blob:|data:|javascript:|vbscript:)(.*)/i
+  );
+  if (_specialProtoMatch) {
+    const [, _proto, _pathname = ""] = _specialProtoMatch;
+    return {
+      protocol: _proto.toLowerCase(),
+      pathname: _pathname,
+      href: _proto + _pathname,
+      auth: "",
+      host: "",
+      search: "",
+      hash: ""
+    };
+  }
+  if (!hasProtocol(input, { acceptRelative: true })) {
+    return parsePath(input);
+  }
+  const [, protocol = "", auth, hostAndPath = ""] = input.replace(/\\/g, "/").match(/^[\s\0]*([\w+.-]{2,}:)?\/\/([^/@]+@)?(.*)/) || [];
+  let [, host = "", path = ""] = hostAndPath.match(/([^#/?]*)(.*)?/) || [];
+  if (protocol === "file:") {
+    path = path.replace(/\/(?=[A-Za-z]:)/, "");
+  }
+  const { pathname, search, hash } = parsePath(path);
+  return {
+    protocol: protocol.toLowerCase(),
+    auth: auth ? auth.slice(0, Math.max(0, auth.length - 1)) : "",
+    host,
+    pathname,
+    search,
+    hash,
+    [protocolRelative]: !protocol
+  };
+}
+function parsePath(input = "") {
+  const [pathname = "", search = "", hash = ""] = (input.match(/([^#?]*)(\?[^#]*)?(#.*)?/) || []).splice(1);
+  return {
+    pathname,
+    search,
+    hash
+  };
+}
+function stringifyParsedURL(parsed) {
+  const pathname = parsed.pathname || "";
+  const search = parsed.search ? (parsed.search.startsWith("?") ? "" : "?") + parsed.search : "";
+  const hash = parsed.hash || "";
+  const auth = parsed.auth ? parsed.auth + "@" : "";
+  const host = parsed.host || "";
+  const proto = parsed.protocol || parsed[protocolRelative] ? (parsed.protocol || "") + "//" : "";
+  return proto + auth + host + pathname + search + hash;
+}
+
+function parse(str, options) {
+  if (typeof str !== "string") {
+    throw new TypeError("argument str must be a string");
+  }
+  const obj = {};
+  const opt = {};
+  const dec = opt.decode || decode;
+  let index = 0;
+  while (index < str.length) {
+    const eqIdx = str.indexOf("=", index);
+    if (eqIdx === -1) {
+      break;
+    }
+    let endIdx = str.indexOf(";", index);
+    if (endIdx === -1) {
+      endIdx = str.length;
+    } else if (endIdx < eqIdx) {
+      index = str.lastIndexOf(";", eqIdx - 1) + 1;
+      continue;
+    }
+    const key = str.slice(index, eqIdx).trim();
+    if (opt?.filter && !opt?.filter(key)) {
+      index = endIdx + 1;
+      continue;
+    }
+    if (void 0 === obj[key]) {
+      let val = str.slice(eqIdx + 1, endIdx).trim();
+      if (val.codePointAt(0) === 34) {
+        val = val.slice(1, -1);
+      }
+      obj[key] = tryDecode(val, dec);
+    }
+    index = endIdx + 1;
+  }
+  return obj;
+}
+function decode(str) {
+  return str.includes("%") ? decodeURIComponent(str) : str;
+}
+function tryDecode(str, decode2) {
+  try {
+    return decode2(str);
+  } catch {
+    return str;
+  }
+}
+
+const fieldContentRegExp = /^[\u0009\u0020-\u007E\u0080-\u00FF]+$/;
+function serialize$1(name, value, options) {
+  const opt = options || {};
+  const enc = opt.encode || encodeURIComponent;
+  if (typeof enc !== "function") {
+    throw new TypeError("option encode is invalid");
+  }
+  if (!fieldContentRegExp.test(name)) {
+    throw new TypeError("argument name is invalid");
+  }
+  const encodedValue = enc(value);
+  if (encodedValue && !fieldContentRegExp.test(encodedValue)) {
+    throw new TypeError("argument val is invalid");
+  }
+  let str = name + "=" + encodedValue;
+  if (void 0 !== opt.maxAge && opt.maxAge !== null) {
+    const maxAge = opt.maxAge - 0;
+    if (Number.isNaN(maxAge) || !Number.isFinite(maxAge)) {
+      throw new TypeError("option maxAge is invalid");
+    }
+    str += "; Max-Age=" + Math.floor(maxAge);
+  }
+  if (opt.domain) {
+    if (!fieldContentRegExp.test(opt.domain)) {
+      throw new TypeError("option domain is invalid");
+    }
+    str += "; Domain=" + opt.domain;
+  }
+  if (opt.path) {
+    if (!fieldContentRegExp.test(opt.path)) {
+      throw new TypeError("option path is invalid");
+    }
+    str += "; Path=" + opt.path;
+  }
+  if (opt.expires) {
+    if (!isDate(opt.expires) || Number.isNaN(opt.expires.valueOf())) {
+      throw new TypeError("option expires is invalid");
+    }
+    str += "; Expires=" + opt.expires.toUTCString();
+  }
+  if (opt.httpOnly) {
+    str += "; HttpOnly";
+  }
+  if (opt.secure) {
+    str += "; Secure";
+  }
+  if (opt.priority) {
+    const priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
+    switch (priority) {
+      case "low": {
+        str += "; Priority=Low";
+        break;
+      }
+      case "medium": {
+        str += "; Priority=Medium";
+        break;
+      }
+      case "high": {
+        str += "; Priority=High";
+        break;
+      }
+      default: {
+        throw new TypeError("option priority is invalid");
+      }
+    }
+  }
+  if (opt.sameSite) {
+    const sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
+    switch (sameSite) {
+      case true: {
+        str += "; SameSite=Strict";
+        break;
+      }
+      case "lax": {
+        str += "; SameSite=Lax";
+        break;
+      }
+      case "strict": {
+        str += "; SameSite=Strict";
+        break;
+      }
+      case "none": {
+        str += "; SameSite=None";
+        break;
+      }
+      default: {
+        throw new TypeError("option sameSite is invalid");
+      }
+    }
+  }
+  if (opt.partitioned) {
+    str += "; Partitioned";
+  }
+  return str;
+}
+function isDate(val) {
+  return Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date;
+}
+
+function parseSetCookie(setCookieValue, options) {
+  const parts = (setCookieValue || "").split(";").filter((str) => typeof str === "string" && !!str.trim());
+  const nameValuePairStr = parts.shift() || "";
+  const parsed = _parseNameValuePair(nameValuePairStr);
+  const name = parsed.name;
+  let value = parsed.value;
+  try {
+    value = options?.decode === false ? value : (options?.decode || decodeURIComponent)(value);
+  } catch {
+  }
+  const cookie = {
+    name,
+    value
+  };
+  for (const part of parts) {
+    const sides = part.split("=");
+    const partKey = (sides.shift() || "").trimStart().toLowerCase();
+    const partValue = sides.join("=");
+    switch (partKey) {
+      case "expires": {
+        cookie.expires = new Date(partValue);
+        break;
+      }
+      case "max-age": {
+        cookie.maxAge = Number.parseInt(partValue, 10);
+        break;
+      }
+      case "secure": {
+        cookie.secure = true;
+        break;
+      }
+      case "httponly": {
+        cookie.httpOnly = true;
+        break;
+      }
+      case "samesite": {
+        cookie.sameSite = partValue;
+        break;
+      }
+      default: {
+        cookie[partKey] = partValue;
+      }
+    }
+  }
+  return cookie;
+}
+function _parseNameValuePair(nameValuePairStr) {
+  let name = "";
+  let value = "";
+  const nameValueArr = nameValuePairStr.split("=");
+  if (nameValueArr.length > 1) {
+    name = nameValueArr.shift();
+    value = nameValueArr.join("=");
+  } else {
+    value = nameValuePairStr;
+  }
+  return { name, value };
+}
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== null && prototype !== Object.prototype && Object.getPrototypeOf(prototype) !== null) {
+    return false;
+  }
+  if (Symbol.iterator in value) {
+    return false;
+  }
+  if (Symbol.toStringTag in value) {
+    return Object.prototype.toString.call(value) === "[object Module]";
+  }
+  return true;
+}
+
+function _defu(baseObject, defaults, namespace = ".", merger) {
+  if (!isPlainObject(defaults)) {
+    return _defu(baseObject, {}, namespace, merger);
+  }
+  const object = Object.assign({}, defaults);
+  for (const key in baseObject) {
+    if (key === "__proto__" || key === "constructor") {
+      continue;
+    }
+    const value = baseObject[key];
+    if (value === null || value === void 0) {
+      continue;
+    }
+    if (merger && merger(object, key, value, namespace)) {
+      continue;
+    }
+    if (Array.isArray(value) && Array.isArray(object[key])) {
+      object[key] = [...value, ...object[key]];
+    } else if (isPlainObject(value) && isPlainObject(object[key])) {
+      object[key] = _defu(
+        value,
+        object[key],
+        (namespace ? `${namespace}.` : "") + key.toString(),
+        merger
+      );
+    } else {
+      object[key] = value;
+    }
+  }
+  return object;
+}
+function createDefu(merger) {
+  return (...arguments_) => (
+    // eslint-disable-next-line unicorn/no-array-reduce
+    arguments_.reduce((p, c) => _defu(p, c, "", merger), {})
+  );
+}
+const defu = createDefu();
+
+function hasProp(obj, prop) {
+  try {
+    return prop in obj;
+  } catch {
+    return false;
+  }
+}
+
+class H3Error extends Error {
+  static __h3_error__ = true;
+  statusCode = 500;
+  fatal = false;
+  unhandled = false;
+  statusMessage;
+  data;
+  cause;
+  constructor(message, opts = {}) {
+    super(message, opts);
+    if (opts.cause && !this.cause) {
+      this.cause = opts.cause;
+    }
+  }
+  toJSON() {
+    const obj = {
+      message: this.message,
+      statusCode: sanitizeStatusCode(this.statusCode, 500)
+    };
+    if (this.statusMessage) {
+      obj.statusMessage = sanitizeStatusMessage(this.statusMessage);
+    }
+    if (this.data !== void 0) {
+      obj.data = this.data;
+    }
+    return obj;
+  }
+}
+function createError$1(input) {
+  if (typeof input === "string") {
+    return new H3Error(input);
+  }
+  if (isError(input)) {
+    return input;
+  }
+  const err = new H3Error(input.message ?? input.statusMessage ?? "", {
+    cause: input.cause || input
+  });
+  if (hasProp(input, "stack")) {
+    try {
+      Object.defineProperty(err, "stack", {
+        get() {
+          return input.stack;
+        }
+      });
+    } catch {
+      try {
+        err.stack = input.stack;
+      } catch {
+      }
+    }
+  }
+  if (input.data) {
+    err.data = input.data;
+  }
+  if (input.statusCode) {
+    err.statusCode = sanitizeStatusCode(input.statusCode, err.statusCode);
+  } else if (input.status) {
+    err.statusCode = sanitizeStatusCode(input.status, err.statusCode);
+  }
+  if (input.statusMessage) {
+    err.statusMessage = input.statusMessage;
+  } else if (input.statusText) {
+    err.statusMessage = input.statusText;
+  }
+  if (err.statusMessage) {
+    const originalMessage = err.statusMessage;
+    const sanitizedMessage = sanitizeStatusMessage(err.statusMessage);
+    if (sanitizedMessage !== originalMessage) {
+      console.warn(
+        "[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default."
+      );
+    }
+  }
+  if (input.fatal !== void 0) {
+    err.fatal = input.fatal;
+  }
+  if (input.unhandled !== void 0) {
+    err.unhandled = input.unhandled;
+  }
+  return err;
+}
+function isError(input) {
+  return input?.constructor?.__h3_error__ === true;
+}
+function getRequestHeaders(event) {
+  const _headers = {};
+  for (const key in event.node.req.headers) {
+    const val = event.node.req.headers[key];
+    _headers[key] = Array.isArray(val) ? val.filter(Boolean).join(", ") : val;
+  }
+  return _headers;
+}
+function getRequestHeader(event, name) {
+  const headers = getRequestHeaders(event);
+  const value = headers[name.toLowerCase()];
+  return value;
+}
+
+const DISALLOWED_STATUS_CHARS = /[^\u0009\u0020-\u007E]/g;
+function sanitizeStatusMessage(statusMessage = "") {
+  return statusMessage.replace(DISALLOWED_STATUS_CHARS, "");
+}
+function sanitizeStatusCode(statusCode, defaultStatusCode = 200) {
+  if (!statusCode) {
+    return defaultStatusCode;
+  }
+  if (typeof statusCode === "string") {
+    statusCode = Number.parseInt(statusCode, 10);
+  }
+  if (statusCode < 100 || statusCode > 999) {
+    return defaultStatusCode;
+  }
+  return statusCode;
+}
+
+function getDistinctCookieKey(name, opts) {
+  return [name, opts.domain || "", opts.path || "/"].join(";");
+}
+
+function parseCookies(event) {
+  return parse(event.node.req.headers.cookie || "");
+}
+function getCookie(event, name) {
+  return parseCookies(event)[name];
+}
+function setCookie(event, name, value, serializeOptions = {}) {
+  if (!serializeOptions.path) {
+    serializeOptions = { path: "/", ...serializeOptions };
+  }
+  const newCookie = serialize$1(name, value, serializeOptions);
+  const currentCookies = splitCookiesString(
+    event.node.res.getHeader("set-cookie")
+  );
+  if (currentCookies.length === 0) {
+    event.node.res.setHeader("set-cookie", newCookie);
+    return;
+  }
+  const newCookieKey = getDistinctCookieKey(name, serializeOptions);
+  event.node.res.removeHeader("set-cookie");
+  for (const cookie of currentCookies) {
+    const parsed = parseSetCookie(cookie);
+    const key = getDistinctCookieKey(parsed.name, parsed);
+    if (key === newCookieKey) {
+      continue;
+    }
+    event.node.res.appendHeader("set-cookie", cookie);
+  }
+  event.node.res.appendHeader("set-cookie", newCookie);
+}
+function deleteCookie(event, name, serializeOptions) {
+  setCookie(event, name, "", {
+    ...serializeOptions,
+    maxAge: 0
+  });
+}
+function splitCookiesString(cookiesString) {
+  if (Array.isArray(cookiesString)) {
+    return cookiesString.flatMap((c) => splitCookiesString(c));
+  }
+  if (typeof cookiesString !== "string") {
+    return [];
+  }
+  const cookiesStrings = [];
+  let pos = 0;
+  let start;
+  let ch;
+  let lastComma;
+  let nextStart;
+  let cookiesSeparatorFound;
+  const skipWhitespace = () => {
+    while (pos < cookiesString.length && /\s/.test(cookiesString.charAt(pos))) {
+      pos += 1;
+    }
+    return pos < cookiesString.length;
+  };
+  const notSpecialChar = () => {
+    ch = cookiesString.charAt(pos);
+    return ch !== "=" && ch !== ";" && ch !== ",";
+  };
+  while (pos < cookiesString.length) {
+    start = pos;
+    cookiesSeparatorFound = false;
+    while (skipWhitespace()) {
+      ch = cookiesString.charAt(pos);
+      if (ch === ",") {
+        lastComma = pos;
+        pos += 1;
+        skipWhitespace();
+        nextStart = pos;
+        while (pos < cookiesString.length && notSpecialChar()) {
+          pos += 1;
+        }
+        if (pos < cookiesString.length && cookiesString.charAt(pos) === "=") {
+          cookiesSeparatorFound = true;
+          pos = nextStart;
+          cookiesStrings.push(cookiesString.slice(start, lastComma));
+          start = pos;
+        } else {
+          pos = lastComma + 1;
+        }
+      } else {
+        pos += 1;
+      }
+    }
+    if (!cookiesSeparatorFound || pos >= cookiesString.length) {
+      cookiesStrings.push(cookiesString.slice(start));
+    }
+  }
+  return cookiesStrings;
+}
+
+typeof setImmediate === "undefined" ? (fn) => fn() : setImmediate;
+
+function serialize(o){return typeof o=="string"?`'${o}'`:new c().serialize(o)}const c=/*@__PURE__*/function(){class o{#t=new Map;compare(t,r){const e=typeof t,n=typeof r;return e==="string"&&n==="string"?t.localeCompare(r):e==="number"&&n==="number"?t-r:String.prototype.localeCompare.call(this.serialize(t,true),this.serialize(r,true))}serialize(t,r){if(t===null)return "null";switch(typeof t){case "string":return r?t:`'${t}'`;case "bigint":return `${t}n`;case "object":return this.$object(t);case "function":return this.$function(t)}return String(t)}serializeObject(t){const r=Object.prototype.toString.call(t);if(r!=="[object Object]")return this.serializeBuiltInType(r.length<10?`unknown:${r}`:r.slice(8,-1),t);const e=t.constructor,n=e===Object||e===void 0?"":e.name;if(n!==""&&globalThis[n]===e)return this.serializeBuiltInType(n,t);if(typeof t.toJSON=="function"){const i=t.toJSON();return n+(i!==null&&typeof i=="object"?this.$object(i):`(${this.serialize(i)})`)}return this.serializeObjectEntries(n,Object.entries(t))}serializeBuiltInType(t,r){const e=this["$"+t];if(e)return e.call(this,r);if(typeof r?.entries=="function")return this.serializeObjectEntries(t,r.entries());throw new Error(`Cannot serialize ${t}`)}serializeObjectEntries(t,r){const e=Array.from(r).sort((i,a)=>this.compare(i[0],a[0]));let n=`${t}{`;for(let i=0;i<e.length;i++){const[a,l]=e[i];n+=`${this.serialize(a,true)}:${this.serialize(l)}`,i<e.length-1&&(n+=",");}return n+"}"}$object(t){let r=this.#t.get(t);return r===void 0&&(this.#t.set(t,`#${this.#t.size}`),r=this.serializeObject(t),this.#t.set(t,r)),r}$function(t){const r=Function.prototype.toString.call(t);return r.slice(-15)==="[native code] }"?`${t.name||""}()[native]`:`${t.name}(${t.length})${r.replace(/\s*\n\s*/g,"")}`}$Array(t){let r="[";for(let e=0;e<t.length;e++)r+=this.serialize(t[e]),e<t.length-1&&(r+=",");return r+"]"}$Date(t){try{return `Date(${t.toISOString()})`}catch{return "Date(null)"}}$ArrayBuffer(t){return `ArrayBuffer[${new Uint8Array(t).join(",")}]`}$Set(t){return `Set${this.$Array(Array.from(t).sort((r,e)=>this.compare(r,e)))}`}$Map(t){return this.serializeObjectEntries("Map",t.entries())}}for(const s of ["Error","RegExp","URL"])o.prototype["$"+s]=function(t){return `${s}(${t})`};for(const s of ["Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array"])o.prototype["$"+s]=function(t){return `${s}[${t.join(",")}]`};for(const s of ["BigInt64Array","BigUint64Array"])o.prototype["$"+s]=function(t){return `${s}[${t.join("n,")}${t.length>0?"n":""}]`};return o}();
+
+function isEqual(object1, object2) {
+  if (object1 === object2) {
+    return true;
+  }
+  if (serialize(object1) === serialize(object2)) {
+    return true;
+  }
+  return false;
+}
+
+const e=globalThis.process?.getBuiltinModule?.("crypto")?.hash,r="sha256",s="base64url";function digest(t){if(e)return e(r,t,s);const o=createHash(r).update(t);return globalThis.process?.versions?.webcontainer?o.digest().toString(s):o.digest(s)}
+
+function hash(input) {
+  return digest(serialize(input));
+}
+
+function klona(x) {
+	if (typeof x !== 'object') return x;
+
+	var k, tmp, str=Object.prototype.toString.call(x);
+
+	if (str === '[object Object]') {
+		if (x.constructor !== Object && typeof x.constructor === 'function') {
+			tmp = new x.constructor();
+			for (k in x) {
+				if (x.hasOwnProperty(k) && tmp[k] !== x[k]) {
+					tmp[k] = klona(x[k]);
+				}
+			}
+		} else {
+			tmp = {}; // null
+			for (k in x) {
+				if (k === '__proto__') {
+					Object.defineProperty(tmp, k, {
+						value: klona(x[k]),
+						configurable: true,
+						enumerable: true,
+						writable: true,
+					});
+				} else {
+					tmp[k] = klona(x[k]);
+				}
+			}
+		}
+		return tmp;
+	}
+
+	if (str === '[object Array]') {
+		k = x.length;
+		for (tmp=Array(k); k--;) {
+			tmp[k] = klona(x[k]);
+		}
+		return tmp;
+	}
+
+	if (str === '[object Set]') {
+		tmp = new Set;
+		x.forEach(function (val) {
+			tmp.add(klona(val));
+		});
+		return tmp;
+	}
+
+	if (str === '[object Map]') {
+		tmp = new Map;
+		x.forEach(function (val, key) {
+			tmp.set(klona(key), klona(val));
+		});
+		return tmp;
+	}
+
+	if (str === '[object Date]') {
+		return new Date(+x);
+	}
+
+	if (str === '[object RegExp]') {
+		tmp = new RegExp(x.source, x.flags);
+		tmp.lastIndex = x.lastIndex;
+		return tmp;
+	}
+
+	if (str === '[object DataView]') {
+		return new x.constructor( klona(x.buffer) );
+	}
+
+	if (str === '[object ArrayBuffer]') {
+		return x.slice(0);
+	}
+
+	// ArrayBuffer.isView(x)
+	// ~> `new` bcuz `Buffer.slice` => ref
+	if (str.slice(-6) === 'Array]') {
+		return new x.constructor(x);
+	}
+
+	return x;
+}
+
+const VueResolver = (_, value) => {
+  return isRef(value) ? toValue(value) : value;
+};
+
+const headSymbol = "usehead";
+
+// @__NO_SIDE_EFFECTS__
+function injectHead$1() {
+  if (hasInjectionContext()) {
+    const instance = inject(headSymbol);
+    if (instance) {
+      return instance;
+    }
+  }
+  throw new Error("useHead() was called without provide context, ensure you call it through the setup() function.");
+}
+function useHead$1(input, options = {}) {
+  const head = options.head || /* @__PURE__ */ injectHead$1();
+  return head.ssr ? head.push(input || {}, options) : clientUseHead(head, input, options);
+}
+function clientUseHead(head, input, options = {}) {
+  const deactivated = ref(false);
+  let entry;
+  watchEffect(() => {
+    const i = deactivated.value ? {} : walkResolver(input, VueResolver);
+    if (entry) {
+      entry.patch(i);
+    } else {
+      entry = head.push(i, options);
+    }
+  });
+  const vm = getCurrentInstance();
+  if (vm) {
+    onBeforeUnmount(() => {
+      entry.dispose();
+    });
+    onDeactivated(() => {
+      deactivated.value = true;
+    });
+    onActivated(() => {
+      deactivated.value = false;
+    });
+  }
+  return entry;
+}
+function useSeoMeta$1(input = {}, options = {}) {
+  const head = options.head || /* @__PURE__ */ injectHead$1();
+  head.use(FlatMetaPlugin);
+  const { title, titleTemplate, ...meta } = input;
+  return useHead$1({
+    title,
+    titleTemplate,
+    _flatMeta: meta
+  }, options);
+}
+
 function diff(obj1, obj2) {
   const h1 = _toHashedObject(obj1);
   const h2 = _toHashedObject(obj2);
@@ -269,7 +1234,7 @@ function _diff(h1, h2) {
 }
 function _toHashedObject(obj, key = "") {
   if (obj && typeof obj !== "object") {
-    return new DiffHashedObject(key, obj, serialize(obj));
+    return new DiffHashedObject(key, obj, serialize$2(obj));
   }
   const props = {};
   const hashes = [];
@@ -727,7 +1692,7 @@ function useSeoMeta(input, options = {}) {
 const matcher = (m, p) => {
   return [];
 };
-const _routeRulesMatcher = (path) => defu({}, ...matcher().map((r) => r.data).reverse());
+const _routeRulesMatcher = (path) => defu$1({}, ...matcher().map((r) => r.data).reverse());
 const routeRulesMatcher$1 = _routeRulesMatcher;
 function getRouteRules(arg) {
   const path = typeof arg === "string" ? arg : arg.path;
@@ -750,7 +1715,7 @@ const payloadPlugin = definePayloadPlugin(() => {
     (data) => !shouldHydrate(data) && 1
   );
 });
-const unhead_k2P3m_ZDyjlr2mMYnoDPwavjsDN8hBlk9cFai0bbopU = /* @__PURE__ */ defineNuxtPlugin({
+const unhead_qe3fQ4FQKwdWzPfdeD9rnVnSlcLW_cWS_uEveE0an_0 = /* @__PURE__ */ defineNuxtPlugin({
   name: "nuxt:head",
   enforce: "pre",
   setup(nuxtApp) {
@@ -768,68 +1733,68 @@ const _routes = [
   {
     name: "barbers-queue-id",
     path: "/barbers/queue/:id()",
-    component: () => import('./_id_-YrsTjhEJ.mjs')
+    component: () => import('./_id_-DKlNJ_43.mjs')
   },
   {
     name: "barbers-workspace",
     path: "/barbers/workspace",
-    component: () => import('./workspace-BtXQa4u5.mjs')
+    component: () => import('./workspace-1Cb619gJ.mjs')
   },
   {
     name: "history-barber",
     path: "/history/barber",
-    component: () => import('./barber-BGYo8gFI.mjs')
+    component: () => import('./barber-BuqXy9IX.mjs')
   },
   {
     name: "marketplace-banners",
     path: "/marketplace/banners",
-    component: () => import('./banners-CIvow06Y.mjs')
+    component: () => import('./banners-CQ0UsfPq.mjs')
   },
   {
     name: "api-debug",
     path: "/api-debug",
-    component: () => import('./api-debug-B7GGnog6.mjs')
+    component: () => import('./api-debug-B1XsfMBp.mjs')
   },
   {
     name: "certificates",
     path: "/certificates",
-    component: () => import('./certificates-ApkoJuN9.mjs')
+    component: () => import('./certificates-mEgC4NDZ.mjs')
   },
   {
     name: "history",
     path: "/history",
-    component: () => import('./index-CSA4hAce.mjs')
+    component: () => import('./index-bxxO4lWv.mjs')
   },
   {
     name: "kiosk",
     path: "/kiosk",
-    component: () => import('./kiosk-D59ztNOP.mjs')
+    component: () => import('./kiosk-DIk478HW.mjs')
   },
   {
     name: "login",
     path: "/login",
     meta: { ...__nuxt_page_meta || {}, ...{ "middleware": "guest-only" } },
-    component: () => import('./login-Bqq2YVf1.mjs')
+    component: () => import('./login-CbuY2-jF.mjs')
   },
   {
     name: "promo-codes",
     path: "/promo-codes",
-    component: () => import('./promo-codes-C0DNRiqS.mjs')
+    component: () => import('./promo-codes-BEYhpK4Q.mjs')
   },
   {
     name: "services",
     path: "/services",
-    component: () => import('./services-DE9hTe5v.mjs')
+    component: () => import('./services-DZRVGc59.mjs')
   },
   {
     name: "statistics",
     path: "/statistics",
-    component: () => import('./statistics-DqWd9Cin.mjs')
+    component: () => import('./statistics-DNLCV3iA.mjs')
   },
   {
     name: "index",
     path: "/",
-    component: () => import('./index-DgLCkW4_.mjs')
+    component: () => import('./index-CfyOMG60.mjs')
   }
 ];
 const _wrapInTransition = (props, children) => {
@@ -1396,7 +2361,7 @@ const auth_45global = /* @__PURE__ */ defineNuxtRouteMiddleware(async (to) => {
     return;
   }
   const sessionStore = useSessionStore();
-  [__temp, __restore] = executeAsync(() => sessionStore.ensureLoaded()), await __temp, __restore();
+  [__temp, __restore] = executeAsync$1(() => sessionStore.ensureLoaded()), await __temp, __restore();
   if (!sessionStore.isAuthenticated) {
     return navigateTo("/login");
   }
@@ -1412,7 +2377,7 @@ const globalMiddleware = [
   manifest_45route_45rule
 ];
 const namedMiddleware = {
-  "guest-only": () => import('./guest-only-CMXDyfdP.mjs')
+  "guest-only": () => import('./guest-only-Bx1LhXv_.mjs')
 };
 const plugin$1 = /* @__PURE__ */ defineNuxtPlugin({
   name: "nuxt:router",
@@ -1612,7 +2577,7 @@ const plugin$1 = /* @__PURE__ */ defineNuxtPlugin({
     return { provide: { router } };
   }
 });
-const debug_hooks_hyXe6laRLyyi6S6XoqeItfe9HTFGNswlS09LT9GQbmQ = /* @__PURE__ */ defineNuxtPlugin({
+const debug_hooks_B93iOX3P4gejK5qoNTlL6w_t4RWrZWMMaInzWlY9N50 = /* @__PURE__ */ defineNuxtPlugin({
   name: "nuxt:debug:hooks",
   enforce: "pre",
   setup(nuxtApp) {
@@ -1628,7 +2593,7 @@ const reducers = [
   ["Ref", (data) => isRef(data) && data.value],
   ["Reactive", (data) => isReactive(data) && toRaw(data)]
 ];
-const revive_payload_server_MVtmlZaQpj6ApFmshWfUWl5PehCebzaBf2NuRMiIbms = /* @__PURE__ */ defineNuxtPlugin({
+const revive_payload_server___JI1fBdxHJd4JbWfrOSPlsvGxHd_8coFURhh6frGYo = /* @__PURE__ */ defineNuxtPlugin({
   name: "nuxt:revive-payload:server",
   setup() {
     for (const [reducer, fn] of reducers) {
@@ -2029,7 +2994,7 @@ function generateOptionSegments(opts) {
         obj[key] = val instanceof File ? val.name : val;
       }
       segments.push(hash(obj));
-    } else if (isPlainObject(value)) {
+    } else if (isPlainObject$1(value)) {
       segments.push(hash(reactive(value)));
     } else {
       try {
@@ -2758,7 +3723,7 @@ function generateShades(key, value, prefix) {
 function generateColor(key, shade) {
   return `--ui-${key}: var(--ui-color-${key}-${shade});`;
 }
-const colors_E7kSti5pGZ28QhUUurq6gGRU3l65WuXO_KJC3GQgzFo = /* @__PURE__ */ defineNuxtPlugin(() => {
+const colors_zQGBFUeO4BQuJPQPHQ5uNszWGweKcokcUX5VwenhF5w = /* @__PURE__ */ defineNuxtPlugin(() => {
   const appConfig2 = useAppConfig();
   useNuxtApp();
   const root = computed(() => {
@@ -2852,13 +3817,13 @@ const plugin_MeUvTuoKUi51yb_kBguab6hdcExVXeTtZtTg9TZZBB8 = /* @__PURE__ */ defin
 });
 const plugins = [
   payloadPlugin,
-  unhead_k2P3m_ZDyjlr2mMYnoDPwavjsDN8hBlk9cFai0bbopU,
+  unhead_qe3fQ4FQKwdWzPfdeD9rnVnSlcLW_cWS_uEveE0an_0,
   plugin$1,
-  debug_hooks_hyXe6laRLyyi6S6XoqeItfe9HTFGNswlS09LT9GQbmQ,
-  revive_payload_server_MVtmlZaQpj6ApFmshWfUWl5PehCebzaBf2NuRMiIbms,
+  debug_hooks_B93iOX3P4gejK5qoNTlL6w_t4RWrZWMMaInzWlY9N50,
+  revive_payload_server___JI1fBdxHJd4JbWfrOSPlsvGxHd_8coFURhh6frGYo,
   plugin,
   components_plugin_4kY4pyzJIYX99vmMAAIorFf3CnAaptHitJgf7JxiED8,
-  colors_E7kSti5pGZ28QhUUurq6gGRU3l65WuXO_KJC3GQgzFo,
+  colors_zQGBFUeO4BQuJPQPHQ5uNszWGweKcokcUX5VwenhF5w,
   plugin_server_9Ca9_HhnjAGwBWpwAydRauMHxWoxTDY60BrArRnXN_A,
   plugin_MeUvTuoKUi51yb_kBguab6hdcExVXeTtZtTg9TZZBB8
 ];
@@ -3173,7 +4138,7 @@ function compare(value, currentValue, comparator) {
   if (typeof comparator === "string") {
     return get(value, comparator) === get(currentValue, comparator);
   }
-  return isEqual(value, currentValue);
+  return isEqual$1(value, currentValue);
 }
 function isEmpty(value) {
   if (value == null) {
@@ -3415,7 +4380,7 @@ function usePortal(portal) {
     disabled: disabled.value
   }));
 }
-const [injectThemeContext, provideThemeContext] = createContext("UTheme", "RootContext");
+const [injectThemeContext, provideThemeContext] = createContext$1("UTheme", "RootContext");
 function useComponentUI(name, props) {
   const { ui } = injectThemeContext({ ui: computed(() => ({})) });
   return computed(() => {
@@ -3657,7 +4622,7 @@ const _sfc_main$f = {
 const _sfc_setup$f = _sfc_main$f.setup;
 _sfc_main$f.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Icon.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Icon.vue");
   return _sfc_setup$f ? _sfc_setup$f(props, ctx) : void 0;
 };
 const ImageComponent = "img";
@@ -3825,7 +4790,7 @@ const _sfc_main$e = /* @__PURE__ */ Object.assign({ inheritAttrs: false }, {
 const _sfc_setup$e = _sfc_main$e.setup;
 _sfc_main$e.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Chip.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Chip.vue");
   return _sfc_setup$e ? _sfc_setup$e(props, ctx) : void 0;
 };
 const theme$7 = {
@@ -4016,7 +4981,7 @@ const _sfc_main$d = /* @__PURE__ */ Object.assign({ inheritAttrs: false }, {
 const _sfc_setup$d = _sfc_main$d.setup;
 _sfc_main$d.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Avatar.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Avatar.vue");
   return _sfc_setup$d ? _sfc_setup$d(props, ctx) : void 0;
 };
 function useComponentIcons(componentProps) {
@@ -4174,7 +5139,7 @@ function isPartiallyEqual(item1, item2) {
   }, /* @__PURE__ */ new Set());
   const item1Filtered = Object.fromEntries(Object.entries(item1).filter(([key]) => !diffedKeys.has(key)));
   const item2Filtered = Object.fromEntries(Object.entries(item2).filter(([key]) => !diffedKeys.has(key)));
-  return isEqual(item1Filtered, item2Filtered);
+  return isEqual$1(item1Filtered, item2Filtered);
 }
 const _sfc_main$c = {
   __name: "ULinkBase",
@@ -4243,7 +5208,7 @@ const _sfc_main$c = {
 const _sfc_setup$c = _sfc_main$c.setup;
 _sfc_main$c.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/LinkBase.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/LinkBase.vue");
   return _sfc_setup$c ? _sfc_setup$c(props, ctx) : void 0;
 };
 const theme$6 = {
@@ -4324,7 +5289,7 @@ const _sfc_main$b = /* @__PURE__ */ Object.assign({ inheritAttrs: false }, {
       if (props.exactQuery === "partial") {
         if (!isPartiallyEqual(linkRoute.query, route.query)) return false;
       } else if (props.exactQuery === true) {
-        if (!isEqual(linkRoute.query, route.query)) return false;
+        if (!isEqual$1(linkRoute.query, route.query)) return false;
       }
       if (props.exactHash && linkRoute.hash !== route.hash) {
         return false;
@@ -4443,7 +5408,7 @@ const _sfc_main$b = /* @__PURE__ */ Object.assign({ inheritAttrs: false }, {
 const _sfc_setup$b = _sfc_main$b.setup;
 _sfc_main$b.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Link.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Link.vue");
   return _sfc_setup$b ? _sfc_setup$b(props, ctx) : void 0;
 };
 const theme$5 = {
@@ -5042,7 +6007,7 @@ const _sfc_main$a = {
 const _sfc_setup$a = _sfc_main$a.setup;
 _sfc_main$a.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Button.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Button.vue");
   return _sfc_setup$a ? _sfc_setup$a(props, ctx) : void 0;
 };
 const theme$4 = {
@@ -5518,7 +6483,7 @@ const _sfc_main$9 = {
 const _sfc_setup$9 = _sfc_main$9.setup;
 _sfc_main$9.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Progress.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Progress.vue");
   return _sfc_setup$9 ? _sfc_setup$9(props, ctx) : void 0;
 };
 const theme$3 = {
@@ -5994,7 +6959,7 @@ const _sfc_main$8 = {
 const _sfc_setup$8 = _sfc_main$8.setup;
 _sfc_main$8.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Toast.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Toast.vue");
   return _sfc_setup$8 ? _sfc_setup$8(props, ctx) : void 0;
 };
 const theme$2 = {
@@ -6261,7 +7226,7 @@ const _sfc_main$7 = /* @__PURE__ */ Object.assign(__default__$1, {
 const _sfc_setup$7 = _sfc_main$7.setup;
 _sfc_main$7.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Toaster.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Toaster.vue");
   return _sfc_setup$7 ? _sfc_setup$7(props, ctx) : void 0;
 };
 const UToaster = Object.assign(_sfc_main$7, { __name: "UToaster" });
@@ -6381,7 +7346,7 @@ const _sfc_main$6 = {
 const _sfc_setup$6 = _sfc_main$6.setup;
 _sfc_main$6.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/OverlayProvider.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/OverlayProvider.vue");
   return _sfc_setup$6 ? _sfc_setup$6(props, ctx) : void 0;
 };
 const __default__ = {
@@ -6474,7 +7439,7 @@ const _sfc_main$5 = /* @__PURE__ */ Object.assign(__default__, {
 const _sfc_setup$5 = _sfc_main$5.setup;
 _sfc_main$5.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/App.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/App.vue");
   return _sfc_setup$5 ? _sfc_setup$5(props, ctx) : void 0;
 };
 const __nuxt_component_0 = Object.assign(_sfc_main$5, { __name: "UApp" });
@@ -6611,7 +7576,7 @@ const __nuxt_component_1 = defineComponent({
 });
 const layouts = {
   auth: defineAsyncComponent(() => import('./auth-Duc4oGv1.mjs').then((m) => m.default || m)),
-  default: defineAsyncComponent(() => import('./default-CL3QaK3Z.mjs').then((m) => m.default || m))
+  default: defineAsyncComponent(() => import('./default-PVvTKQMr.mjs').then((m) => m.default || m))
 };
 const routeRulesMatcher = _routeRulesMatcher;
 const LayoutLoader = defineComponent({
@@ -7169,7 +8134,7 @@ const _sfc_main$3 = {
 const _sfc_setup$3 = _sfc_main$3.setup;
 _sfc_main$3.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Card.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Card.vue");
   return _sfc_setup$3 ? _sfc_setup$3(props, ctx) : void 0;
 };
 const theme = {
@@ -7641,7 +8606,7 @@ const _sfc_main$2 = {
 const _sfc_setup$2 = _sfc_main$2.setup;
 _sfc_main$2.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/@nuxt/ui/dist/runtime/components/Alert.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/@nuxt+ui@4.5.1_@tiptap+exte_d0faa0730db27155126639674f551f9c/node_modules/@nuxt/ui/dist/runtime/components/Alert.vue");
   return _sfc_setup$2 ? _sfc_setup$2(props, ctx) : void 0;
 };
 const _sfc_main$1 = /* @__PURE__ */ defineComponent({
@@ -7864,7 +8829,7 @@ const _sfc_main = {
 const _sfc_setup = _sfc_main.setup;
 _sfc_main.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/nuxt/dist/app/components/nuxt-root.vue");
+  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/.pnpm/nuxt@4.4.2_@babel+core@7.29_c7facafaee23f0bb5de662a9e1041062/node_modules/nuxt/dist/app/components/nuxt-root.vue");
   return _sfc_setup ? _sfc_setup(props, ctx) : void 0;
 };
 let entry;
@@ -7887,5 +8852,67 @@ let entry;
 }
 const entry_default = ((ssrContext) => entry(ssrContext));
 
-export { noop as $, defineNuxtRouteMiddleware as A, useNuxtApp as B, usePortal as C, transformUI as D, omit as E, useState as F, isArrayOfArray as G, _sfc_main$e as H, _sfc_main$b as I, pickLinkProps as J, _sfc_main$c as K, refThrottled as L, useDebounceFn as M, useColorMode as N, createSharedComposable as O, useFieldGroup as P, compare as Q, getDisplayValue as R, useRequestEvent as S, makeDestructurable as T, watchPausable as U, tryOnMounted as V, camelize as W, toArray as X, watchImmediate as Y, isDef as Z, _sfc_main$2 as _, useBarbersApi as a, tryOnScopeDispose as a0, notNullish as a1, isObject as a2, useAsyncData as b, _sfc_main$3 as c, _sfc_main$a as d, entry_default as default, useApiClient as e, useSessionStore as f, useUiStore as g, useAppConfig as h, useComponentUI as i, useFormField as j, useComponentIcons as k, _sfc_main$f as l, _sfc_main$d as m, navigateTo as n, looseToNumber as o, useLocale as p, get as q, reactivePick as r, createRef as s, tv as t, useRoute as u, formErrorsInjectionKey as v, formInputsInjectionKey as w, inputIdInjectionKey as x, formFieldInjectionKey as y, reactiveOmit as z };;globalThis.__timing__.logEnd('Load chunks/build/server');
+const server = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+	__proto__: null,
+	$: noop,
+	A: defineNuxtRouteMiddleware,
+	B: useNuxtApp,
+	C: usePortal,
+	D: transformUI,
+	E: omit,
+	F: useState,
+	G: isArrayOfArray,
+	H: _sfc_main$e,
+	I: _sfc_main$b,
+	J: pickLinkProps,
+	K: _sfc_main$c,
+	L: refThrottled,
+	M: useDebounceFn,
+	N: useColorMode,
+	O: createSharedComposable,
+	P: useFieldGroup,
+	Q: compare,
+	R: getDisplayValue,
+	S: useRequestEvent,
+	T: makeDestructurable,
+	U: watchPausable,
+	V: tryOnMounted,
+	W: camelize,
+	X: toArray,
+	Y: watchImmediate,
+	Z: isDef,
+	_: _sfc_main$2,
+	a: useBarbersApi,
+	a0: tryOnScopeDispose,
+	a1: notNullish,
+	a2: isObject,
+	b: useAsyncData,
+	c: _sfc_main$3,
+	d: _sfc_main$a,
+	default: entry_default,
+	e: useApiClient,
+	f: useSessionStore,
+	g: useUiStore,
+	h: useAppConfig,
+	i: useComponentUI,
+	j: useFormField,
+	k: useComponentIcons,
+	l: _sfc_main$f,
+	m: _sfc_main$d,
+	n: navigateTo,
+	o: looseToNumber,
+	p: useLocale,
+	q: get,
+	r: reactivePick,
+	s: createRef,
+	t: tv,
+	u: useRoute,
+	v: formErrorsInjectionKey,
+	w: formInputsInjectionKey,
+	x: inputIdInjectionKey,
+	y: formFieldInjectionKey,
+	z: reactiveOmit
+}, Symbol.toStringTag, { value: 'Module' }));
+
+export { useState as $, defu as A, isArrayOfArray as B, compare as C, get as D, _sfc_main$e as E, getDisplayValue as F, klona as G, useNuxtApp as H, getRequestHeader as I, useRequestEvent as J, isEqual as K, setCookie as L, getCookie as M, deleteCookie as N, makeDestructurable as O, watchPausable as P, tryOnMounted as Q, camelize as R, toArray as S, watchImmediate as T, isObject as U, noop as V, tryOnScopeDispose as W, isDef as X, notNullish as Y, createRef as Z, _sfc_main$2 as _, useBarbersApi as a, createSharedComposable as a0, defineNuxtRouteMiddleware as a1, transformUI as a2, _sfc_main$b as a3, pickLinkProps as a4, _sfc_main$c as a5, useColorMode as a6, omit as a7, useDebounceFn as a8, refThrottled as a9, server as aa, useAsyncData as b, _sfc_main$3 as c, _sfc_main$a as d, useApiClient as e, useSessionStore as f, useUiStore as g, useAppConfig as h, useComponentUI as i, _sfc_main$f as j, useLocale as k, formErrorsInjectionKey as l, formInputsInjectionKey as m, navigateTo as n, inputIdInjectionKey as o, formFieldInjectionKey as p, useFormField as q, reactiveOmit as r, useFieldGroup as s, tv as t, useRoute as u, useComponentIcons as v, _sfc_main$d as w, looseToNumber as x, reactivePick as y, usePortal as z };;globalThis.__timing__.logEnd('Load chunks/build/server');
 //# sourceMappingURL=server.mjs.map

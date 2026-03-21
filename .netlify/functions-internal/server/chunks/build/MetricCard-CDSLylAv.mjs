@@ -1,6 +1,6 @@
-globalThis.__timing__.logStart('Load chunks/build/MetricCard-CDSLylAv');import { c as _sfc_main$3, l as _sfc_main$f } from './server.mjs';
-import { defineComponent, mergeProps, withCtx, createVNode, toDisplayString, openBlock, createBlock, createCommentVNode, useSSRContext } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/index.mjs';
-import { ssrRenderComponent, ssrInterpolate } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/server-renderer/index.mjs';
+globalThis.__timing__.logStart('Load chunks/build/MetricCard-CDSLylAv');import { c as _sfc_main$3, j as _sfc_main$f } from './server.mjs';
+import { defineComponent, mergeProps, withCtx, createVNode, toDisplayString, openBlock, createBlock, createCommentVNode, useSSRContext } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/index.mjs';
+import { ssrRenderComponent, ssrInterpolate } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/server-renderer/index.mjs';
 
 const _sfc_main = /* @__PURE__ */ defineComponent({
   __name: "MetricCard",

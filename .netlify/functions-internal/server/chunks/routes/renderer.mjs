@@ -1,11 +1,19 @@
 globalThis.__timing__.logStart('Load chunks/routes//renderer');import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue-bundle-renderer/dist/runtime.mjs';
 import { w as buildAssetsURL, x as useRuntimeConfig, y as getResponseStatusText, z as getResponseStatus, A as defineRenderHandler, B as publicAssetsURL, C as getQuery, c as createError, D as destr, E as getRouteRules, F as joinURL, u as useNitroApp } from '../_/nitro.mjs';
-import { renderToString } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/server-renderer/index.mjs';
+import { renderToString } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/server-renderer/index.mjs';
 import { createHead as createHead$1, propsToString, renderSSRHead } from 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/server.mjs';
 import { stringify, uneval } from 'file://D:/projects/bradobrey-dashboard/node_modules/devalue/index.js';
-import { FlatMetaPlugin } from 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/plugins.mjs';
-import { walkResolver } from 'file://D:/projects/bradobrey-dashboard/node_modules/unhead/dist/utils.mjs';
-import { isRef, toValue, hasInjectionContext, inject, ref, watchEffect, getCurrentInstance, onBeforeUnmount, onDeactivated, onActivated } from 'file://D:/projects/bradobrey-dashboard/node_modules/vue/index.mjs';
+import { isRef, toValue } from 'file://D:/projects/bradobrey-dashboard/node_modules/.pnpm/vue@3.5.30_typescript@5.9.3/node_modules/vue/index.mjs';
+import 'node:crypto';
+import 'node:http';
+import 'node:https';
+import 'node:events';
+import 'node:buffer';
+import 'node:util';
+import 'node:path';
+import 'node:process';
+import 'node:tty';
+import 'node:fs';
 
 const VueResolver = (_, value) => {
   return isRef(value) ? toValue(value) : value;
@@ -22,56 +30,6 @@ function vueInstall(head) {
     }
   };
   return plugin.install;
-}
-
-// @__NO_SIDE_EFFECTS__
-function injectHead() {
-  if (hasInjectionContext()) {
-    const instance = inject(headSymbol);
-    if (instance) {
-      return instance;
-    }
-  }
-  throw new Error("useHead() was called without provide context, ensure you call it through the setup() function.");
-}
-function useHead(input, options = {}) {
-  const head = options.head || /* @__PURE__ */ injectHead();
-  return head.ssr ? head.push(input || {}, options) : clientUseHead(head, input, options);
-}
-function clientUseHead(head, input, options = {}) {
-  const deactivated = ref(false);
-  let entry;
-  watchEffect(() => {
-    const i = deactivated.value ? {} : walkResolver(input, VueResolver);
-    if (entry) {
-      entry.patch(i);
-    } else {
-      entry = head.push(i, options);
-    }
-  });
-  const vm = getCurrentInstance();
-  if (vm) {
-    onBeforeUnmount(() => {
-      entry.dispose();
-    });
-    onDeactivated(() => {
-      deactivated.value = true;
-    });
-    onActivated(() => {
-      deactivated.value = false;
-    });
-  }
-  return entry;
-}
-function useSeoMeta(input = {}, options = {}) {
-  const head = options.head || /* @__PURE__ */ injectHead();
-  head.use(FlatMetaPlugin);
-  const { title, titleTemplate, ...meta } = input;
-  return useHead({
-    title,
-    titleTemplate,
-    _flatMeta: meta
-  }, options);
 }
 
 // @__NO_SIDE_EFFECTS__
@@ -106,7 +64,7 @@ const appId = "nuxt-app";
 const APP_ROOT_OPEN_TAG = `<${appRootTag}${propsToString(appRootAttrs)}>`;
 const APP_ROOT_CLOSE_TAG = `</${appRootTag}>`;
 // @ts-expect-error file will be produced after app build
-const getServerEntry = () => import('../build/server.mjs').then((r) => r.default || r);
+const getServerEntry = () => import('../build/server.mjs').then(function (n) { return n.aa; }).then((r) => r.default || r);
 // @ts-expect-error file will be produced after app build
 const getPrecomputedDependencies = () => import('../build/client.precomputed.mjs').then((r) => r.default || r).then((r) => typeof r === "function" ? r() : r);
 // -- SSR Renderer --
@@ -485,10 +443,5 @@ function renderHTMLDocument(html) {
 	return "<!DOCTYPE html>" + `<html${joinAttrs(html.htmlAttrs)}>` + `<head>${joinTags(html.head)}</head>` + `<body${joinAttrs(html.bodyAttrs)}>${joinTags(html.bodyPrepend)}${joinTags(html.body)}${joinTags(html.bodyAppend)}</body>` + "</html>";
 }
 
-const renderer = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
-  __proto__: null,
-  default: handler
-}, Symbol.toStringTag, { value: 'Module' }));
-
-export { useSeoMeta as a, headSymbol as h, renderer as r, useHead as u };;globalThis.__timing__.logEnd('Load chunks/routes//renderer');
+export { handler as default };;globalThis.__timing__.logEnd('Load chunks/routes//renderer');
 //# sourceMappingURL=renderer.mjs.map
