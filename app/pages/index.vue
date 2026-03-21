@@ -153,7 +153,7 @@ const shortcuts = computed(() =>
             label="Состояние" :value="data?.health ? 'OK' : 'В ожидании'" />
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[1]">
+        <div class="grid gap-6">
           <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
