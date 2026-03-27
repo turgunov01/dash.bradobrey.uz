@@ -2,6 +2,7 @@
 import type { Branch } from '~~/shared/schemas'
 import type { FlatServiceItem } from '~/utils/services'
 
+import ChartDoughnut from '~/components/shared/ChartDoughnut.vue'
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 import { formatPaymentMethod, formatScopeLabel } from '~/utils/display'
 import { flattenServicesPayload } from '~/utils/services'
@@ -53,17 +54,19 @@ type ServiceBreakdownRow = {
 
 type TimelineRow = {
   cancelled: number
-  cancelledHeight: number
   completed: number
-  completedHeight: number
   dateKey: string
   label: string
 }
 
-type TimelineAxisTick = {
+type PieSlice = {
+  color?: string
+  displayValue: string
   label: string
   value: number
 }
+
+const chartColors = ['#22c55e', '#f59e0b', '#0ea5e9', '#6366f1', '#ef4444', '#14b8a6', '#a855f7', '#f97316', '#475569']
 
 type NormalizedHistoryEntry = {
   actualServiceMinutes: number | null
@@ -254,14 +257,6 @@ function average(values: number[]) {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length
-}
-
-function toBarHeight(value: number, max: number) {
-  if (!value || !max) {
-    return 0
-  }
-
-  return Math.max((value / max) * 100, 8)
 }
 
 function formatMinutes(value: number) {
@@ -645,39 +640,12 @@ const timelineRows = computed<TimelineRow[]>(() => {
     }
   }
 
-  const maxCompleted = Math.max(...[...points.values()].map(point => point.completed), 0)
-  const maxCancelled = Math.max(...[...points.values()].map(point => point.cancelled), 0)
-  const maxValue = Math.max(maxCompleted, maxCancelled, 4)
-
   return [...points.entries()].map(([dateKey, point]) => ({
     cancelled: point.cancelled,
-    cancelledHeight: toBarHeight(point.cancelled, maxValue),
     completed: point.completed,
-    completedHeight: toBarHeight(point.completed, maxValue),
     dateKey,
     label: shortDayFormatter.format(new Date(`${dateKey}T00:00:00`))
   }))
-})
-
-const timelineScaleMax = computed(() =>
-  Math.max(
-    ...timelineRows.value.flatMap(point => [point.completed, point.cancelled]),
-    4
-  )
-)
-
-const timelineAxisTicks = computed<TimelineAxisTick[]>(() => {
-  const steps = 4
-
-  return Array.from({ length: steps + 1 }, (_, index) => {
-    const ratio = (steps - index) / steps
-    const value = Math.round(timelineScaleMax.value * ratio)
-
-    return {
-      label: formatCount(value),
-      value
-    }
-  })
 })
 
 const branchBreakdown = computed<BreakdownRow[]>(() => {
@@ -825,10 +793,7 @@ const paymentBreakdown = computed<PaymentBreakdownRow[]>(() => {
     }
 
     current.count += 1
-
-    if (item.isCompleted) {
-      current.revenue += item.estimatedRevenue
-    }
+    current.revenue += item.estimatedRevenue
 
     rows.set(key, current)
   }
@@ -839,6 +804,119 @@ const paymentBreakdown = computed<PaymentBreakdownRow[]>(() => {
       percent: filteredHistory.value.length ? (row.count / filteredHistory.value.length) * 100 : 0
     }))
     .sort((left, right) => right.count - left.count || right.revenue - left.revenue)
+})
+
+function toPieSlices<T>(
+  rows: T[],
+  getLabel: (row: T) => string,
+  getValue: (row: T) => number,
+  formatValue: (value: number) => string
+): PieSlice[] {
+  const maxSlices = 8
+  const items = rows
+    .map(row => ({
+      label: getLabel(row),
+      value: Math.max(0, getValue(row)),
+      displayValue: formatValue(Math.max(0, getValue(row)))
+    }))
+    .filter(item => item.value > 0)
+
+  if (items.length <= maxSlices) {
+    return items
+  }
+
+  const head = items.slice(0, maxSlices - 1)
+  const tail = items.slice(maxSlices - 1)
+  const restValue = tail.reduce((sum, item) => sum + item.value, 0)
+
+  return restValue > 0
+    ? [...head, { label: 'Р”СЂСѓРіРёРµ', value: restValue, displayValue: formatValue(restValue) }]
+    : head
+}
+
+const statusPieItems = computed<PieSlice[]>(() => {
+  const completed = filteredHistory.value.filter(item => item.isCompleted).length
+  const cancelled = filteredHistory.value.filter(item => item.isCancelled).length
+
+  return [
+    { label: 'Р—Р°РІРµСЂС€РµРЅРѕ', value: completed, displayValue: formatCount(completed), color: '#22c55e' },
+    { label: 'РћС‚РєР°Р·С‹', value: cancelled, displayValue: formatCount(cancelled), color: '#f59e0b' }
+  ].filter(item => item.value > 0)
+})
+
+const branchPieItems = computed<PieSlice[]>(() =>
+  toPieSlices(branchBreakdown.value, row => row.label, row => row.count, formatCount)
+)
+
+const barberPieItems = computed<PieSlice[]>(() =>
+  toPieSlices(barberBreakdown.value, row => row.label, row => row.count, formatCount)
+)
+
+const servicePieItems = computed<PieSlice[]>(() =>
+  toPieSlices(serviceBreakdown.value, row => row.count ? `${row.label}` : row.label, row => row.count, formatCount)
+    .map((item, index) => ({
+      ...item,
+      color: item.color ?? chartColors[index % chartColors.length]
+    }))
+)
+
+const paymentPieItems = computed<PieSlice[]>(() =>
+  toPieSlices(paymentBreakdown.value, row => row.label, row => row.count, formatCount)
+)
+
+const serviceChartData = computed<{
+  labels: string[]
+  dataset: { data: number[]; backgroundColor: string[] }
+}>(() => {
+  const items = servicePieItems.value
+  return {
+    labels: items.map(item => item.label),
+    dataset: {
+      data: items.map(item => item.value),
+      backgroundColor: items.map(item => item.color as string)
+    }
+  }
+})
+
+const mainStatusChartData = computed(() => {
+  const orders = Math.max(0, mainMetrics.value.orders)
+  const completed = Math.max(0, mainMetrics.value.completed)
+  const notCompleted = Math.max(orders - completed, 0)
+  const labels = ['Завершено', 'Не завершено']
+  const backgroundColor = ['#22c55e', '#ef4444']
+  const tooltipLabels = [
+    `Завершено: ${formatCount(completed)} · ${formatPercent(orders ? (completed / orders) * 100 : 0)} · ${formatMoney(mainMetrics.value.revenue)}`,
+    `Не завершено: ${formatCount(notCompleted)}`
+  ]
+
+  return {
+    labels,
+    dataset: {
+      data: [completed, notCompleted],
+      backgroundColor
+    },
+    tooltipLabels
+  }
+})
+
+const clientChartData = computed(() => {
+  const newClients = Math.max(0, clientMetrics.value.newClients)
+  const repeatClients = Math.max(0, clientMetrics.value.repeatClients)
+  const labels = ['Новые', 'Повторные']
+  const backgroundColor = ['#0ea5e9', '#a855f7']
+  const tooltipLabels = [
+    `Новые: ${formatCount(newClients)}`,
+    `Повторные: ${formatCount(repeatClients)}`
+  ]
+
+  return {
+    labels,
+    dataset: {
+      data: [newClients, repeatClients],
+      backgroundColor
+    },
+    tooltipLabels
+  }
 })
 
 const topBranches = computed(() => branchBreakdown.value.slice(0, 3))
@@ -1022,26 +1100,69 @@ const scopeContextLabel = computed(() => {
         />
 
         <template v-else>
-          <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
-            <DashboardMetricCard
-              v-for="card in primaryKpiCards"
-              :key="card.label"
-              :description="card.description"
-              :icon="card.icon"
-              :label="card.label"
-              :value="card.value"
-            />
-          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+              <div class="flex flex-col gap-6">
+                <div class="space-y-3">
+                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
+                    Выполнение
+                  </p>
+                  <h2 class="barbershop-heading text-3xl text-charcoal-950">
+                    Завершение заказов
+                  </h2>
+                  <div class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
+                    <UBadge color="neutral" variant="soft">
+                      Всего {{ formatCount(mainMetrics.orders) }}
+                    </UBadge>
+                    <UBadge color="neutral" variant="outline">
+                      Завершено {{ formatCount(mainMetrics.completed) }}
+                    </UBadge>
+                    <span class="text-charcoal-500">
+                      Выручка в подсказке на графике
+                    </span>
+                  </div>
+                </div>
 
-          <div class="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
-            <DashboardMetricCard
-              v-for="card in supportingKpiCards"
-              :key="card.label"
-              :description="card.description"
-              :icon="card.icon"
-              :label="card.label"
-              :value="card.value"
-            />
+                <div class="flex w-full justify-center lg:w-auto">
+                  <ChartDoughnut
+                    :dataset="mainStatusChartData.dataset"
+                    :labels="mainStatusChartData.labels"
+                    :tooltip-labels="mainStatusChartData.tooltipLabels"
+                    title="Завершено / не завершено"
+                  />
+                </div>
+              </div>
+            </UCard>
+
+            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+              <div class="flex flex-col gap-6">
+                <div class="space-y-3">
+                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
+                    Клиенты
+                  </p>
+                  <h2 class="barbershop-heading text-3xl text-charcoal-950">
+                    Новые / повторные и completion
+                  </h2>
+                  <div class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
+                    <UBadge color="neutral" variant="soft">
+                      Всего {{ formatCount(clientMetrics.uniqueClients) }}
+                    </UBadge>
+                    <UBadge color="neutral" variant="outline">
+                      Completion {{ formatPercent(clientMetrics.completionRate) }}
+                    </UBadge>
+                  </div>
+                </div>
+
+                <div class="flex w-full justify-center lg:w-auto">
+                  <ChartDoughnut
+                    :dataset="clientChartData.dataset"
+                    :labels="clientChartData.labels"
+                    :tooltip-labels="clientChartData.tooltipLabels"
+                    title="Клиенты"
+                  />
+                </div>
+              </div>
+            </UCard>
           </div>
 
           <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
@@ -1083,68 +1204,42 @@ const scopeContextLabel = computed(() => {
               </div>
             </template>
 
-            <div v-if="timelineRows.length && filteredHistory.length" class="overflow-x-auto pb-2">
-              <div class="min-w-[64rem] rounded-[2rem] bg-charcoal-950 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.24)] sm:p-6">
-                <div class="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-4">
-                  <div class="flex h-[24rem] flex-col justify-between pb-12 text-right text-xs font-medium text-sand-200/70">
-                    <span
-                      v-for="tick in timelineAxisTicks"
-                      :key="`tick-${tick.value}`"
-                    >
-                      {{ tick.label }}
-                    </span>
+            <div v-if="filteredHistory.length" class="grid gap-6 xl:grid-cols-[0.55fr_0.45fr] items-center">
+              <SharedPieChart
+                :items="statusPieItems"
+                center-label="Записи"
+                empty-label="За выбранный диапазон нет записей."
+                :size="260"
+              />
+
+              <div class="space-y-3 max-h-[24rem] overflow-auto pr-1">
+                <div
+                  v-for="point in timelineRows"
+                  :key="point.dateKey"
+                  class="flex items-center justify-between gap-4 rounded-[1.25rem] border border-charcoal-200 bg-white/90 px-4 py-3"
+                  :title="`${point.label}: ${formatCount(point.completed)} завершено, ${formatCount(point.cancelled)} отказов`"
+                >
+                  <div class="flex items-center gap-2 text-sm text-charcoal-700">
+                    <span class="size-2.5 rounded-full bg-emerald-400" />
+                    <span class="font-medium text-charcoal-950">{{ point.label }}</span>
                   </div>
-
-                  <div class="relative">
-                    <div class="pointer-events-none absolute inset-0 flex h-[24rem] flex-col justify-between pb-12">
-                      <div
-                        v-for="tick in timelineAxisTicks"
-                        :key="`grid-${tick.value}`"
-                        class="border-t border-dashed border-white/10"
-                      />
-                    </div>
-
-                    <div class="relative flex h-[24rem] min-w-max items-end gap-3 pb-12">
-                      <div
-                        v-for="point in timelineRows"
-                        :key="point.dateKey"
-                        class="flex w-14 shrink-0 flex-col items-center gap-3"
-                        :title="`${point.label}: ${formatCount(point.completed)} завершено, ${formatCount(point.cancelled)} отказов`"
-                      >
-                        <div class="flex h-full w-full items-end justify-center gap-1.5 rounded-[1.5rem] px-1">
-                          <div
-                            class="w-4 rounded-t-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.35)] transition-all"
-                            :style="{ height: `${point.completedHeight}%` }"
-                          />
-                          <div
-                            class="w-4 rounded-t-full bg-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.28)] transition-all"
-                            :style="{ height: `${point.cancelledHeight}%` }"
-                          />
-                        </div>
-
-                        <div class="space-y-1 text-center">
-                          <p class="text-[11px] font-medium text-sand-50">
-                            {{ point.label }}
-                          </p>
-                          <p class="text-[10px] text-sand-200/60">
-                            {{ formatCount(point.completed) }} / {{ formatCount(point.cancelled) }}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                  <div class="flex items-center gap-3 text-sm font-semibold">
+                    <span class="text-emerald-600">{{ formatCount(point.completed) }}</span>
+                    <span class="text-charcoal-300">/</span>
+                    <span class="text-amber-500">{{ formatCount(point.cancelled) }}</span>
                   </div>
                 </div>
               </div>
             </div>
             <SharedEmptyState
               v-else
-              description="За выбранный диапазон нет записей для построения графика завершений и отказов."
+              description="За выбранный диапазон нет записей для построения диаграммы статусов."
               icon="i-lucide-chart-no-axes-combined"
               title="Нет данных по периоду"
             />
           </UCard>
 
-          <div class="grid gap-6 2xl:grid-cols-2">
+          <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
@@ -1157,36 +1252,39 @@ const scopeContextLabel = computed(() => {
                 </div>
               </template>
 
-              <div v-if="branchBreakdown.length" class="space-y-3">
-                <div
-                  v-for="row in branchBreakdown"
-                  :key="row.id"
-                  class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
-                >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="space-y-1">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ row.label }}
-                      </p>
-                      <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
-                        {{ formatCount(row.count) }} записей · {{ formatCount(row.uniqueClients) }} клиентов
-                      </p>
-                    </div>
-                    <div class="space-y-1 text-right">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ formatMoney(row.revenue) }}
-                      </p>
-                      <p class="text-xs text-charcoal-500">
-                        Completion {{ formatPercent(row.completionRate) }}
-                      </p>
-                    </div>
-                  </div>
+              <div v-if="branchBreakdown.length" class="space-y-6">
+                <div class="flex justify-center">
+                  <SharedPieChart
+                    :items="branchPieItems"
+                    center-label="Записи"
+                    empty-label="Нет данных для диаграммы по филиалам"
+                  />
+                </div>
 
-                  <div class="mt-3 h-2 rounded-full bg-sand-100">
-                    <div
-                      class="h-full rounded-full bg-brass-400"
-                      :style="{ width: `${row.completionRate}%` }"
-                    />
+                <div class="space-y-3 max-h-[32rem] overflow-auto pr-1">
+                  <div
+                    v-for="row in branchBreakdown"
+                    :key="row.id"
+                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="space-y-1">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ row.label }}
+                        </p>
+                        <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
+                          {{ formatCount(row.count) }} записей · {{ formatCount(row.uniqueClients) }} клиентов
+                        </p>
+                      </div>
+                      <div class="space-y-1 text-right">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ formatMoney(row.revenue) }}
+                        </p>
+                        <p class="text-xs text-charcoal-500">
+                          Completion {{ formatPercent(row.completionRate) }}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1210,36 +1308,39 @@ const scopeContextLabel = computed(() => {
                 </div>
               </template>
 
-              <div v-if="barberBreakdown.length" class="space-y-3">
-                <div
-                  v-for="row in barberBreakdown"
-                  :key="row.id"
-                  class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
-                >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="space-y-1">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ row.label }}
-                      </p>
-                      <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
-                        {{ formatCount(row.count) }} записей · {{ formatCount(row.uniqueClients) }} клиентов
-                      </p>
-                    </div>
-                    <div class="space-y-1 text-right">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ formatMoney(row.revenue) }}
-                      </p>
-                      <p class="text-xs text-charcoal-500">
-                        Completion {{ formatPercent(row.completionRate) }}
-                      </p>
-                    </div>
-                  </div>
+              <div v-if="barberBreakdown.length" class="space-y-6">
+                <div class="flex justify-center">
+                  <SharedPieChart
+                    :items="barberPieItems"
+                    center-label="Записи"
+                    empty-label="Нет данных для диаграммы по барберам"
+                  />
+                </div>
 
-                  <div class="mt-3 h-2 rounded-full bg-sand-100">
-                    <div
-                      class="h-full rounded-full bg-charcoal-700"
-                      :style="{ width: `${row.completionRate}%` }"
-                    />
+                <div class="space-y-3 max-h-[32rem] overflow-auto pr-1">
+                  <div
+                    v-for="row in barberBreakdown"
+                    :key="row.id"
+                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="space-y-1">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ row.label }}
+                        </p>
+                        <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
+                          {{ formatCount(row.count) }} записей · {{ formatCount(row.uniqueClients) }} клиентов
+                        </p>
+                      </div>
+                      <div class="space-y-1 text-right">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ formatMoney(row.revenue) }}
+                        </p>
+                        <p class="text-xs text-charcoal-500">
+                          Completion {{ formatPercent(row.completionRate) }}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1263,31 +1364,12 @@ const scopeContextLabel = computed(() => {
                 </div>
               </template>
 
-              <div v-if="serviceBreakdown.length" class="max-h-[34rem] space-y-3 overflow-auto pr-1">
-                <div
-                  v-for="row in serviceBreakdown"
-                  :key="row.id"
-                  class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
-                >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="space-y-1">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ row.label }}
-                      </p>
-                      <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
-                        {{ row.category }} · {{ formatCount(row.count) }} использований
-                      </p>
-                    </div>
-                    <div class="space-y-1 text-right">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ formatMoney(row.revenue) }}
-                      </p>
-                      <p class="text-xs text-charcoal-500">
-                        Средняя цена {{ formatMoney(row.avgPrice) }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+              <div v-if="serviceBreakdown.length" class="flex justify-center">
+                <ChartDoughnut
+                  :dataset="serviceChartData.dataset"
+                  :labels="serviceChartData.labels"
+                  title="Использования услуг"
+                />
               </div>
               <SharedEmptyState
                 v-else
@@ -1309,25 +1391,35 @@ const scopeContextLabel = computed(() => {
                 </div>
               </template>
 
-              <div v-if="paymentBreakdown.length" class="space-y-3">
-                <div
-                  v-for="row in paymentBreakdown"
-                  :key="row.key"
-                  class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
-                >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="space-y-1">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ row.label }}
-                      </p>
-                      <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
-                        {{ formatCount(row.count) }} записей · {{ formatPercent(row.percent) }}
-                      </p>
-                    </div>
-                    <div class="text-right">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ formatMoney(row.revenue) }}
-                      </p>
+              <div v-if="paymentBreakdown.length" class="space-y-6">
+                <div class="flex justify-center">
+                  <SharedPieChart
+                    :items="paymentPieItems"
+                    center-label="Записи"
+                    empty-label="Нет данных по оплате"
+                  />
+                </div>
+
+                <div class="space-y-3">
+                  <div
+                    v-for="row in paymentBreakdown"
+                    :key="row.key"
+                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="space-y-1">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ row.label }}
+                        </p>
+                        <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">
+                          {{ formatCount(row.count) }} записей · {{ formatPercent(row.percent) }}
+                        </p>
+                      </div>
+                      <div class="text-right">
+                        <p class="font-semibold text-charcoal-950">
+                          {{ formatMoney(row.revenue) }}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -100,100 +100,72 @@ watch(
 
 <template>
   <UDashboardPanel id="history-global">
-    <template #header>
-      <UDashboardNavbar title="История" :ui="{ right: 'gap-3' }">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-
-        <template #right>
+    <template #body>
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
+        <UBadge color="neutral" variant="soft">
+          {{ branchStore.activeBranch?.name || 'Филиал не выбран' }}
+        </UBadge>
+        <div class="flex items-center gap-2">
+          <UBadge color="neutral" variant="outline">
+            {{ historyItems.length }} записей
+          </UBadge>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
-        </template>
-      </UDashboardNavbar>
-    </template>
+        </div>
+      </div>
 
-    <template #body>
-      <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
-        <template #header>
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
-                История
-              </p>
-              <h2 class="barbershop-heading text-3xl text-charcoal-950">
-                История филиала
-              </h2>
-              <p class="text-sm text-charcoal-500">
-                Таблица показывает записи для филиала, выбранного в BranchSelector.
-              </p>
-            </div>
+      <div v-if="historyItems.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <div class="max-h-[80vh] overflow-auto">
+          <UTable :columns="columns" :data="paginatedHistory" :loading="pending" sticky="header" :ui="{
+            root: 'w-full overflow-auto',
+            base: 'w-full min-w-[64rem]',
+            thead: 'bg-charcoal-50/90',
+            tbody: 'divide-y divide-charcoal-100',
+            th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
+          }">
+            <template #phone_number-cell="{ row }">
+              <span class="font-medium text-charcoal-950">
+                {{ row.original.phone_number || 'Не указан' }}
+              </span>
+            </template>
 
-            <div class="flex flex-wrap items-center gap-3">
-              <UBadge color="neutral" size="lg" variant="soft">
-                {{ branchStore.activeBranch?.name || 'Филиал не выбран' }}
-              </UBadge>
-              <UBadge color="neutral" variant="outline">
-                {{ historyItems.length }} записей
-              </UBadge>
-            </div>
-          </div>
-        </template>
+            <template #status-cell="{ row }">
+              <SharedStatusBadge :label="row.original.status" />
+            </template>
 
-        <div v-if="historyItems.length" class="space-y-4">
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-            <UTable :columns="columns" :data="paginatedHistory" :loading="pending" sticky="header" :ui="{
-              root: 'w-full overflow-auto',
-              base: 'w-full min-w-[64rem]',
-              thead: 'bg-charcoal-50/90',
-              tbody: 'divide-y divide-charcoal-100',
-              th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
-            }">
-              <template #phone_number-cell="{ row }">
-                <span class="font-medium text-charcoal-950">
-                  {{ row.original.phone_number || 'Не указан' }}
-                </span>
-              </template>
+            <template #payment_method-cell="{ row }">
+              {{ formatPaymentMethod(row.original.payment_method) }}
+            </template>
 
-              <template #status-cell="{ row }">
-                <SharedStatusBadge :label="row.original.status" />
-              </template>
+            <template #amount-cell="{ row }">
+              {{ formatMoney(row.original.amount) }}
+            </template>
 
-              <template #payment_method-cell="{ row }">
-                {{ formatPaymentMethod(row.original.payment_method) }}
-              </template>
-
-              <template #amount-cell="{ row }">
-                {{ formatMoney(row.original.amount) }}
-              </template>
-
-              <template #created_at-cell="{ row }">
-                {{ formatDateTime(row.original.created_at) }}
-              </template>
-            </UTable>
-          </div>
-
-          <div
-            class="flex flex-col gap-3 border-t border-charcoal-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-sm text-charcoal-500">
-              Показано {{ pageFrom }}-{{ pageTo }} из {{ historyItems.length }}
-            </p>
-
-            <UPagination v-model:page="page" active-color="primary" active-variant="solid"
-              :items-per-page="itemsPerPage" :show-controls="true" :sibling-count="1" :total="historyItems.length" />
-          </div>
+            <template #created_at-cell="{ row }">
+              {{ formatDateTime(row.original.created_at) }}
+            </template>
+          </UTable>
         </div>
 
-        <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6">
-          <p class="text-base font-semibold text-charcoal-950">
-            История не найдена
+        <div class="flex flex-col gap-3 border-t border-charcoal-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-charcoal-500">
+            Показано {{ pageFrom }}-{{ pageTo }} из {{ historyItems.length }}
           </p>
-          <p class="mt-2 text-sm text-charcoal-500">
-            Для выбранного филиала записи отсутствуют.
-          </p>
+
+          <UPagination v-model:page="page"
+            :items-per-page="itemsPerPage"
+            :show-controls="true"
+            :sibling-count="1"
+            :total="historyItems.length"
+            size="sm"
+          />
         </div>
-      </UCard>
+      </div>
+
+      <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
+        Для выбранного филиала записи отсутствуют.
+      </div>
     </template>
   </UDashboardPanel>
 </template>

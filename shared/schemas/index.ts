@@ -185,6 +185,7 @@ export const certificateCreateSchema = z.object({
 
 export const serviceFormSchema = z.object({
   name: z.string().trim().min(1, 'Введите название услуги'),
+  image: optionalTextSchema,
   price: z.union([z.string(), z.number()]).optional().nullable(),
   duration: z.union([z.string(), z.number()]).optional().nullable(),
   category_id: identifierSchema.optional().nullable(),

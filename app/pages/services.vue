@@ -18,14 +18,23 @@ type ServiceRow = {
 const servicesApi = useServicesApi()
 
 const serviceModalOpen = ref(false)
+const previewOpen = ref(false)
+const previewSrc = ref('')
+const previewTitle = ref('')
 const form = reactive({
   category_name: '',
   duration: 30,
   id: '',
   is_active: true,
+  image: '',
   name: '',
   price: 0
 })
+const imageFile = ref<File | null>(null)
+const objectUrl = ref('')
+const previewUrl = computed(() => objectUrl.value || form.image || '')
+const servicePage = ref(1)
+const servicePageSize = 10
 
 const modalTitle = computed(() =>
   form.id ? 'Редактировать услугу' : 'Создать новую услугу'
@@ -38,7 +47,6 @@ const modalDescription = computed(() =>
 )
 
 const serviceColumns: TableColumn<ServiceRow>[] = [
-  { accessorKey: 'id', header: 'id' },
   { accessorKey: 'name', header: 'name' },
   { accessorKey: 'category', header: 'category' },
   { accessorKey: 'duration_minutes', header: 'duration_minutes' },
@@ -70,6 +78,18 @@ const serviceRows = computed<ServiceRow[]>(() =>
   })
 )
 
+const servicePageCount = computed(() => Math.max(1, Math.ceil(serviceRows.value.length / servicePageSize)))
+const pagedServices = computed(() => {
+  const start = (servicePage.value - 1) * servicePageSize
+  return serviceRows.value.slice(start, start + servicePageSize)
+})
+
+watch([serviceRows, servicePage], () => {
+  if (servicePage.value > servicePageCount.value) {
+    servicePage.value = servicePageCount.value
+  }
+})
+
 watch(serviceModalOpen, (open) => {
   if (!open) {
     resetForm()
@@ -81,8 +101,14 @@ function resetForm() {
   form.duration = 30
   form.id = ''
   form.is_active = true
+  form.image = ''
   form.name = ''
   form.price = 0
+  imageFile.value = null
+  if (objectUrl.value) {
+    globalThis.URL?.revokeObjectURL(objectUrl.value)
+    objectUrl.value = ''
+  }
 }
 
 function openCreateModal() {
@@ -95,8 +121,14 @@ function startEdit(service: ServiceRow) {
   form.duration = Number(service.duration_minutes || 0)
   form.id = String(service.id)
   form.is_active = Boolean(service.is_active ?? true)
+  form.image = service.image || ''
   form.name = service.name || ''
   form.price = Number(service.base_price || 0)
+  imageFile.value = null
+  if (objectUrl.value) {
+    globalThis.URL?.revokeObjectURL(objectUrl.value)
+    objectUrl.value = ''
+  }
   serviceModalOpen.value = true
 }
 
@@ -104,6 +136,7 @@ async function submit() {
   const payload = serviceFormSchema.safeParse({
     category_name: form.category_name || undefined,
     duration: form.duration,
+    image: form.image || undefined,
     is_active: form.is_active,
     name: form.name,
     price: form.price
@@ -114,11 +147,27 @@ async function submit() {
     return
   }
 
+  // Если загружен файл — отправляем multipart, иначе обычный JSON
+  const body: FormData | typeof payload.data = imageFile.value
+    ? (() => {
+        const fd = new FormData()
+        fd.append('name', payload.data.name)
+        fd.append('price', String(payload.data.price ?? ''))
+        fd.append('duration', String(payload.data.duration ?? ''))
+        fd.append('is_active', String(payload.data.is_active ?? true))
+        if (payload.data.category_name) fd.append('category_name', payload.data.category_name)
+        if (payload.data.category_id) fd.append('category_id', String(payload.data.category_id))
+        if (payload.data.image) fd.append('image', payload.data.image)
+        fd.append('file', imageFile.value as Blob)
+        return fd
+      })()
+    : payload.data
+
   if (form.id) {
-    await servicesApi.update(form.id, payload.data)
+    await servicesApi.update(form.id, body as any)
   }
   else {
-    await servicesApi.create(payload.data)
+    await servicesApi.create(body as any)
   }
 
   await refresh()
@@ -129,68 +178,75 @@ async function removeService(id: string) {
   await servicesApi.remove(id)
   await refresh()
 }
+
+function openPreview(src: string | null, title: string) {
+  if (!src) {
+    return
+  }
+  previewSrc.value = src
+  previewTitle.value = title
+  previewOpen.value = true
+}
+
+function handleImageInput(event: Event) {
+  const file = (event.target as HTMLInputElement)?.files?.[0] || null
+  imageFile.value = file
+}
+
+watch(imageFile, (file) => {
+  if (objectUrl.value) {
+    globalThis.URL?.revokeObjectURL(objectUrl.value)
+    objectUrl.value = ''
+  }
+
+  if (file) {
+    const created = globalThis.URL?.createObjectURL(file)
+    if (created) {
+      objectUrl.value = created
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (objectUrl.value) {
+    globalThis.URL?.revokeObjectURL(objectUrl.value)
+  }
+})
 </script>
 
 <template>
   <UDashboardPanel id="services">
-    <template #header>
-      <UDashboardNavbar title="Услуги" :ui="{ right: 'gap-3' }">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-
-        <template #right>
+    <template #body>
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
+        <UBadge color="neutral" size="lg" variant="soft">
+          {{ serviceRows.length }} услуг
+        </UBadge>
+        <div class="flex items-center gap-2">
+          <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal">
+            Создать услугу
+          </UButton>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
-        </template>
-      </UDashboardNavbar>
-    </template>
+        </div>
+      </div>
 
-    <template #body>
-      <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
-        <template #header>
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
-                Единый список
-              </p>
-              <h2 class="barbershop-heading text-3xl text-charcoal-950">
-                Каталог услуг
-              </h2>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-              <UBadge color="neutral" size="lg" variant="soft">
-                {{ serviceRows.length }} услуг
-              </UBadge>
-              <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal">
-                Создать услугу
-              </UButton>
-            </div>
-          </div>
-        </template>
-
-        <div v-if="serviceRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-          <div class="max-h-[42rem] overflow-auto">
-            <UTable
-              :columns="serviceColumns"
-              :data="serviceRows"
-              :loading="pending"
-              sticky="header"
-              :ui="{
-                root: 'w-full overflow-auto',
-                base: 'w-full min-w-[88rem]',
-                thead: 'bg-charcoal-50/90',
-                tbody: 'divide-y divide-charcoal-100',
-                th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
-                td: 'px-4 py-4 text-sm text-charcoal-700 align-middle'
-              }"
-            >
-            <template #id-cell="{ row }">
-              <span class="font-mono text-xs text-charcoal-500">{{ row.original.id }}</span>
-            </template>
-
+      <div v-if="serviceRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <div class="max-h-[80vh] overflow-auto">
+          <UTable
+            :columns="serviceColumns"
+            :data="pagedServices"
+            :loading="pending"
+            sticky="header"
+            :ui="{
+              root: 'w-full overflow-auto',
+              base: 'w-full min-w-[88rem]',
+              thead: 'bg-charcoal-50/90',
+              tbody: 'divide-y divide-charcoal-100',
+              th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
+              td: 'px-4 py-4 text-sm text-charcoal-700 align-middle'
+            }"
+          >
             <template #duration_minutes-cell="{ row }">
               <span class="font-medium">{{ row.original.duration_minutes }} мин</span>
             </template>
@@ -200,22 +256,18 @@ async function removeService(id: string) {
             </template>
 
             <template #image-cell="{ row }">
-              <a
+              <button
                 v-if="row.original.image"
-                :href="row.original.image"
-                class="inline-flex items-center gap-3"
-                rel="noreferrer"
-                target="_blank"
+                class="flex items-center"
+                type="button"
+                @click="openPreview(row.original.image, row.original.name)"
               >
                 <img
                   :alt="row.original.name"
                   :src="row.original.image"
-                  class="size-12 rounded-xl border border-charcoal-200 object-cover"
+                  class="size-12 rounded-xl border border-charcoal-200 object-cover transition hover:scale-[1.02] hover:shadow"
                 >
-                <span class="max-w-[16rem] truncate text-xs text-primary-600">
-                  {{ row.original.image }}
-                </span>
-              </a>
+              </button>
               <span v-else class="text-charcoal-400">Нет изображения</span>
             </template>
 
@@ -248,17 +300,28 @@ async function removeService(id: string) {
                 </UTooltip>
               </div>
             </template>
-            </UTable>
-          </div>
+          </UTable>
         </div>
+        <div class="flex items-center justify-end gap-3 border-t border-charcoal-100 px-4 py-3">
+          <span class="text-xs text-charcoal-500">
+            Показано {{ pagedServices.length ? (servicePage - 1) * servicePageSize + 1 : 0 }}–{{ Math.min(servicePage * servicePageSize, serviceRows.length) }} из {{ serviceRows.length }}
+          </span>
+          <UPagination
+            v-model="servicePage"
+            :page-count="servicePageCount"
+            :total="serviceRows.length"
+            :per-page="servicePageSize"
+            size="sm"
+          />
+        </div>
+      </div>
 
-        <SharedEmptyState
-          v-else
-          description="Список услуг пуст или не был получен от бэкенда."
-          icon="i-lucide-badge-dollar-sign"
-          title="Услуги не загружены"
-        />
-      </UCard>
+      <SharedEmptyState
+        v-else
+        description="Список услуг пуст или не был получен от бэкенда."
+        icon="i-lucide-badge-dollar-sign"
+        title="Услуги не загружены"
+      />
 
       <UModal
         v-model:open="serviceModalOpen"
@@ -286,6 +349,31 @@ async function removeService(id: string) {
               </UFormField>
             </div>
 
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField label="Ссылка на картинку">
+                <UInput v-model="form.image" placeholder="https://..." />
+              </UFormField>
+
+              <UFormField label="Или загрузите файл">
+                <UInput
+                  accept="image/*"
+                  type="file"
+                  @change="handleImageInput"
+                />
+              </UFormField>
+            </div>
+
+            <div v-if="form.image || imageFile" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
+                Предпросмотр
+              </p>
+              <img
+                :alt="form.name || 'Превью услуги'"
+                :src="previewUrl"
+                class="max-h-64 w-full rounded-lg object-contain"
+              >
+            </div>
+
             <UCheckbox v-model="form.is_active" label="Услуга активна" />
           </div>
         </template>
@@ -306,4 +394,21 @@ async function removeService(id: string) {
       </UModal>
     </template>
   </UDashboardPanel>
+
+  <UModal
+    v-model:open="previewOpen"
+    class="sm:max-w-3xl"
+    :title="previewTitle || 'Предпросмотр изображения'"
+  >
+    <template #body>
+      <div class="flex justify-center">
+        <img
+          v-if="previewSrc"
+          :alt="previewTitle || 'Превью услуги'"
+          :src="previewSrc"
+          class="max-h-[70vh] max-w-full rounded-2xl border border-charcoal-200 object-contain"
+        >
+      </div>
+    </template>
+  </UModal>
 </template>

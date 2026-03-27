@@ -12,6 +12,19 @@ export function useCertificatesApi() {
         successMessage: 'Сертификат создан'
       })
     },
+    update(id: string, payload: Partial<CertificateCreatePayload>) {
+      return client.request(`/api/certificate/${id}`, {
+        body: payload,
+        method: 'PATCH',
+        successMessage: 'Сертификат обновлен'
+      })
+    },
+    remove(id: string) {
+      return client.request(`/api/certificate/${id}`, {
+        method: 'DELETE',
+        successMessage: 'Сертификат удален'
+      })
+    },
     listActive() {
       return client.request('/api/certificate/active')
     },

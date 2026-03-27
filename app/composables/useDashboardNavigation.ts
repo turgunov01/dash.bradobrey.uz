@@ -8,9 +8,10 @@ export function useDashboardNavigation() {
   const primaryLinks = [[
     { icon: 'i-lucide-layout-dashboard', label: 'Обзор', to: '/' },
     { icon: 'i-lucide-monitor-smartphone', label: 'Киоск', to: '/kiosk' },
+    { icon: 'i-lucide-users', label: 'Барберы', to: '/barbers' },
+    { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
     { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' },
     { icon: 'i-lucide-history', label: 'История', to: '/history' },
-    { icon: 'i-lucide-scroll-text', label: 'История барбера', to: '/history/barber' },
     { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },
     { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
     { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
