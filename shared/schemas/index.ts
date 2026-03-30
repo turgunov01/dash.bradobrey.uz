@@ -1,8 +1,26 @@
 import { z } from 'zod'
 
+import { employeePermissions, employeeRoles } from '../auth/employees'
+
 const identifierSchema = z.union([z.string(), z.number()]).transform(value => String(value))
 const optionalTextSchema = z.string().trim().optional().nullable()
 const numberLikeSchema = z.union([z.number(), z.string()]).transform(value => Number(value || 0))
+const employeeRoleTuple = [employeeRoles[0], ...employeeRoles.slice(1)] as [typeof employeeRoles[number], ...typeof employeeRoles[number][]]
+const employeePermissionTuple = [employeePermissions[0], ...employeePermissions.slice(1)] as [typeof employeePermissions[number], ...typeof employeePermissions[number][]]
+const employeeRoleSchema = z.enum(employeeRoleTuple)
+const employeePermissionSchema = z.enum(employeePermissionTuple)
+const employeePermissionsSchema = z.array(employeePermissionSchema).default([]).transform(value => [...new Set(value)])
+const optionalPasswordSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  if (typeof value === 'string' && !value.trim()) {
+    return undefined
+  }
+
+  return value
+}, z.string().min(6, 'Введите минимум 6 символов').optional())
 
 export const branchSchema = z.object({
   id: identifierSchema,
@@ -16,7 +34,8 @@ export const barberUserSchema = z.object({
   login: optionalTextSchema,
   name: z.string().catch('Неизвестный барбер'),
   phone: optionalTextSchema,
-  role: optionalTextSchema
+  permissions: employeePermissionsSchema.optional(),
+  role: z.union([employeeRoleSchema, optionalTextSchema]).optional().nullable()
 }).passthrough()
 
 export const barberSchema = z.object({
@@ -133,7 +152,22 @@ export const barberRegisterSchema = z.object({
   password: z.string().min(6),
   name: z.string().trim().min(2),
   branch_id: identifierSchema,
+  permissions: employeePermissionsSchema,
+  photo_url: optionalTextSchema,
   phone: optionalTextSchema,
+  role: employeeRoleSchema,
+  specialization: optionalTextSchema
+})
+
+export const barberUpdateSchema = z.object({
+  login: z.string().trim().min(1),
+  password: optionalPasswordSchema,
+  name: z.string().trim().min(2),
+  branch_id: identifierSchema,
+  permissions: employeePermissionsSchema,
+  photo_url: optionalTextSchema,
+  phone: optionalTextSchema,
+  role: employeeRoleSchema,
   specialization: optionalTextSchema
 })
 
@@ -266,6 +300,7 @@ export type PromoCode = z.infer<typeof promoCodeSchema>
 export type BannerItem = z.infer<typeof bannerSchema>
 export type LoginPayload = z.infer<typeof loginSchema>
 export type BarberRegisterPayload = z.infer<typeof barberRegisterSchema>
+export type BarberUpdatePayload = z.infer<typeof barberUpdateSchema>
 export type QueueUpdatePayload = z.infer<typeof queueUpdateSchema>
 export type QueueEditBeforeCompletePayload = z.infer<typeof queueEditBeforeCompleteSchema>
 export type BreakPayload = z.infer<typeof breakSchema>
@@ -277,3 +312,5 @@ export type PromoValidatePayload = z.infer<typeof promoValidateSchema>
 export type PromoUsePayload = z.infer<typeof promoUseSchema>
 export type PromoCreatePayload = z.infer<typeof promoCreateSchema>
 export type BannerFormPayload = z.infer<typeof bannerFormSchema>
+export type EmployeePermission = z.infer<typeof employeePermissionSchema>
+export type EmployeeRole = z.infer<typeof employeeRoleSchema>

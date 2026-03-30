@@ -1,7 +1,10 @@
 import type {
   BarberProfile,
+  BarberRegisterPayload,
+  BarberUpdatePayload,
   BarberUser,
   BreakPayload,
+  EmployeePermission,
   LoginPayload,
   QueueEditBeforeCompletePayload,
   QueueItem,
@@ -16,19 +19,19 @@ export function useBarbersApi() {
       return client.request("/api/barbers/break", {
         body: minutes,
         method: "POST",
-        successMessage: "РџРµСЂРµСЂС‹РІ РЅР°С‡Р°С‚",
+        successMessage: "Перерыв начат",
       });
     },
     callQueue(id: string) {
       return client.request(`/api/barbers/queue/${id}/call`, {
         method: "PATCH",
-        successMessage: "РљР»РёРµРЅС‚ РІС‹Р·РІР°РЅ",
+        successMessage: "Клиент вызван",
       });
     },
     completeQueue(id: string) {
       return client.request(`/api/barbers/queue/${id}/complete`, {
         method: "PATCH",
-        successMessage: "Р—Р°РїРёСЃСЊ РѕС‡РµСЂРµРґРё Р·Р°РІРµСЂС€РµРЅР°",
+        successMessage: "Запись очереди завершена",
       });
     },
     list(query?: Record<string, unknown>) {
@@ -37,7 +40,12 @@ export function useBarbersApi() {
           branch_id: string | null;
           id: string;
           login: string | null;
+          name?: string | null;
+          permissions?: EmployeePermission[];
+          photo_url?: string | null;
+          phone: string | null;
           role: string | null;
+          specialization?: string | null;
         }>;
         total?: number;
       }>("/api/barbers", {
@@ -46,19 +54,17 @@ export function useBarbersApi() {
       });
     },
     login(payload: LoginPayload) {
-      const data = client.request<any>("/api/barbers/login", {
+      return client.request<any>("/api/barbers/login", {
         body: payload,
         method: "POST",
-        successMessage: "Р’С…РѕРґ РІС‹РїРѕР»РЅРµРЅ",
+        successMessage: "Вход выполнен",
       });
-
-      return data;
     },
     logout(payload?: Record<string, unknown>) {
       return client.request("/api/barbers/logout", {
         body: payload,
         method: "POST",
-        successMessage: "Р’С‹С…РѕРґ РІС‹РїРѕР»РЅРµРЅ",
+        successMessage: "Выход выполнен",
       });
     },
     me(options: { silent?: boolean } = {}) {
@@ -87,37 +93,50 @@ export function useBarbersApi() {
         silent: options.silent,
       });
     },
-    register(payload: Record<string, unknown>) {
+    register(payload: BarberRegisterPayload | FormData) {
       return client.request("/api/barbers/register", {
         body: payload,
         method: "POST",
-        successMessage: "Р‘Р°СЂР±РµСЂ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅ",
+        successMessage: "Сотрудник создан",
+      });
+    },
+    remove(id: string) {
+      return client.request(`/api/barbers/${id}`, {
+        method: "DELETE",
+        successMessage: "Сотрудник удален",
       });
     },
     returnFromBreak() {
       return client.request("/api/barbers/return", {
         method: "POST",
-        successMessage: "Р’РѕР·РІСЂР°С‚ СЃ РїРµСЂРµСЂС‹РІР° РІС‹РїРѕР»РЅРµРЅ",
+        successMessage: "Возврат с перерыва выполнен",
       });
     },
     startQueue(id: string) {
       return client.request(`/api/barbers/queue/${id}/start`, {
         method: "PATCH",
-        successMessage: "РЈСЃР»СѓРіР° РЅР°С‡Р°С‚Р°",
+        successMessage: "Услуга начата",
+      });
+    },
+    update(id: string, payload: BarberUpdatePayload | FormData) {
+      return client.request(`/api/barbers/${id}`, {
+        body: payload,
+        method: "PATCH",
+        successMessage: "Сотрудник обновлен",
       });
     },
     updateMe(body: FormData | Record<string, unknown>) {
       return client.request("/api/barbers/me", {
         body,
         method: "PATCH",
-        successMessage: "РџСЂРѕС„РёР»СЊ РѕР±РЅРѕРІР»РµРЅ",
+        successMessage: "Профиль обновлен",
       });
     },
     updateQueue(id: string, payload: QueueUpdatePayload) {
       return client.request(`/api/barbers/queue/${id}`, {
         body: payload,
         method: "PATCH",
-        successMessage: "Р—Р°РїРёСЃСЊ РѕС‡РµСЂРµРґРё РѕР±РЅРѕРІР»РµРЅР°",
+        successMessage: "Запись очереди обновлена",
       });
     },
     updateQueueBeforeComplete(
@@ -127,20 +146,20 @@ export function useBarbersApi() {
       return client.request(`/api/barbers/queue/${id}/edit-before-complete`, {
         body: payload,
         method: "PATCH",
-        successMessage: "РљРѕСЂСЂРµРєС‚РёСЂРѕРІРєР° РїРµСЂРµРґ Р·Р°РІРµСЂС€РµРЅРёРµРј СЃРѕС…СЂР°РЅРµРЅР°",
+        successMessage: "Корректировка перед завершением сохранена",
       });
     },
     updateQueueNoShow(id: string, payload?: { no_show?: boolean }) {
       return client.request(`/api/barbers/queue/${id}/no-show`, {
         body: payload,
         method: "PATCH",
-        successMessage: "Р—Р°РїРёСЃСЊ РѕС‚РјРµС‡РµРЅР° РєР°Рє РЅРµСЏРІРєР°",
+        successMessage: "Запись отмечена как неявка",
       });
     },
     updateQueueNotInTime(id: string) {
       return client.request(`/api/barbers/queue/${id}/not-in-time`, {
         method: "PATCH",
-        successMessage: "Р—Р°РїРёСЃСЊ РѕС‚РјРµС‡РµРЅР° РєР°Рє РЅРµ РІРѕРІСЂРµРјСЏ",
+        successMessage: "Запись отмечена как не вовремя",
       });
     },
   };

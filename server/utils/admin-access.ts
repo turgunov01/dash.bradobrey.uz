@@ -9,6 +9,7 @@ const accessUserSchema = z.object({
   branch_id: optionalIdentifierSchema,
   id: identifierSchema,
   login: optionalTextSchema,
+  phone: optionalTextSchema,
   password_hash: z.string().optional().nullable(),
   role: optionalTextSchema
 }).passthrough()
@@ -36,6 +37,43 @@ function getSupabaseAccessConfig(event: H3Event) {
     serviceRoleKey,
     supabaseUrl
   }
+}
+
+function getSupabaseErrorPayload(error: any) {
+  return error?.data || error?.response?._data || null
+}
+
+function isMissingColumnError(error: any, column: string) {
+  const payload = getSupabaseErrorPayload(error)
+  const code = String(payload?.code || error?.code || '').trim()
+  const message = [
+    payload?.message,
+    payload?.details,
+    error?.message
+  ].filter(Boolean).join(' ')
+
+  return code === '42703'
+    || code === 'PGRST204'
+    || (
+      message.includes(column)
+      && /does not exist|unknown column|not found|could not find|schema cache/i.test(message)
+    )
+}
+
+async function fetchSupabaseUsers(
+  event: H3Event,
+  query: Record<string, string | number>
+) {
+  const { serviceRoleKey, supabaseUrl } = getSupabaseAccessConfig(event)
+
+  return $fetch<unknown[]>('/rest/v1/users', {
+    baseURL: supabaseUrl,
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`
+    },
+    query
+  })
 }
 
 async function queryAccessUser(
@@ -70,7 +108,7 @@ async function queryAccessUser(
   }
   catch (error: any) {
     throw createError({
-      data: error?.data || error?.response?._data,
+      data: getSupabaseErrorPayload(error),
       statusCode: 502,
       statusMessage: 'Не удалось проверить доступ к панели через Supabase.'
     })
@@ -82,26 +120,44 @@ export async function listSupabaseUsers(
   options: {
     limit?: number
     role?: string | null
+    roles?: string[] | null
     branchId?: string | null
   } = {}
 ) {
-  const { serviceRoleKey, supabaseUrl } = getSupabaseAccessConfig(event)
+  const roleFilter = Array.isArray(options.roles) && options.roles.length
+    ? `in.(${options.roles.map(role => `"${role}"`).join(',')})`
+    : null
+
+  const baseQuery: Record<string, string | number> = {
+    limit: options.limit || 500,
+    order: 'login.asc.nullslast',
+    ...(roleFilter
+      ? { role: roleFilter }
+      : options.role
+        ? { role: `eq.${options.role}` }
+        : {}),
+    ...(options.branchId ? { branch_id: `eq.${options.branchId}` } : {})
+  }
 
   try {
-    const rows = await $fetch<unknown[]>('/rest/v1/users', {
-      baseURL: supabaseUrl,
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`
-      },
-      query: {
-        limit: options.limit || 500,
-        order: 'login.asc.nullslast',
-        select: 'id,login,role,branch_id',
-        ...(options.role ? { role: `eq.${options.role}` } : {}),
-        ...(options.branchId ? { branch_id: `eq.${options.branchId}` } : {})
+    let rows: unknown[]
+
+    try {
+      rows = await fetchSupabaseUsers(event, {
+        ...baseQuery,
+        select: 'id,login,phone,role,branch_id'
+      })
+    }
+    catch (error: any) {
+      if (!isMissingColumnError(error, 'phone')) {
+        throw error
       }
-    })
+
+      rows = await fetchSupabaseUsers(event, {
+        ...baseQuery,
+        select: 'id,login,role,branch_id'
+      })
+    }
 
     if (!Array.isArray(rows)) {
       return [] as AccessUser[]
@@ -121,7 +177,7 @@ export async function listSupabaseUsers(
   }
   catch (error: any) {
     throw createError({
-      data: error?.data || error?.response?._data,
+      data: getSupabaseErrorPayload(error),
       statusCode: 502,
       statusMessage: 'Не удалось получить список пользователей из Supabase.'
     })
@@ -159,10 +215,10 @@ export async function findSupabaseUserByLogin(
 }
 
 export function assertAdminNetworkRole(accessUser: AccessUser) {
-  if (accessUser.role !== 'admin_network') {
+  if (accessUser.role !== 'admin_network' && accessUser.role !== 'admin') {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Доступ к панели разрешен только пользователям admin_network.'
+      statusMessage: 'Доступ к панели разрешен только пользователям admin_network или admin.'
     })
   }
 
