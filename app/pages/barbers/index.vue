@@ -89,6 +89,10 @@ const roleOptions = computed(() =>
     value
   }))
 )
+const roleFilterOptions = computed(() => [
+  { label: 'Все роли', value: 'all' },
+  ...roleOptions.value
+])
 
 const branchMap = computed(() =>
   new Map(branchStore.branches.map(branch => [branch.id, branch.name]))
@@ -106,6 +110,8 @@ const columns: TableColumn<EmployeeRow>[] = [
 
 const page = ref(1)
 const pageSize = 10
+const searchLogin = ref('')
+const roleFilter = ref<'all' | EmployeeRole>('all')
 
 const { data, pending, refresh } = await useAsyncData('employees-directory', async () => {
   const response = await barbersApi.list({
@@ -140,10 +146,19 @@ const { data, pending, refresh } = await useAsyncData('employees-directory', asy
 })
 
 const employeeRows = computed<EmployeeRow[]>(() => data.value?.rows || [])
-const pageCount = computed(() => Math.max(1, Math.ceil(employeeRows.value.length / pageSize)))
+const filteredRows = computed<EmployeeRow[]>(() => {
+  const loginNeedle = searchLogin.value.trim().toLowerCase()
+
+  return employeeRows.value.filter((row) => {
+    const matchesLogin = !loginNeedle || row.login.toLowerCase().includes(loginNeedle)
+    const matchesRole = roleFilter.value === 'all' || row.role === roleFilter.value
+    return matchesLogin && matchesRole
+  })
+})
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize)))
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize
-  return employeeRows.value.slice(start, start + pageSize)
+  return filteredRows.value.slice(start, start + pageSize)
 })
 
 const selectedRoleDescription = computed(() => roleDescriptions[form.role])
@@ -163,7 +178,7 @@ const selectedPermissionPreview = computed(() => {
   return remaining > 0 ? `${preview} и еще ${remaining}` : preview
 })
 
-watch([employeeRows, page], () => {
+watch([filteredRows, page], () => {
   if (page.value > pageCount.value) {
     page.value = pageCount.value
   }
@@ -460,7 +475,7 @@ onBeforeUnmount(() => {
         <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
           <div class="flex flex-wrap items-center justify-between gap-3 pb-2">
             <UBadge color="neutral" size="lg" variant="soft">
-              {{ employeeRows.length }} сотрудников
+              {{ filteredRows.length }} сотрудников
             </UBadge>
             <div class="flex items-center gap-2">
               <UButton color="primary" icon="i-lucide-user-plus" @click="openCreateModal">
@@ -472,7 +487,21 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="employeeRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <div class="grid gap-3 pb-4 md:grid-cols-3">
+            <UInput
+              v-model="searchLogin"
+              icon="i-lucide-search"
+              placeholder="Поиск по логину"
+            />
+            <USelectMenu
+              v-model="roleFilter"
+              :items="roleFilterOptions"
+              value-key="value"
+              placeholder="Все роли"
+            />
+          </div>
+
+          <div v-if="filteredRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
             <div class="max-h-[80vh] overflow-auto">
               <UTable
                 :columns="columns"

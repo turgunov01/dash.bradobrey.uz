@@ -131,6 +131,9 @@ const page = ref(1)
 const pageSize = 10
 const detailModalOpen = ref(false)
 const selectedPhone = ref('')
+const searchPhone = ref('')
+const minVisits = ref<number | null>(null)
+const serviceFilter = ref('')
 
 const { data, pending, refresh } = await useAsyncData('clients-directory', async () => {
   const query = {
@@ -218,13 +221,32 @@ const visitsByPhone = computed(() => {
   return grouped
 })
 
-const pageCount = computed(() => Math.max(1, Math.ceil(clientRows.value.length / pageSize)))
-const pagedRows = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return clientRows.value.slice(start, start + pageSize)
+const filteredClientRows = computed<ClientRow[]>(() => {
+  const phoneNeedle = searchPhone.value.trim()
+  const selectedService = serviceFilter.value.trim()
+  const min = minVisits.value ?? null
+
+  return clientRows.value.filter((row) => {
+    const matchesPhone = !phoneNeedle || row.phone.includes(phoneNeedle)
+    const matchesVisits = min === null || row.visits >= min
+
+    if (selectedService) {
+      const visits = visitsByPhone.value.get(row.phone) || []
+      const hasService = visits.some(v => getVisitServiceIds(v).includes(selectedService))
+      return matchesPhone && matchesVisits && hasService
+    }
+
+    return matchesPhone && matchesVisits
+  })
 })
 
-watch([clientRows, page], () => {
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredClientRows.value.length / pageSize)))
+const pagedRows = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return filteredClientRows.value.slice(start, start + pageSize)
+})
+
+watch([filteredClientRows, page], () => {
   if (page.value > pageCount.value) {
     page.value = pageCount.value
   }
@@ -270,6 +292,13 @@ const serviceNameMap = computed(() =>
     (servicesData.value || []).map((svc: any) => [String(svc.id), svc.name || `Услуга ${svc.id}`])
   )
 )
+const serviceOptions = computed(() => [
+  { label: 'Все услуги', value: '' },
+  ...(servicesData.value || []).map((svc: any) => ({
+    label: svc.name || `Услуга ${svc.id}`,
+    value: String(svc.id)
+  }))
+])
 
 function getVisitServices(visit: Record<string, any>) {
   const ids = Array.isArray(visit.service_ids)
@@ -285,6 +314,16 @@ function getVisitServices(visit: Record<string, any>) {
     })
     .filter(Boolean)
 }
+
+function getVisitServiceIds(visit: Record<string, any>) {
+  const ids = Array.isArray(visit.service_ids)
+    ? visit.service_ids
+    : visit.service_id
+      ? [visit.service_id]
+      : []
+
+  return ids.map((id: any) => String(id))
+}
 </script>
 
 <template>
@@ -293,12 +332,34 @@ function getVisitServices(visit: Record<string, any>) {
       <div class="flex items-center justify-between pb-4">
         <div class="flex items-center gap-3">
           <UBadge color="neutral" size="lg" variant="soft">
-            {{ formatCount(clientRows.length) }} клиентов
+            {{ formatCount(filteredClientRows.length) }} клиентов
           </UBadge>
         </div>
         <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
           Обновить
         </UButton>
+      </div>
+
+      <div class="grid gap-3 pb-4 md:grid-cols-3">
+        <UInput
+          v-model="searchPhone"
+          icon="i-lucide-search"
+          placeholder="Телефон"
+        />
+        <UInput
+          v-model.number="minVisits"
+          type="number"
+          min="0"
+          placeholder="Мин. визитов"
+        />
+        <USelect
+          v-model="serviceFilter"
+          :options="serviceOptions"
+          option-attribute="label"
+          value-attribute="value"
+          placeholder="Все услуги"
+          clearable
+        />
       </div>
 
       <div class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">

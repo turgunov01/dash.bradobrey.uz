@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
-
+import Draggable from 'vuedraggable'
+import { useStorage } from '@vueuse/core'
 import { serviceFormSchema } from '~~/shared/schemas'
 import { formatMoney } from '~/utils/format'
 import { flattenServicesPayload } from '~/utils/services'
 
 type ServiceRow = {
-  base_price: number | string
+  base_price: number
   category: string
   duration_minutes: number
   id: string
   image: string | null
   is_active: boolean
   name: string
+}
+
+type Bucket = {
+  name: string
+  items: ServiceRow[]
 }
 
 const servicesApi = useServicesApi()
@@ -24,6 +29,19 @@ const serviceModalOpen = ref(false)
 const previewOpen = ref(false)
 const previewSrc = ref('')
 const previewTitle = ref('')
+
+const sortDirection = ref<'asc' | 'desc'>('asc')
+const orderStorage = useStorage<Record<string, string[]>>('services-order', {}, undefined, {
+  deep: true,
+  listenToStorageChanges: false
+})
+const categoryOrder = useStorage<string[]>('services-category-order', [], undefined, {
+  deep: true,
+  listenToStorageChanges: false
+})
+const buckets = ref<Bucket[]>([])
+const ready = ref(false)
+
 const form = reactive({
   category_name: '',
   duration: 30,
@@ -33,31 +51,10 @@ const form = reactive({
   name: '',
   price: 0
 })
+
 const imageFile = ref<File | null>(null)
 const objectUrl = ref('')
 const previewUrl = computed(() => objectUrl.value || form.image || '')
-const servicePage = ref(1)
-const servicePageSize = 10
-
-const modalTitle = computed(() =>
-  form.id ? 'Редактировать услугу' : 'Создать новую услугу'
-)
-
-const modalDescription = computed(() =>
-  form.id
-    ? 'Обновите данные выбранной услуги.'
-    : 'Заполните форму, чтобы добавить услугу в каталог.'
-)
-
-const serviceColumns: TableColumn<ServiceRow>[] = [
-  { accessorKey: 'name', header: 'name' },
-  { accessorKey: 'category', header: 'category' },
-  { accessorKey: 'duration_minutes', header: 'duration_minutes' },
-  { accessorKey: 'base_price', header: 'base_price' },
-  { accessorKey: 'image', header: 'image' },
-  { accessorKey: 'is_active', header: 'is_active' },
-  { id: 'actions', header: '' }
-]
 
 const { data, pending, refresh } = await useAsyncData('services-dashboard', async () => {
   return await servicesApi.list()
@@ -67,45 +64,164 @@ const { data, pending, refresh } = await useAsyncData('services-dashboard', asyn
 
 const serviceRows = computed<ServiceRow[]>(() =>
   flattenServicesPayload(data.value).map((service, index) => ({
-    base_price: service.base_price ?? service.price ?? 0,
-    category: service.category || 'Без категории',
+    base_price: Number(service.base_price ?? service.price ?? 0),
+    category: service.category?.trim() || 'Без категории',
     duration_minutes: Number(service.duration_minutes ?? service.duration ?? 0),
     id: String(service.id ?? `service-${index}`),
-    image: String(service.image || '').trim() || null,
+    image: service.image ? String(service.image).trim() : null,
     is_active: Boolean(service.is_active ?? true),
-    name: service.name || 'Услуга без названия'
-  })).sort((left, right) => {
-    const categoryComparison = left.category.localeCompare(right.category, 'ru')
+    name: service.name?.trim() || 'Услуга без названия'
+  }))
+)
 
-    return categoryComparison !== 0
-      ? categoryComparison
-      : left.name.localeCompare(right.name, 'ru')
+watch(serviceRows, (rows) => {
+  if (ready.value) {
+    syncBuckets(rows)
+  }
+}, { immediate: true })
+
+watch(sortDirection, () => {
+  buckets.value = buckets.value.map(bucket => ({
+    ...bucket,
+    items: applySortAndOrder(bucket.items, bucket.name)
+  }))
+})
+
+onMounted(() => {
+  ready.value = true
+  syncBuckets(serviceRows.value)
+})
+
+const totalServices = computed(() => serviceRows.value.length)
+const modalTitle = computed(() => form.id ? 'Обновить услугу' : 'Создать услугу')
+const modalDescription = computed(() => form.id ? 'Измените параметры и сохраните' : 'Заполните данные, чтобы добавить услугу')
+
+function applySortAndOrder(list: ServiceRow[], category: string, preferredOrder?: string[]) {
+  const ordered = [...list].sort((a, b) =>
+    sortDirection.value === 'asc'
+      ? a.name.localeCompare(b.name, 'ru')
+      : b.name.localeCompare(a.name, 'ru')
+  )
+
+  const saved = preferredOrder && preferredOrder.length
+    ? preferredOrder
+    : orderStorage.value?.[category]
+  if (saved?.length) {
+    const indexMap = new Map(saved.map((id, idx) => [id, idx]))
+    ordered.sort((a, b) => {
+      const ai = indexMap.get(a.id)
+      const bi = indexMap.get(b.id)
+      if (ai !== undefined && bi !== undefined) return ai - bi
+      if (ai !== undefined) return -1
+      if (bi !== undefined) return 1
+      return sortDirection.value === 'asc'
+        ? a.name.localeCompare(b.name, 'ru')
+        : b.name.localeCompare(a.name, 'ru')
+    })
+  }
+
+  return ordered
+}
+
+function syncBuckets(rows: ServiceRow[]) {
+  const map = new Map<string, ServiceRow[]>()
+  for (const row of rows) {
+    const key = row.category || 'Без категории'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push({ ...row })
+  }
+
+  const storedOrder = categoryOrder.value || []
+  const names = Array.from(map.keys()).sort((a, b) => {
+    const ai = storedOrder.indexOf(a)
+    const bi = storedOrder.indexOf(b)
+    if (ai !== -1 && bi !== -1) return ai - bi
+    if (ai !== -1) return -1
+    if (bi !== -1) return 1
+    return a.localeCompare(b, 'ru')
   })
-)
 
-const servicePageCount = computed(() => Math.max(1, Math.ceil(serviceRows.value.length / servicePageSize)))
-const pagedServices = computed(() => {
-  const start = (servicePage.value - 1) * servicePageSize
-  return serviceRows.value.slice(start, start + servicePageSize)
-})
+  const next: Bucket[] = []
 
-watch([serviceRows, servicePage], () => {
-  if (servicePage.value > servicePageCount.value) {
-    servicePage.value = servicePageCount.value
+  for (const name of names) {
+    const existing = buckets.value.find(b => b.name === name)
+    const preferredOrder = ready.value
+      ? (existing?.items.map(i => i.id) || orderStorage.value?.[name] || [])
+      : (existing?.items.map(i => i.id) || [])
+    const items = applySortAndOrder(map.get(name) || [], name, preferredOrder)
+    next.push({ name, items })
   }
-})
 
-watch(
-  () => [branchStore.activeBranchId, serviceRows.value.length],
-  () => {
-    servicePage.value = 1
+  buckets.value = next
+
+  // ensure category order stored
+  if (ready.value) {
+    categoryOrder.value = next.map(b => b.name)
   }
-)
+}
+
+function saveOrder(category: string) {
+  const bucket = buckets.value.find(b => b.name === category)
+  if (!bucket) return
+
+  orderStorage.value = {
+    ...(orderStorage.value || {}),
+    [category]: bucket.items.map(item => item.id)
+  }
+}
+
+function persistAllOrders() {
+  for (const bucket of buckets.value) {
+    orderStorage.value = {
+      ...(orderStorage.value || {}),
+      [bucket.name]: bucket.items.map(item => item.id)
+    }
+  }
+  categoryOrder.value = buckets.value.map(b => b.name)
+  useApiClient().notifySuccess('Порядок сохранён')
+}
+
+async function onDragChange(category: string, evt: any) {
+  if (evt.added?.element) {
+    evt.added.element.category = category
+  }
+  if (evt.moved?.element) {
+    evt.moved.element.category = category
+  }
+
+  saveOrder(category)
+
+  const fromCategory = evt?.from?.dataset?.category
+  if (fromCategory && fromCategory !== category) {
+    saveOrder(fromCategory)
+  }
+
+  const element = evt.added?.element ?? evt.moved?.element
+  const source = fromCategory || category
+  if (element && source !== category) {
+    try {
+      await servicesApi.update(element.id, {
+        category_name: category,
+        name: element.name,
+        price: element.base_price,
+        duration: element.duration_minutes,
+        image: element.image || undefined,
+        is_active: element.is_active
+      })
+    } catch (error) {
+      console.error('Failed to update category', error)
+      useApiClient().notifyError(new Error('Не удалось сохранить новую категорию'))
+    }
+  }
+}
+
+function persistCategoryOrder() {
+  categoryOrder.value = buckets.value.map(b => b.name)
+  useApiClient().notifySuccess('Порядок категорий сохранён')
+}
 
 watch(serviceModalOpen, (open) => {
-  if (!open) {
-    resetForm()
-  }
+  if (!open) resetForm()
 })
 
 function resetForm() {
@@ -144,6 +260,18 @@ function startEdit(service: ServiceRow) {
   serviceModalOpen.value = true
 }
 
+function handleImageInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (objectUrl.value) {
+    globalThis.URL?.revokeObjectURL(objectUrl.value)
+  }
+  objectUrl.value = globalThis.URL?.createObjectURL(file) || ''
+  imageFile.value = file
+}
+
 async function submit() {
   const payload = serviceFormSchema.safeParse({
     category_name: form.category_name || undefined,
@@ -155,39 +283,15 @@ async function submit() {
   })
 
   if (!payload.success) {
-    useApiClient().notifyError(new Error(payload.error.issues[0]?.message || 'Некорректные данные услуги'))
+    useApiClient().notifyError(new Error(payload.error.issues[0]?.message || 'Проверьте данные'))
     return
   }
 
-  // Если загружен файл — отправляем multipart, иначе обычный JSON
-  const body: FormData | Record<string, any> = imageFile.value
-    ? (() => {
-        const fd = new FormData()
-        fd.append('name', payload.data.name)
-        fd.append('base_price', String(payload.data.price ?? ''))
-        fd.append('duration_minutes', String(payload.data.duration ?? ''))
-        fd.append('is_active', String(payload.data.is_active ?? true))
-        if (payload.data.category_name) fd.append('category', payload.data.category_name)
-        if (payload.data.image) fd.append('image', payload.data.image)
-        fd.append('file', imageFile.value as Blob)
-        return fd
-      })()
-    : {
-        base_price: payload.data.price ?? null,
-        category: payload.data.category_name ?? null,
-        duration_minutes: payload.data.duration ?? null,
-        image: payload.data.image || undefined,
-        is_active: payload.data.is_active,
-        name: payload.data.name
-      }
-
   if (form.id) {
-    await servicesApi.update(form.id, body as any)
+    await servicesApi.update(form.id, payload.data)
+  } else {
+    await servicesApi.create(payload.data)
   }
-  else {
-    await servicesApi.create(body as any)
-  }
-
   await refresh()
   serviceModalOpen.value = false
 }
@@ -197,39 +301,11 @@ async function removeService(id: string) {
   await refresh()
 }
 
-function openPreview(src: string | null, title: string) {
-  if (!src) {
-    return
-  }
+function openPreview(src: string, title: string) {
   previewSrc.value = src
   previewTitle.value = title
   previewOpen.value = true
 }
-
-function handleImageInput(event: Event) {
-  const file = (event.target as HTMLInputElement)?.files?.[0] || null
-  imageFile.value = file
-}
-
-watch(imageFile, (file) => {
-  if (objectUrl.value) {
-    globalThis.URL?.revokeObjectURL(objectUrl.value)
-    objectUrl.value = ''
-  }
-
-  if (file) {
-    const created = globalThis.URL?.createObjectURL(file)
-    if (created) {
-      objectUrl.value = created
-    }
-  }
-})
-
-onBeforeUnmount(() => {
-  if (objectUrl.value) {
-    globalThis.URL?.revokeObjectURL(objectUrl.value)
-  }
-})
 </script>
 
 <template>
@@ -237,11 +313,25 @@ onBeforeUnmount(() => {
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" size="lg" variant="soft">
-          {{ serviceRows.length }} услуг
+          {{ totalServices }} услуг
         </UBadge>
+
         <div class="flex items-center gap-2">
+          <USelect
+            v-model="sortDirection"
+            :options="[
+              { label: 'A → Я', value: 'asc' },
+              { label: 'Я → A', value: 'desc' }
+            ]"
+            option-attribute="label"
+            value-attribute="value"
+            size="sm"
+          />
+          <UButton color="success" icon="i-lucide-save" variant="solid" @click="persistAllOrders">
+            Сохранить порядок
+          </UButton>
           <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal">
-            Создать услугу
+            Добавить услугу
           </UButton>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
@@ -249,97 +339,91 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="serviceRows.length" class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-        <div class="flex-1 overflow-auto">
-          <UTable
-            :columns="serviceColumns"
-            :data="pagedServices"
-            :loading="pending"
-            sticky="header"
-            :ui="{
-              root: 'w-full overflow-auto',
-              base: 'w-full min-w-[88rem]',
-              thead: 'bg-charcoal-50/90',
-              tbody: 'divide-y divide-charcoal-100',
-              th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
-              td: 'px-4 py-4 text-sm text-charcoal-700 align-middle'
-            }"
+      <Draggable
+        v-if="ready && buckets.length"
+        v-model="buckets"
+        item-key="name"
+        class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+        :group="{ name: 'categories', pull: false, put: false }"
+        handle=".category-drag-handle"
+        ghost-class="opacity-60"
+        @change="persistCategoryOrder"
+      >
+        <template #item="{ element: bucket }">
+          <div
+            class="rounded-2xl border border-charcoal-200 bg-white/90 p-3"
           >
-            <template #duration_minutes-cell="{ row }">
-              <span class="font-medium">{{ row.original.duration_minutes }} мин</span>
-            </template>
-
-            <template #base_price-cell="{ row }">
-              <span class="font-medium">{{ formatMoney(row.original.base_price) }}</span>
-            </template>
-
-            <template #image-cell="{ row }">
-              <button
-                v-if="row.original.image"
-                class="flex items-center"
-                type="button"
-                @click="openPreview(row.original.image, row.original.name)"
-              >
-                <img
-                  :alt="row.original.name"
-                  :src="row.original.image"
-                  class="size-12 rounded-xl border border-charcoal-200 object-cover transition hover:scale-[1.02] hover:shadow"
-                >
-              </button>
-              <span v-else class="text-charcoal-400">Нет изображения</span>
-            </template>
-
-            <template #is_active-cell="{ row }">
-              <SharedStatusBadge :label="row.original.is_active ? 'active' : 'inactive'" />
-            </template>
-
-            <template #actions-cell="{ row }">
-              <div class="flex justify-end gap-2">
-                <UTooltip text="Редактировать">
-                  <UButton
-                    aria-label="Редактировать услугу"
-                    color="neutral"
-                    icon="i-lucide-pencil"
-                    square
-                    variant="ghost"
-                    @click="startEdit(row.original)"
-                  />
-                </UTooltip>
-
-                <UTooltip text="Удалить">
-                  <UButton
-                    aria-label="Удалить услугу"
-                    color="error"
-                    icon="i-lucide-trash-2"
-                    square
-                    variant="ghost"
-                    @click="removeService(row.original.id)"
-                  />
-                </UTooltip>
+            <div class="mb-2 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <UButton
+                  icon="i-lucide-grip-vertical"
+                  variant="ghost"
+                  size="xs"
+                  class="category-drag-handle cursor-grab"
+                />
+                <h3 class="text-lg font-semibold text-charcoal-950">{{ bucket.name }}</h3>
               </div>
-            </template>
-          </UTable>
-        </div>
-        <div class="flex items-center justify-end gap-3 border-t border-charcoal-100 px-4 py-3">
-          <span class="text-xs text-charcoal-500">
-            Показано {{ pagedServices.length ? (servicePage - 1) * servicePageSize + 1 : 0 }}–{{ Math.min(servicePage * servicePageSize, serviceRows.length) }} из {{ serviceRows.length }}
-          </span>
-          <UPagination
-            v-model:page="servicePage"
-            :page-count="servicePageCount"
-            :total="serviceRows.length"
-            :per-page="servicePageSize"
-            size="sm"
-          />
-        </div>
-      </div>
+              <UBadge color="neutral" variant="soft">{{ bucket.items.length }}</UBadge>
+            </div>
+
+            <Draggable
+              v-model="bucket.items"
+              :group="{ name: 'services', pull: true, put: true }"
+              item-key="id"
+              handle=".drag-handle"
+              class="space-y-2"
+              ghost-class="opacity-60"
+              :data-category="bucket.name"
+              @change="onDragChange(bucket.name, $event)"
+            >
+              <template #item="{ element }">
+                <div class="rounded-xl border border-charcoal-200 bg-white shadow-sm transition hover:-translate-y-[1px] hover:shadow-md">
+                  <div class="flex items-start justify-between gap-3 p-3">
+                    <div class="space-y-1">
+                      <p class="font-semibold text-charcoal-950">{{ element.name }}</p>
+                      <p class="text-xs text-charcoal-500">
+                        {{ element.duration_minutes }} мин · {{ formatMoney(element.base_price) }}
+                      </p>
+                      <p class="text-xs text-charcoal-400">ID: {{ element.id }}</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <UButton
+                        icon="i-lucide-grip-vertical"
+                        variant="ghost"
+                        size="xs"
+                        class="drag-handle cursor-grab"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-2 border-t border-charcoal-100 px-3 py-2">
+                    <UButton
+                      v-if="element.image"
+                      icon="i-lucide-image"
+                      variant="ghost"
+                      size="xs"
+                      @click="openPreview(element.image!, element.name)"
+                    />
+                    <UButton icon="i-lucide-pencil" variant="ghost" size="xs" @click="startEdit(element)" />
+                    <UButton icon="i-lucide-trash-2" color="error" variant="ghost" size="xs" @click="removeService(element.id)" />
+                  </div>
+                </div>
+              </template>
+            </Draggable>
+          </div>
+        </template>
+      </Draggable>
 
       <SharedEmptyState
-        v-else
+        v-else-if="ready"
         description="Список услуг пуст или не был получен от бэкенда."
         icon="i-lucide-badge-dollar-sign"
         title="Услуги не загружены"
       />
+
+      <div v-else class="flex justify-center py-8">
+        <ULoader size="lg" />
+      </div>
 
       <UModal
         v-model:open="serviceModalOpen"
@@ -353,12 +437,12 @@ onBeforeUnmount(() => {
               <UInput v-model="form.name" />
             </UFormField>
 
-            <UFormField label="Название категории">
-              <UInput v-model="form.category_name" placeholder="Стрижки, бритье, окрашивание" />
+            <UFormField label="Категория">
+              <UInput v-model="form.category_name" placeholder="Стрижки, бритьё, окрашивание" />
             </UFormField>
 
             <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Длительность">
+              <UFormField label="Длительность (мин)">
                 <UInput v-model="form.duration" type="number" />
               </UFormField>
 
@@ -381,7 +465,7 @@ onBeforeUnmount(() => {
               </UFormField>
             </div>
 
-            <div v-if="form.image || imageFile" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+            <div v-if="previewUrl" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
               <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
                 Предпросмотр
               </p>
