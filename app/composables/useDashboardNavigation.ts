@@ -12,6 +12,7 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' },
     { icon: 'i-lucide-history', label: 'История', to: '/history' },
     { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },
+    { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' },
     { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
     { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
     { icon: 'i-lucide-image-up', label: 'Баннеры маркетплейса', to: '/marketplace/banners' },
