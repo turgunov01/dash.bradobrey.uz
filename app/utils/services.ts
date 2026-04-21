@@ -1,5 +1,7 @@
 import type { ServiceItem } from '~~/shared/schemas'
 
+import { fixMojibakeCp1251 } from '~/utils/text'
+
 export type FlatServiceItem = ServiceItem & {
   category: string | null | undefined
 }
@@ -11,18 +13,20 @@ type ServicesPayload =
   | undefined
 
 function asCategoryName(value: unknown, fallback?: string | null) {
-  const normalized = String(value || '').trim()
+  const normalized = fixMojibakeCp1251(String(value || '').trim())
 
   return normalized || fallback || null
 }
 
 function normalizeService(service: any, fallbackCategory?: string | null): FlatServiceItem {
   const category = asCategoryName(service?.category ?? service?.category_name, fallbackCategory)
+  const name = fixMojibakeCp1251(String(service?.name ?? '').trim())
   const price = service?.base_price ?? service?.price ?? 0
   const duration = service?.duration_minutes ?? service?.duration ?? 0
 
   return {
     ...service,
+    ...(name ? { name } : {}),
     base_price: price,
     category,
     category_name: category,

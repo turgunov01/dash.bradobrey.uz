@@ -208,7 +208,56 @@ async function removeBranch(row: BranchRow) {
   removingId.value = row.id
 
   try {
-    await branchesApi.remove(row.id)
+    let deleted = false
+
+    try {
+      await branchesApi.remove(row.id, { silent: true })
+      deleted = true
+    }
+    catch (error: any) {
+      const payload = error?.data || error?.response?._data || null
+      const code = payload?.data?.code || payload?.code || null
+
+      if (code === 'BRANCH_DELETE_HAS_QUEUE_ENTRIES') {
+        if (import.meta.client && window.confirm(`В филиале ${label} есть записи очереди. Удалить филиал вместе с ними?`)) {
+          await branchesApi.remove(row.id, { force: true })
+          deleted = true
+        }
+
+        if (!deleted) {
+          return
+        }
+      }
+      else if (code === 'BRANCH_DELETE_HAS_USERS') {
+        if (import.meta.client && window.confirm(`В филиале ${label} есть сотрудники. Удалить филиал и отвязать сотрудников от филиала?`)) {
+          await branchesApi.remove(row.id, { force: true })
+          deleted = true
+        }
+
+        if (!deleted) {
+          return
+        }
+      }
+      else if (code === 'BRANCH_DELETE_HAS_BARBERS') {
+        if (import.meta.client && window.confirm(`В филиале ${label} есть мастера. Удалить филиал и отвязать мастеров от филиала?`)) {
+          await branchesApi.remove(row.id, { force: true })
+          deleted = true
+        }
+
+        if (!deleted) {
+          return
+        }
+      }
+      else {
+        useApiClient().notifyError(error)
+        throw error
+      }
+    }
+
+    if (!deleted) {
+      return
+    }
+
     await refresh()
     await branchStore.reload()
   }

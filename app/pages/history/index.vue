@@ -84,12 +84,62 @@ function getServiceNames(item: Record<string, any>) {
     .filter(Boolean)
 }
 
+function sanitizeFilenameSegment(value: string) {
+  const sanitized = value.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim()
+  return sanitized || 'export'
+}
+
+function formatExportTimestamp(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}`
+}
+
+function escapeCsvCell(value: unknown, delimiter: string) {
+  if (value === undefined || value === null) {
+    return ''
+  }
+
+  const text = String(value)
+  const shouldQuote = text.includes('"') || text.includes('\n') || text.includes('\r') || text.includes(delimiter)
+  const escaped = text.replace(/"/g, '""')
+
+  return shouldQuote ? `"${escaped}"` : escaped
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  if (!import.meta.client) {
+    return
+  }
+
+  const blob = new Blob([content], { type: mimeType })
+  const url = globalThis.URL?.createObjectURL(blob)
+
+  if (!url) {
+    throw new Error('Не удалось сформировать файл экспорта.')
+  }
+
+  const link = globalThis.document?.createElement('a')
+
+  if (!link) {
+    throw new Error('Не удалось сформировать ссылку для экспорта.')
+  }
+
+  link.href = url
+  link.download = filename
+  link.rel = 'noopener'
+  link.click()
+
+  globalThis.URL?.revokeObjectURL(url)
+}
+
 const branchStore = useBranchStore()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
 
 const page = ref(1)
 const itemsPerPage = 10
+const exporting = ref(false)
 
 await branchStore.ensureLoaded()
 
@@ -139,7 +189,12 @@ const rows = computed(() =>
     client: getClientName(item) || 'Клиент',
     phone: getClientPhone(item) || 'Не указан',
     created_at: item.created_at || (item as any).createdAt || '',
-    amount: item.amount ?? (item as any).price_override ?? (item as any).price ?? null
+    amount: item.amount
+      ?? (item as any).order_total
+      ?? (item as any).orderTotal
+      ?? (item as any).price_override
+      ?? (item as any).price
+      ?? null
   }))
 )
 
@@ -183,6 +238,59 @@ function openDetails(row: any) {
   selectedEntry.value = row
   detailModalOpen.value = true
 }
+
+async function exportHistoryToExcel() {
+  if (!import.meta.client) {
+    return
+  }
+
+  if (!rows.value.length) {
+    useApiClient().notifyError(new Error('Нет данных для экспорта'))
+    return
+  }
+
+  exporting.value = true
+
+  try {
+    const delimiter = ';'
+    const branchNameMap = new Map(branchStore.branches.map(branch => [String(branch.id), branch.name]))
+
+    const exportRows: string[][] = [
+      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Статус', 'Оплата', 'Сумма', 'Создано', 'Услуги']
+    ]
+
+    for (const entry of rows.value) {
+      const branchId = normalizeText((entry as any).branch_id || (entry as any).branch?.id)
+      const branchName = branchId ? branchNameMap.get(String(branchId)) || String(branchId) : ''
+
+      exportRows.push([
+        String((entry as any).id || ''),
+        branchName,
+        getClientName(entry) || '',
+        getClientPhone(entry) || '',
+        normalizeText((entry as any).status) || '',
+        formatPaymentMethod((entry as any).payment_method),
+        (entry as any).amount == null ? '' : String((entry as any).amount),
+        formatDateTime((entry as any).created_at),
+        getServiceNames(entry).join(', ')
+      ])
+    }
+
+    const csv = exportRows
+      .map(row => row.map(cell => escapeCsvCell(cell, delimiter)).join(delimiter))
+      .join('\r\n')
+
+    const activeBranchName = branchStore.activeBranch?.name
+    const branchSegment = sanitizeFilenameSegment(activeBranchName ? activeBranchName : 'all-branches')
+    const filename = `history_${branchSegment}_${formatExportTimestamp(new Date())}.csv`
+
+    downloadTextFile(filename, `\uFEFF${csv}`, 'text/csv;charset=utf-8')
+    useApiClient().notifySuccess('Экспорт готов')
+  }
+  finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -196,6 +304,16 @@ function openDetails(row: any) {
           <UBadge color="neutral" variant="outline">
             {{ historyItems.length }} записей
           </UBadge>
+          <UButton
+            color="neutral"
+            icon="i-lucide-file-spreadsheet"
+            :loading="exporting"
+            :disabled="!rows.length"
+            variant="outline"
+            @click="exportHistoryToExcel"
+          >
+            Экспорт в Excel
+          </UButton>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>

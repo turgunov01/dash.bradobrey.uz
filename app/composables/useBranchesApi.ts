@@ -24,9 +24,11 @@ export function useBranchesApi() {
         }
       })
     },
-    remove(id: string) {
+    remove(id: string, options: { force?: boolean, silent?: boolean } = {}) {
       return client.request<{ deleted: boolean, id: string }>(`/api/branches/${id}`, {
         method: 'DELETE',
+        ...(options.force ? { query: { force: true } } : {}),
+        ...(options.silent ? { silent: true } : {}),
         successMessage: 'Филиал удалён'
       })
     },
@@ -39,4 +41,3 @@ export function useBranchesApi() {
     }
   }
 }
-

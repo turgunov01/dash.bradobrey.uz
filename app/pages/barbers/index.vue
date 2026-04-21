@@ -259,6 +259,10 @@ function hasPermission(permission: EmployeePermission) {
   return form.permissions.includes(permission)
 }
 
+function isReadOnlyPermission(permission: EmployeePermission) {
+  return permission.includes('.read')
+}
+
 function setPermission(permission: EmployeePermission, enabled: boolean) {
   if (enabled) {
     if (!hasPermission(permission)) {
@@ -775,7 +779,16 @@ onBeforeUnmount(() => {
                     :label="employeePermissionDefinitions[permission].label"
                     :model-value="hasPermission(permission)"
                     @update:model-value="(value) => setPermission(permission, Boolean(value))"
-                  />
+                  >
+                    <template #label="{ label }">
+                      <span class="inline-flex items-center gap-2">
+                        <UTooltip v-if="isReadOnlyPermission(permission)" text="Только чтение">
+                          <UIcon class="text-base text-charcoal-400" name="i-lucide-eye" />
+                        </UTooltip>
+                        <span>{{ label }}</span>
+                      </span>
+                    </template>
+                  </USwitch>
                 </div>
               </div>
             </div>
