@@ -56,6 +56,10 @@ export const useSessionStore = defineStore("session", {
       const response = await useBarbersApi().login(payload);
 
       if (response?.authenticated) {
+        if (import.meta.client) {
+          useAdminToken().set(typeof response?.token === 'string' ? response.token : null)
+        }
+
         await this.ensureLoaded({ force: true });
       }
 
@@ -66,6 +70,10 @@ export const useSessionStore = defineStore("session", {
       try {
         await useBarbersApi().logout(payload);
       } finally {
+        if (import.meta.client) {
+          useAdminToken().clear()
+        }
+
         this.barber = null;
         this.user = null;
         this.status = "idle";

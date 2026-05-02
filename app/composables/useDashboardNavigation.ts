@@ -17,6 +17,14 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
     { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
     { icon: 'i-lucide-image-up', label: 'Баннеры маркетплейса', to: '/marketplace/banners' },
+    {
+      icon: 'i-lucide-settings',
+      label: 'Настройки',
+      children: [
+        { icon: 'i-lucide-award', label: 'Ранги клиентов', to: '/settings/loyalty-ranks' },
+        { icon: 'i-lucide-monitor-play', label: 'Реклама киоска', to: '/settings/kiosk-ads' }
+      ]
+    },
     { icon: 'i-lucide-code-xml', label: 'Отладка API', to: '/api-debug' }
   ]] satisfies NavigationMenuItem[][]
 
