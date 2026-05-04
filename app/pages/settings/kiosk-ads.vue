@@ -196,7 +196,7 @@ function moveRow(target: 'regular' | 'kids', index: number, direction: -1 | 1) {
 
 const { data, pending, refresh, error } = await useAsyncData('settings-kiosk-ads', async () => {
   return await adsApi.getSettings()
-})
+}, { server: false })
 
 watch(
   () => data.value?.settings,

@@ -17,12 +17,14 @@ const form = reactive({
 
 const snapshot = ref<Pick<LoyaltyRanksSettings, 'bronze_min_visits' | 'silver_min_visits' | 'gold_min_visits' | 'updated_at'> | null>(null)
 
-function parsePositiveInt(value: string) {
-  const trimmed = value.trim()
+function parsePositiveInt(value: unknown) {
+  const trimmed = String(value ?? '').trim()
   if (!trimmed) return null
 
+  if (!/^\d+$/.test(trimmed)) return null
+
   const num = Number(trimmed)
-  if (!Number.isInteger(num) || num <= 0) return null
+  if (!Number.isSafeInteger(num) || num <= 0) return null
 
   return num
 }
@@ -71,7 +73,7 @@ function applySettings(settings: LoyaltyRanksSettings | null | undefined) {
 
 const { data, pending, refresh, error } = await useAsyncData('settings-loyalty-ranks', async () => {
   return await ranksApi.getSettings()
-})
+}, { server: false })
 
 watch(
   () => data.value?.settings,
@@ -97,10 +99,14 @@ const hasChanges = computed(() => {
   const base = snapshot.value
   if (!base) return false
 
+  const bronzeValue = String(form.bronze_min_visits ?? '').trim()
+  const silverValue = String(form.silver_min_visits ?? '').trim()
+  const goldValue = String(form.gold_min_visits ?? '').trim()
+
   return (
-    form.bronze_min_visits.trim() !== String(base.bronze_min_visits)
-    || form.silver_min_visits.trim() !== String(base.silver_min_visits)
-    || form.gold_min_visits.trim() !== String(base.gold_min_visits)
+    bronzeValue !== String(base.bronze_min_visits)
+    || silverValue !== String(base.silver_min_visits)
+    || goldValue !== String(base.gold_min_visits)
   )
 })
 

@@ -40,11 +40,33 @@ export default defineEventHandler(async (event): Promise<{ authenticated: boolea
       login: accessUser.login || payload.login
     })
 
-  return {
-    authenticated: true,
-    user: toDashboardUser(accessUser),
-    token: undefined // Supabase login doesn't provide a token
-  }
+    let adminToken: string | undefined
+
+    try {
+      const response = await backendRequest<{ token?: string }>(event, {
+        auth: 'none',
+        body: {
+          login: payload.login,
+          password: payload.password
+        },
+        method: 'POST',
+        path: '/api/barbers/admin/login'
+      })
+
+      if (typeof response.data?.token === 'string' && response.data.token.trim()) {
+        adminToken = response.data.token.trim()
+      }
+    }
+    catch {
+      // Dashboard login should still work even if backend admin token is unavailable.
+      adminToken = undefined
+    }
+
+    return {
+      authenticated: true,
+      user: toDashboardUser(accessUser),
+      token: adminToken
+    }
   }
 
   const backendPayload = {
