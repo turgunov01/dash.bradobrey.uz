@@ -833,7 +833,7 @@ function toPieSlices<T>(
   const restValue = tail.reduce((sum, item) => sum + item.value, 0)
 
   return restValue > 0
-    ? [...head, { label: 'Р”СЂСѓРіРёРµ', value: restValue, displayValue: formatValue(restValue) }]
+    ? [...head, { label: 'Другие', value: restValue, displayValue: formatValue(restValue) }]
     : head
 }
 
@@ -842,8 +842,8 @@ const statusPieItems = computed<PieSlice[]>(() => {
   const cancelled = filteredHistory.value.filter(item => item.isCancelled).length
 
   return [
-    { label: 'Р—Р°РІРµСЂС€РµРЅРѕ', value: completed, displayValue: formatCount(completed), color: '#22c55e' },
-    { label: 'РћС‚РєР°Р·С‹', value: cancelled, displayValue: formatCount(cancelled), color: '#f59e0b' }
+    { label: 'Завершено', value: completed, displayValue: formatCount(completed), color: '#22c55e' },
+    { label: 'Отказы', value: cancelled, displayValue: formatCount(cancelled), color: '#f59e0b' }
   ].filter(item => item.value > 0)
 })
 

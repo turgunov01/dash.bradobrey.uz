@@ -10,7 +10,7 @@ function requireBranchId(value: unknown) {
   if (!id) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'РќРµ СѓРєР°Р·Р°РЅ id С„РёР»РёР°Р»Р°.'
+      statusMessage: 'Не указан id филиала.'
     })
   }
 
@@ -38,10 +38,9 @@ export default defineEventHandler(async (event) => {
   if (!item) {
     throw createError({
       statusCode: 404,
-      statusMessage: 'Р¤РёР»РёР°Р» РЅРµ РЅР°Р№РґРµРЅ.'
+      statusMessage: 'Филиал не найден.'
     })
   }
 
   return { item }
 })
-

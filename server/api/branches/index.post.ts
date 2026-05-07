@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   if (!item) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ С„РёР»РёР°Р».'
+      statusMessage: 'Не удалось создать филиал.'
     })
   }
 

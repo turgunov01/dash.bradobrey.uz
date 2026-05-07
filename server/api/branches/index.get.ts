@@ -48,11 +48,10 @@ export default defineEventHandler(async (event) => {
       throw createError({
         data: getSupabaseErrorPayload(error),
         statusCode: 501,
-        statusMessage: 'Р’ Supabase РЅРµС‚ С‚Р°Р±Р»РёС†С‹ branches. РЎРѕР·РґР°Р№С‚Рµ РµС‘ Рё РїРѕРІС‚РѕСЂРёС‚Рµ.'
+        statusMessage: 'В Supabase нет таблицы branches. Создайте её и повторите.'
       })
     }
 
     throw error
   }
 })
-

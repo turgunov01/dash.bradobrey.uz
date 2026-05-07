@@ -16,7 +16,7 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' },
     { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
     { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
-    { icon: 'i-lucide-image-up', label: 'Баннеры маркетплейса', to: '/marketplace/banners' },
+    { icon: 'i-lucide-shopping-bag', label: 'Маркетплейс', to: '/admin/marketplace/barbershops' },
     {
       icon: 'i-lucide-settings',
       label: 'Настройки',

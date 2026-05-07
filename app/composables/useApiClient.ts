@@ -71,8 +71,16 @@ function extractErrorMessage(error: any) {
 
 function buildRequestHeaders(headers?: HeadersInit) {
   const mergedHeaders = new Headers(
-    import.meta.server ? useRequestHeaders(["cookie"]) : undefined,
+    import.meta.server ? useRequestHeaders(["cookie", "authorization"]) : undefined,
   );
+
+  if (import.meta.client) {
+    const header = useAdminToken().authHeader.value;
+
+    if (header && !mergedHeaders.has("authorization")) {
+      mergedHeaders.set("authorization", header);
+    }
+  }
 
   if (!headers) {
     return mergedHeaders;

@@ -30,7 +30,7 @@ type BackendRequestOptions = {
 }
 
 const backendMethods = new Set<BackendMethod>(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'])
-const forwardedHeaderNames = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'user-agent', 'accept-language'] as const
+const forwardedHeaderNames = ['authorization', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'user-agent', 'accept-language'] as const
 
 function normalizeMethod(method?: string): BackendMethod {
   const normalizedMethod = method?.toUpperCase() as BackendMethod | undefined
@@ -81,8 +81,10 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
   const config = useRuntimeConfig(event)
   const token = getBarberToken(event)
   const authMode = options.auth ?? 'optional'
+  const forwardedHeaders = buildForwardedHeaders(event, options.headers)
+  const hasAuthorizationHeader = Boolean((forwardedHeaders as any).authorization)
 
-  if (authMode === 'required' && !token) {
+  if (authMode === 'required' && !token && !hasAuthorizationHeader) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Требуется сессия барбера.'
@@ -94,8 +96,8 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
       baseURL: config.public.apiBase,
       body: options.body,
       headers: {
-        ...buildForwardedHeaders(event, options.headers),
-        ...(authMode !== 'none' && token ? { Authorization: `Bearer ${token}` } : {})
+        ...forwardedHeaders,
+        ...(authMode !== 'none' && token && !hasAuthorizationHeader ? { Authorization: `Bearer ${token}` } : {})
       },
       method: normalizeMethod(options.method || getMethod(event)),
       query: options.query

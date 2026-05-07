@@ -198,7 +198,7 @@ function getBannerTitle(item: any) {
     item.title_en ||
     titleLocales.en ||
     item.title ||
-    'Р‘Р°РЅРЅРµСЂ Р±РµР· РЅР°Р·РІР°РЅРёСЏ'
+    'Баннер без названия'
   )
 }
 </script>
