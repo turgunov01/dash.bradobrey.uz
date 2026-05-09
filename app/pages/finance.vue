@@ -6,6 +6,7 @@ import { formatCount, formatMoney } from '~/utils/format'
 
 type FinanceEmployeeDraft = {
   advances: number
+  bonus_profit_percent: number
   penalty: number
   profit: number
   profit_percent: number
@@ -48,6 +49,7 @@ function normalizeNumber(value: unknown, fallback = 0) {
 function createEmptyEmployeeDraft(): FinanceEmployeeDraft {
   return {
     advances: 0,
+    bonus_profit_percent: 0,
     penalty: 0,
     profit: 0,
     profit_percent: 0,
@@ -64,6 +66,7 @@ function normalizeEmployeeDraft(value: unknown): FinanceEmployeeDraft {
 
   return {
     advances: Math.max(0, normalizeNumber(source.advances)),
+    bonus_profit_percent: Math.max(0, normalizeNumber(source.bonus_profit_percent)),
     penalty: Math.max(0, normalizeNumber(source.penalty)),
     profit: Math.max(0, normalizeNumber(source.profit)),
     profit_percent: Math.max(0, normalizeNumber(source.profit_percent)),
@@ -159,11 +162,20 @@ function getEmployeeDraft(id: string): FinanceEmployeeDraft {
 }
 
 function commissionForDraft(draft: FinanceEmployeeDraft) {
-  return Math.round((draft.profit * draft.profit_percent) / 100)
-}
+  const profit = Math.max(0, draft.profit)
+  const goal = Math.max(0, draft.salary)
+  const basePercent = Math.max(0, draft.profit_percent)
+  const bonusPercent = draft.bonus_profit_percent > 0
+    ? Math.max(0, draft.bonus_profit_percent)
+    : basePercent
 
-function totalForDraft(draft: FinanceEmployeeDraft) {
-  return draft.salary + commissionForDraft(draft) - draft.advances - draft.penalty
+  const profitToGoal = goal > 0 ? Math.min(profit, goal) : 0
+  const profitAboveGoal = Math.max(0, profit - profitToGoal)
+
+  return Math.round(
+    (profitToGoal * basePercent) / 100
+    + (profitAboveGoal * bonusPercent) / 100
+  )
 }
 
 async function loadRemoteSnapshot(options: { overwrite?: boolean } = {}) {
@@ -291,13 +303,13 @@ const totals = computed(() => {
 
 const columns: TableColumn<FinanceEmployeeRow>[] = [
   { accessorKey: 'name', header: 'Сотрудник' },
-  { id: 'salary', header: 'Оклад' },
+  { id: 'salary', header: 'Цель' },
   { id: 'profit', header: 'Прибыль' },
-  { id: 'profitPercent', header: '% с прибыли' },
+  { id: 'profitPercent', header: 'Процент' },
+  { id: 'bonusProfitPercent', header: 'Бонусный процент' },
   { id: 'advances', header: 'Авансы' },
   { id: 'penalty', header: 'Штраф' },
-  { id: 'commission', header: 'С прибыли' },
-  { id: 'total', header: 'К выплате' }
+  { id: 'commission', header: 'С прибыли' }
 ]
 </script>
 
@@ -464,6 +476,18 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
               />
             </template>
 
+            <template #bonusProfitPercent-cell="{ row }">
+              <UInput
+                v-model.number="getEmployeeDraft(row.original.id).bonus_profit_percent"
+                type="number"
+                min="0"
+                step="0.1"
+                size="sm"
+                class="w-28"
+                @update:model-value="dirty = true"
+              />
+            </template>
+
             <template #advances-cell="{ row }">
               <UInput
                 v-model.number="getEmployeeDraft(row.original.id).advances"
@@ -489,12 +513,6 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             <template #commission-cell="{ row }">
               <span class="font-semibold text-charcoal-950">
                 {{ formatMoney(commissionForDraft(getEmployeeDraft(row.original.id))) }}
-              </span>
-            </template>
-
-            <template #total-cell="{ row }">
-              <span class="font-semibold text-charcoal-950">
-                {{ formatMoney(totalForDraft(getEmployeeDraft(row.original.id))) }}
               </span>
             </template>
           </UTable>
