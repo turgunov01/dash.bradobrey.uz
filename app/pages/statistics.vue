@@ -301,6 +301,7 @@ const { data, pending, refresh } = await useAsyncData('statistics-dashboard-rich
       : [] as FlatServiceItem[]
   }
 }, {
+  server: false,
   watch: [() => branchStore.activeBranchId]
 })
 

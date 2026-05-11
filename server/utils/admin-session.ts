@@ -40,6 +40,33 @@ export function getAdminSessionCookieName(event: H3Event) {
   return String(useRuntimeConfig(event).adminSessionCookieName)
 }
 
+export function getAdminBackendTokenCookieName(event: H3Event) {
+  return String(useRuntimeConfig(event).adminBackendTokenCookieName)
+}
+
+export function getAdminBackendToken(event: H3Event) {
+  return getCookie(event, getAdminBackendTokenCookieName(event)) || null
+}
+
+export function setAdminBackendToken(event: H3Event, token: string) {
+  setCookie(event, getAdminBackendTokenCookieName(event), token, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 12,
+    path: '/',
+    sameSite: 'lax',
+    secure: shouldUseSecureCookie(event)
+  })
+}
+
+export function clearAdminBackendToken(event: H3Event) {
+  deleteCookie(event, getAdminBackendTokenCookieName(event), {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    secure: shouldUseSecureCookie(event)
+  })
+}
+
 export function getAdminSession(event: H3Event): AdminSession | null {
   const rawCookie = getCookie(event, getAdminSessionCookieName(event))
 

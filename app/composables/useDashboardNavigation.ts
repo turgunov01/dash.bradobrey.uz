@@ -17,7 +17,7 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-fingerprint', label: 'Verifix', to: '/verifix' },
     { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
     { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
-    { icon: 'i-lucide-shopping-bag', label: 'Маркетплейс', to: '/admin/marketplace/barbershops' },
+    { icon: 'i-lucide-shopping-bag', label: 'Маркетплейс', to: '/dashboard/marketplace' },
     {
       icon: 'i-lucide-settings',
       label: 'Настройки',

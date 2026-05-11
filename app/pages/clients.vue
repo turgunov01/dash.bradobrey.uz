@@ -148,6 +148,7 @@ const { data, pending, refresh } = await useAsyncData('clients-directory', async
 
   return { items: extractHistoryItems(response) }
 }, {
+  server: false,
   watch: [() => uiStore.statisticsRange.start, () => uiStore.statisticsRange.end, () => branchStore.activeBranchId]
 })
 

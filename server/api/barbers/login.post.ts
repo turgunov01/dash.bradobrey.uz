@@ -8,7 +8,12 @@ import {
   findSupabaseUserByLogin,
   toDashboardUser
 } from '~~/server/utils/admin-access'
-import { clearAdminSession, setAdminSession } from '~~/server/utils/admin-session'
+import {
+  clearAdminBackendToken,
+  clearAdminSession,
+  setAdminBackendToken,
+  setAdminSession
+} from '~~/server/utils/admin-session'
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken, setBarberToken } from '~~/server/utils/session'
 
@@ -34,6 +39,7 @@ export default defineEventHandler(async (event): Promise<{ authenticated: boolea
     })
 
     clearBarberToken(event)
+    clearAdminBackendToken(event)
     clearAdminSession(event)
     setAdminSession(event, {
       id: String(accessUser.id),
@@ -55,6 +61,7 @@ export default defineEventHandler(async (event): Promise<{ authenticated: boolea
 
       if (typeof response.data?.token === 'string' && response.data.token.trim()) {
         adminToken = response.data.token.trim()
+        setAdminBackendToken(event, adminToken)
       }
     }
     catch {
@@ -86,6 +93,7 @@ export default defineEventHandler(async (event): Promise<{ authenticated: boolea
   })
 
   if (response.data?.token) {
+    clearAdminBackendToken(event)
     clearAdminSession(event)
     setBarberToken(event, response.data.token)
   }

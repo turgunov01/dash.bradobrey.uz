@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
     prefer: 'return=representation',
     query: {
       id: `eq.${branchId}`,
-      select: 'id,name,address,city,timezone,work_hours,is_active'
+      select: 'id,name,address,city,timezone,work_hours,is_active,marketplace_barbershop_id'
     }
   })
 

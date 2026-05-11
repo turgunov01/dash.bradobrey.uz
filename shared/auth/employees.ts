@@ -34,8 +34,7 @@ export const employeePermissions = [
   'services.read',
   'services.manage',
   'promo.manage',
-  'certificates.manage',
-  'marketplace.manage'
+  'certificates.manage'
 ] as const
 
 export type EmployeeRole = typeof employeeRoles[number]
@@ -133,10 +132,6 @@ export const employeePermissionDefinitions: Record<EmployeePermission, Permissio
   'certificates.manage': {
     description: 'Управление сертификатами.',
     label: 'Сертификаты'
-  },
-  'marketplace.manage': {
-    description: 'Управление маркетплейс-баннерами и витриной.',
-    label: 'Маркетплейс'
   }
 }
 
@@ -178,8 +173,7 @@ export const employeePermissionSections: PermissionSection[] = [
       'services.read',
       'services.manage',
       'promo.manage',
-      'certificates.manage',
-      'marketplace.manage'
+      'certificates.manage'
     ],
     key: 'catalog',
     label: 'Каталог и маркетинг'
@@ -226,8 +220,7 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
     'services.read',
     'services.manage',
     'promo.manage',
-    'certificates.manage',
-    'marketplace.manage'
+    'certificates.manage'
   ]
 }
 

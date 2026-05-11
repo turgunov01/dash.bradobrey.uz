@@ -92,6 +92,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    adminBackendTokenCookieName: 'brado_admin_backend_token',
     adminSessionCookieName: 'brado_admin_session',
     adminSessionSecret: env.NUXT_ADMIN_SESSION_SECRET || env.NUXT_SESSION_SECRET || env.ADMIN_SESSION_SECRET || '',
     barberTokenCookieName: 'brado_barber_token',

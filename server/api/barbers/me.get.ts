@@ -1,6 +1,6 @@
 import { setResponseStatus } from 'h3'
 
-import { clearAdminSession, getAdminSession } from '~~/server/utils/admin-session'
+import { clearAdminBackendToken, clearAdminSession, getAdminSession } from '~~/server/utils/admin-session'
 import { ensureAdminNetworkAccess, toDashboardUser } from '~~/server/utils/admin-access'
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken } from '~~/server/utils/session'
@@ -19,6 +19,7 @@ export default defineEventHandler(async (event): Promise<unknown> => {
     }
     catch (error) {
       clearAdminSession(event)
+      clearAdminBackendToken(event)
       throw error
     }
   }
@@ -50,6 +51,7 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   catch (error: any) {
     if ((error?.statusCode || error?.response?.status) === 403) {
       clearAdminSession(event)
+      clearAdminBackendToken(event)
       clearBarberToken(event)
     }
 

@@ -172,6 +172,20 @@ export default defineEventHandler(async (event) => {
         continue
       }
 
+      if (constraint === 'barber_activity_events_branch_id_fkey') {
+        // Activity events are audit logs: keep them, just detach from deleted branch.
+        await supabaseRequest(event, 'barber_activity_events', {
+          body: { branch_id: null },
+          method: 'PATCH',
+          prefer: 'return=minimal',
+          query: {
+            branch_id: `eq.${branchId}`
+          }
+        })
+
+        continue
+      }
+
       throw error
     }
   }

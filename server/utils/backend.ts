@@ -10,6 +10,7 @@ import {
 } from 'h3'
 
 import { getBarberToken } from './session'
+import { getAdminBackendToken } from './admin-session'
 
 type AuthMode = 'none' | 'optional' | 'required'
 type BackendMethod = 'DELETE' | 'GET' | 'HEAD' | 'OPTIONS' | 'PATCH' | 'POST' | 'PUT'
@@ -79,7 +80,7 @@ export async function readIncomingBody(event: H3Event): Promise<BackendBody> {
 
 export async function backendRequest<T>(event: H3Event, options: BackendRequestOptions): Promise<BackendResponse<T>> {
   const config = useRuntimeConfig(event)
-  const token = getBarberToken(event)
+  const token = getBarberToken(event) || getAdminBackendToken(event)
   const authMode = options.auth ?? 'optional'
   const forwardedHeaders = buildForwardedHeaders(event, options.headers)
   const hasAuthorizationHeader = Boolean((forwardedHeaders as any).authorization)

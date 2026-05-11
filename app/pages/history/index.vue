@@ -45,6 +45,40 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
+function toNumberOrNull(value: unknown) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  const amount = Number(value)
+
+  return Number.isFinite(amount) ? amount : null
+}
+
+function getOriginalAmount(item: Record<string, any>) {
+  return toNumberOrNull(
+    item.original_amount
+    ?? item.originalAmount
+    ?? item.order_total
+    ?? item.orderTotal
+  )
+}
+
+function getAdjustmentReason(item: Record<string, any>) {
+  return normalizeText(
+    item.price_override_reason
+    || item.priceOverrideReason
+    || item.override_reason
+  )
+}
+
+function isPriceAdjusted(item: Record<string, any>) {
+  const amountSource = normalizeText(item.amount_source || item.amountSource)
+  const override = toNumberOrNull(item.price_override ?? item.priceOverride)
+
+  return amountSource === 'price_override' || (override !== null && override > 0)
+}
+
 function getClientPhone(item: Record<string, any>) {
   return normalizeText(
     item.phone_number
@@ -162,6 +196,7 @@ const { data, pending, refresh } = await useAsyncData('history-current-filter', 
 
   return extractHistoryItems(response)
 }, {
+  server: false,
   watch: [() => branchStore.activeBranchId]
 })
 
@@ -194,7 +229,11 @@ const rows = computed(() =>
       ?? (item as any).orderTotal
       ?? (item as any).price_override
       ?? (item as any).price
-      ?? null
+      ?? null,
+    amount_source: (item as any).amount_source || (item as any).amountSource || null,
+    original_amount: (item as any).original_amount ?? (item as any).originalAmount ?? null,
+    price_override: (item as any).price_override ?? (item as any).priceOverride ?? null,
+    price_override_reason: (item as any).price_override_reason ?? (item as any).priceOverrideReason ?? null
   }))
 )
 
@@ -256,7 +295,7 @@ async function exportHistoryToExcel() {
     const branchNameMap = new Map(branchStore.branches.map(branch => [String(branch.id), branch.name]))
 
     const exportRows: string[][] = [
-      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Статус', 'Оплата', 'Сумма', 'Создано', 'Услуги']
+      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Статус', 'Оплата', 'Сумма', 'Оригинальная сумма', 'Причина изменения', 'Создано', 'Услуги']
     ]
 
     for (const entry of rows.value) {
@@ -271,6 +310,8 @@ async function exportHistoryToExcel() {
         normalizeText((entry as any).status) || '',
         formatPaymentMethod((entry as any).payment_method),
         (entry as any).amount == null ? '' : String((entry as any).amount),
+        getOriginalAmount(entry) == null ? '' : String(getOriginalAmount(entry)),
+        getAdjustmentReason(entry) || '',
         formatDateTime((entry as any).created_at),
         getServiceNames(entry).join(', ')
       ])
@@ -347,7 +388,14 @@ async function exportHistoryToExcel() {
             </template>
 
             <template #amount-cell="{ row }">
-              {{ formatMoney(row.original.amount) }}
+              <div class="space-y-1">
+                <p class="font-semibold text-charcoal-950">
+                  {{ formatMoney(row.original.amount) }}
+                </p>
+                <p v-if="isPriceAdjusted(row.original)" class="text-xs text-amber-700">
+                  Изменено<span v-if="getOriginalAmount(row.original) !== null"> с {{ formatMoney(getOriginalAmount(row.original)) }}</span>
+                </p>
+              </div>
             </template>
 
             <template #created_at-cell="{ row }">
@@ -408,6 +456,14 @@ async function exportHistoryToExcel() {
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Сумма</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatMoney(selectedEntry.amount) }}</p>
+                <div v-if="isPriceAdjusted(selectedEntry)" class="mt-2 space-y-1 text-xs text-charcoal-600">
+                  <p v-if="getOriginalAmount(selectedEntry) !== null">
+                    Оригинальная сумма: {{ formatMoney(getOriginalAmount(selectedEntry)) }}
+                  </p>
+                  <p v-if="getAdjustmentReason(selectedEntry)">
+                    Причина: {{ getAdjustmentReason(selectedEntry) }}
+                  </p>
+                </div>
               </div>
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Создано</p>

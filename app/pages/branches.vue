@@ -10,6 +10,7 @@ type BranchRow = {
   address: string | null
   city: string | null
   timezone: string | null
+  marketplace_barbershop_id: string | null
   is_active: boolean | null
 }
 
@@ -38,6 +39,7 @@ function toBranchRow(value: unknown): BranchRow | null {
     address: normalizeText((branch as any).address),
     city: normalizeText((branch as any).city),
     timezone: normalizeText((branch as any).timezone),
+    marketplace_barbershop_id: normalizeText((branch as any).marketplace_barbershop_id),
     is_active: (branch as any).is_active == null ? null : Boolean((branch as any).is_active)
   }
 }
@@ -121,11 +123,13 @@ const branchRows = computed<BranchRow[]>(() =>
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase()
 
+  const rows = branchRows.value.filter(row => !row.marketplace_barbershop_id)
+
   if (!query) {
-    return branchRows.value
+    return rows
   }
 
-  return branchRows.value.filter((row) => {
+  return rows.filter((row) => {
     const haystack = [
       row.name,
       row.address || '',

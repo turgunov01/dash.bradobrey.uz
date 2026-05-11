@@ -1,4 +1,4 @@
-import { createError } from 'h3'
+import { createError, getQuery } from 'h3'
 
 import { ensureDashboardAccess } from '~~/server/utils/dashboard-access'
 import { supabaseRequest } from '~~/server/utils/supabase'
@@ -24,15 +24,36 @@ function isMissingBranchesTableError(error: any) {
     )
 }
 
+function isTruthy(value: unknown) {
+  if (Array.isArray(value)) {
+    return isTruthy(value[0])
+  }
+
+  if (value === true) {
+    return true
+  }
+
+  if (value === undefined || value === null) {
+    return false
+  }
+
+  const text = String(value).trim().toLowerCase()
+
+  return text === '1' || text === 'true' || text === 'yes' || text === 'on'
+}
+
 export default defineEventHandler(async (event) => {
   await ensureDashboardAccess(event)
+  const query = getQuery(event)
+  const includeMarketplace = isTruthy((query as any).include_marketplace ?? (query as any).includeMarketplace)
 
   try {
     const rows = await supabaseRequest(event, 'branches', {
       method: 'GET',
       query: {
         order: 'name.asc.nullslast',
-        select: 'id,name,address,city,timezone,work_hours,is_active'
+        select: 'id,name,address,city,timezone,work_hours,is_active,marketplace_barbershop_id',
+        ...(includeMarketplace ? {} : { marketplace_barbershop_id: 'is.null' })
       }
     })
 

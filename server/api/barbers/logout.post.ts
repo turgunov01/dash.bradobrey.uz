@@ -1,7 +1,7 @@
 import { readBody } from 'h3'
 
 import { backendRequest } from '~~/server/utils/backend'
-import { clearAdminSession } from '~~/server/utils/admin-session'
+import { clearAdminBackendToken, clearAdminSession } from '~~/server/utils/admin-session'
 import { clearBarberToken, getBarberToken } from '~~/server/utils/session'
 
 export default defineEventHandler(async (event): Promise<{ success: true }> => {
@@ -19,6 +19,7 @@ export default defineEventHandler(async (event): Promise<{ success: true }> => {
   }
   finally {
     clearAdminSession(event)
+    clearAdminBackendToken(event)
     clearBarberToken(event)
   }
 

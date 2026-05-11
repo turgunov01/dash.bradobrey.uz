@@ -29,6 +29,7 @@ export const branchSchema = z.object({
   city: optionalTextSchema,
   timezone: optionalTextSchema,
   work_hours: z.any().optional().nullable(),
+  marketplace_barbershop_id: optionalTextSchema,
   is_active: z.boolean().optional().nullable()
 }).passthrough()
 
@@ -38,6 +39,7 @@ export const branchFormSchema = z.object({
   city: optionalTextSchema,
   timezone: optionalTextSchema,
   work_hours: z.any().optional().nullable(),
+  marketplace_barbershop_id: optionalTextSchema,
   is_active: z.boolean().optional().nullable()
 }).passthrough()
 
@@ -117,7 +119,9 @@ export const queueItemSchema = z.object({
 
 export const historyItemSchema = queueItemSchema.extend({
   user_name: optionalTextSchema,
-  order_total: z.union([z.string(), z.number()]).optional().nullable()
+  order_total: z.union([z.string(), z.number()]).optional().nullable(),
+  original_amount: z.union([z.string(), z.number()]).optional().nullable(),
+  amount_source: optionalTextSchema
 }).passthrough()
 
 export const statisticsSchema = z.record(z.string(), z.any())

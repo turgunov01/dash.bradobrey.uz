@@ -1,8 +1,0 @@
-<script setup lang="ts">
-await navigateTo('/admin/marketplace/banners')
-</script>
-
-<template>
-  <div />
-</template>
-

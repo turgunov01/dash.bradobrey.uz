@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     method: 'POST',
     prefer: 'return=representation',
     query: {
-      select: 'id,name,address,city,timezone,work_hours,is_active'
+      select: 'id,name,address,city,timezone,work_hours,is_active,marketplace_barbershop_id'
     }
   })
 
@@ -29,4 +29,3 @@ export default defineEventHandler(async (event) => {
 
   return { item }
 })
-
