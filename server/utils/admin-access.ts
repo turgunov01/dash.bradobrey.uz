@@ -11,6 +11,7 @@ const accessUserSchema = z.object({
   branch_id: optionalIdentifierSchema,
   id: identifierSchema,
   login: optionalTextSchema,
+  marketplace_barbershop_id: optionalIdentifierSchema,
   phone: optionalTextSchema,
   password_hash: z.string().optional().nullable(),
   role: optionalTextSchema
@@ -193,7 +194,16 @@ export async function findSupabaseUserById(event: H3Event, id: string) {
     return null
   }
 
-  return queryAccessUser(event, 'id', normalizedId, 'id,login,role,branch_id')
+  try {
+    return await queryAccessUser(event, 'id', normalizedId, 'id,login,role,branch_id,marketplace_barbershop_id')
+  }
+  catch (error: any) {
+    if (!isMissingColumnError(error, 'marketplace_barbershop_id')) {
+      throw error
+    }
+
+    return await queryAccessUser(event, 'id', normalizedId, 'id,login,role,branch_id')
+  }
 }
 
 export async function findSupabaseUserByLogin(
@@ -210,10 +220,23 @@ export async function findSupabaseUserByLogin(
   }
 
   const select = options.includePasswordHash
-    ? 'id,login,role,branch_id,password_hash'
-    : 'id,login,role,branch_id'
+    ? 'id,login,role,branch_id,marketplace_barbershop_id,password_hash'
+    : 'id,login,role,branch_id,marketplace_barbershop_id'
 
-  return queryAccessUser(event, 'login', normalizedLogin, select)
+  try {
+    return await queryAccessUser(event, 'login', normalizedLogin, select)
+  }
+  catch (error: any) {
+    if (!isMissingColumnError(error, 'marketplace_barbershop_id')) {
+      throw error
+    }
+
+    const fallbackSelect = options.includePasswordHash
+      ? 'id,login,role,branch_id,password_hash'
+      : 'id,login,role,branch_id'
+
+    return await queryAccessUser(event, 'login', normalizedLogin, fallbackSelect)
+  }
 }
 
 export function assertAdminNetworkRole(accessUser: AccessUser) {
@@ -237,6 +260,7 @@ export function toDashboardUser(accessUser: AccessUser) {
     login,
     name: login || 'Администратор',
     phone: null,
+    marketplace_barbershop_id: accessUser.marketplace_barbershop_id ?? null,
     role: accessUser.role || null
   }
 }

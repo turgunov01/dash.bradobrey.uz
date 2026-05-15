@@ -63,7 +63,8 @@ async function submit() {
       branchStore.setActiveBranch(sessionBranchId)
     }
 
-    await navigateTo('/')
+    const role = String(sessionStore.user?.role || '').trim().toLowerCase()
+    await navigateTo(role === 'merchant' || role === 'partner' ? '/merchant' : '/')
 
   } catch (error: any) {
     fieldErrors.password = error?.statusMessage || error?.message || 'Неверный логин или пароль.'

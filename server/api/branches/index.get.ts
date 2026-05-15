@@ -46,6 +46,8 @@ export default defineEventHandler(async (event) => {
   await ensureDashboardAccess(event)
   const query = getQuery(event)
   const includeMarketplace = isTruthy((query as any).include_marketplace ?? (query as any).includeMarketplace)
+  const marketplaceBarbershopIdRaw = (query as any).marketplace_barbershop_id ?? (query as any).marketplaceBarbershopId
+  const marketplaceBarbershopId = marketplaceBarbershopIdRaw === undefined ? undefined : String(marketplaceBarbershopIdRaw || '').trim()
 
   try {
     const rows = await supabaseRequest(event, 'branches', {
@@ -53,7 +55,12 @@ export default defineEventHandler(async (event) => {
       query: {
         order: 'name.asc.nullslast',
         select: 'id,name,address,city,timezone,work_hours,is_active,marketplace_barbershop_id',
-        ...(includeMarketplace ? {} : { marketplace_barbershop_id: 'is.null' })
+        ...(includeMarketplace ? {} : { marketplace_barbershop_id: 'is.null' }),
+        ...(marketplaceBarbershopId
+          ? {
+              marketplace_barbershop_id: `eq.${marketplaceBarbershopId}`
+            }
+          : {})
       }
     })
 

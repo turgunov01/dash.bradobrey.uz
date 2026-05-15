@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
 type BranchRow = {
@@ -33,6 +33,7 @@ function toBranchRow(value: unknown): BranchRow | null {
 const route = useRoute()
 const store = useDashboardMarketplaceStore()
 const branchesApi = useBranchesApi()
+const marketplaceBarbershopsApi = useMarketplaceBarbershopsApi()
 
 const barbershopId = computed(() => String(route.params.id || ''))
 
@@ -75,6 +76,36 @@ const branchWorkHours = reactive<Record<DayKey, { start_time: string, end_time: 
   ...defaultWorkHours
 })
 
+const merchantSubmitting = ref(false)
+const lastCreatedMerchant = ref<{ login: string, password: string } | null>(null)
+const isClient = import.meta.client
+
+const merchantForm = reactive({
+  login: '',
+  password: ''
+})
+
+function generatePassword(length = 10) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnopqrstuvwxyz'
+  let out = ''
+
+  for (let i = 0; i < length; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)]
+  }
+
+  return out
+}
+
+function focusMerchantAccount() {
+  if (!merchantForm.password) {
+    merchantForm.password = generatePassword(10)
+  }
+  lastCreatedMerchant.value = null
+
+  if (!import.meta.client) return
+  document.getElementById('merchant-account')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 const { pending, refresh } = await useAsyncData(
   () => `dashboard-marketplace-barbershop-${barbershopId.value}`,
   async () => {
@@ -92,6 +123,52 @@ const { pending, refresh } = await useAsyncData(
 )
 
 const barbershop = computed<any>(() => store.selectedBarbershop as any)
+
+const { data: merchantsData, pending: merchantsPending, refresh: refreshMerchants } = await useAsyncData(
+  () => `dashboard-marketplace-barbershop-${barbershopId.value}-merchants`,
+  async () => {
+    const id = barbershopId.value
+    if (!id) return { items: [], total: 0 }
+    return await marketplaceBarbershopsApi.listMerchants(id)
+  },
+  { watch: [barbershopId] }
+)
+
+const merchants = computed<any[]>(() => Array.isArray((merchantsData.value as any)?.items) ? (merchantsData.value as any).items : [])
+const merchantAccount = computed<any | null>(() => merchants.value[0] ?? null)
+
+async function submitCreateMerchant() {
+  const login = normalizeText(merchantForm.login)
+  const password = normalizeText(merchantForm.password)
+
+  if (!login) {
+    useApiClient().notifyError(new Error('login is required'), 'Укажите логин мерчанта.')
+    return
+  }
+
+  if (!password || password.length < 6) {
+    useApiClient().notifyError(new Error('password is required'), 'Пароль должен быть минимум 6 символов.')
+    return
+  }
+
+  merchantSubmitting.value = true
+  try {
+    await marketplaceBarbershopsApi.createMerchant(barbershopId.value, { login, password })
+    lastCreatedMerchant.value = { login, password }
+    await refreshMerchants()
+  }
+  finally {
+    merchantSubmitting.value = false
+  }
+}
+
+async function copyLastCreatedCredentials() {
+  if (!import.meta.client || !lastCreatedMerchant.value) return
+
+  await navigator.clipboard.writeText(
+    `login: ${lastCreatedMerchant.value.login}\npassword: ${lastCreatedMerchant.value.password}`
+  )
+}
 
 function resetBranchWorkHours() {
   for (const day of days) {
@@ -257,6 +334,14 @@ const columns: TableColumn<BranchRow>[] = [
           >
             Назад
           </UButton>
+          <UButton
+            color="neutral"
+            icon="i-lucide-user-round"
+            variant="outline"
+            @click="focusMerchantAccount"
+          >
+            Merchant
+          </UButton>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
@@ -314,6 +399,8 @@ const columns: TableColumn<BranchRow>[] = [
             </div>
           </div>
         </UCard>
+
+        
 
         <UCard class="warm-card">
           <template #header>
@@ -409,6 +496,109 @@ const columns: TableColumn<BranchRow>[] = [
 
           <div v-else class="flex justify-center py-8">
             <ULoader size="lg" />
+          </div>
+        </UCard>
+
+        <UCard id="merchant-account" class="warm-card">
+          <template #header>
+            <div class="space-y-1">
+              <h3 class="barbershop-heading text-xl text-charcoal-950">
+                Merchant account
+              </h3>
+              <p class="text-sm text-charcoal-500">
+                Marketplace barbershop id: <span class="font-mono">{{ barbershopId }}</span>
+              </p>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+              <p class="text-xs text-charcoal-500">Current merchant</p>
+
+              <div v-if="merchantsPending" class="text-sm text-charcoal-500">
+                Loading...
+              </div>
+
+              <div v-else-if="merchantAccount" class="space-y-1">
+                <p class="text-sm font-medium text-charcoal-950">
+                  login: <span class="font-mono">{{ merchantAccount.login }}</span>
+                </p>
+                <p class="text-xs text-charcoal-500">
+                  Password is stored as hash and cannot be displayed.
+                </p>
+              </div>
+
+              <div v-else class="text-sm text-charcoal-500">
+                Not created yet.
+              </div>
+            </div>
+
+            <UCard v-if="lastCreatedMerchant" class="border border-amber-200 bg-amber-50/60">
+              <div class="space-y-1">
+                <p class="text-sm font-medium text-amber-900">
+                  Credentials (shown once)
+                </p>
+                <p class="text-sm text-amber-800">
+                  login: <span class="font-mono">{{ lastCreatedMerchant.login }}</span>
+                </p>
+                <p class="text-sm text-amber-800">
+                  password: <span class="font-mono">{{ lastCreatedMerchant.password }}</span>
+                </p>
+                <div class="pt-2">
+                  <UButton
+                    v-if="isClient"
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-copy"
+                    @click="copyLastCreatedCredentials"
+                  >
+                    Copy
+                  </UButton>
+                </div>
+              </div>
+            </UCard>
+
+            <div v-if="!merchantAccount" class="space-y-4">
+              <UFormField label="Login" required>
+                <UInput v-model="merchantForm.login" placeholder="merchant_login" />
+              </UFormField>
+
+              <UFormField label="Password" required>
+                <UInput v-model="merchantForm.password" type="text" />
+              </UFormField>
+
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  icon="i-lucide-wand-2"
+                  @click="merchantForm.password = generatePassword(10)"
+                >
+                  Generate password
+                </UButton>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                color="neutral"
+                icon="i-lucide-external-link"
+                variant="outline"
+                to="/merchant"
+                target="_blank"
+              >
+                Open /merchant
+              </UButton>
+              <UButton
+                v-if="!merchantAccount"
+                color="primary"
+                :loading="merchantSubmitting"
+                @click="submitCreateMerchant"
+              >
+                Create
+              </UButton>
+            </div>
           </div>
         </UCard>
 

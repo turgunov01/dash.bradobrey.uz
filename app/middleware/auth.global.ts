@@ -10,4 +10,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!sessionStore.isAuthenticated) {
     return navigateTo("/login");
   }
+
+  const role = String(sessionStore.user?.role || "").trim().toLowerCase();
+  const isMerchant = role === "merchant" || role === "partner";
+
+  if (isMerchant && !to.path.startsWith("/merchant")) {
+    return navigateTo("/merchant");
+  }
+
+  if (!isMerchant && to.path.startsWith("/merchant")) {
+    return navigateTo("/");
+  }
 });

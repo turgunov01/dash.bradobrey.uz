@@ -14,6 +14,11 @@ type MarketplaceBarbershopPayload = {
 
 type MarketplaceBarbershopUpdatePayload = Partial<MarketplaceBarbershopPayload>
 
+type MarketplaceMerchantCreatePayload = {
+  login: string
+  password: string
+}
+
 export function useMarketplaceBarbershopsApi() {
   const client = useApiClient()
 
@@ -61,6 +66,21 @@ export function useMarketplaceBarbershopsApi() {
         method: 'POST',
         successMessage: 'Барбершоп деактивирован'
       })
+    },
+
+    listMerchants(barbershopId: string) {
+      return client.request<{ items?: unknown[], total?: number }>(`/api/marketplace/barbershops/${barbershopId}/merchant`, {
+        query: { __skipBranchScope: true }
+      })
+    },
+
+    createMerchant(barbershopId: string, payload: MarketplaceMerchantCreatePayload) {
+      return client.request<{ item?: unknown }>(`/api/marketplace/barbershops/${barbershopId}/merchant`, {
+        body: payload,
+        method: 'POST',
+        successMessage: 'Аккаунт мерчанта создан'
+      })
     }
   }
 }
+
