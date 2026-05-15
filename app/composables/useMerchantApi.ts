@@ -52,6 +52,19 @@ export type MerchantServicePayload = {
   price?: string | number | null
 }
 
+export type MerchantServiceCategory = {
+  id: string
+  name: string
+  is_active: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export type MerchantServiceCategoryPayload = {
+  name: string
+  is_active?: boolean | null
+}
+
 export type MerchantQueueEntry = {
   id: string
   branch_id: string | null
@@ -208,6 +221,35 @@ export function useMerchantApi() {
       return client.request<{ deleted: boolean, id: string }>(`/api/merchant/services/${id}`, {
         method: 'DELETE',
         successMessage: 'Услуга удалена'
+      })
+    },
+
+    categories(includeInactive = true) {
+      return client.request<MerchantListResponse<MerchantServiceCategory>>('/api/merchant/categories', {
+        query: { __skipBranchScope: true, include_inactive: includeInactive }
+      })
+    },
+
+    createCategory(payload: MerchantServiceCategoryPayload) {
+      return client.request<{ item: MerchantServiceCategory }>('/api/merchant/categories', {
+        body: payload,
+        method: 'POST',
+        successMessage: 'Категория создана'
+      })
+    },
+
+    updateCategory(id: string, payload: Partial<MerchantServiceCategoryPayload>) {
+      return client.request<{ item: MerchantServiceCategory }>(`/api/merchant/categories/${id}`, {
+        body: payload,
+        method: 'PATCH',
+        successMessage: 'Категория обновлена'
+      })
+    },
+
+    deleteCategory(id: string) {
+      return client.request<{ deleted: boolean, id: string }>(`/api/merchant/categories/${id}`, {
+        method: 'DELETE',
+        successMessage: 'Категория удалена'
       })
     }
   }

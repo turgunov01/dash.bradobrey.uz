@@ -149,6 +149,9 @@ const columns: TableColumn<ActiveOrderRow>[] = [
             <UButton color="neutral" variant="outline" icon="i-lucide-scissors" to="/merchant/barbers">
               Барберы
             </UButton>
+            <UButton color="neutral" variant="outline" icon="i-lucide-folder" to="/merchant/categories">
+              Категории
+            </UButton>
             <UButton color="neutral" variant="outline" icon="i-lucide-tags" to="/merchant/services">
               Услуги
             </UButton>

@@ -2,7 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 
 import { formatMoney } from '~/utils/format'
-import type { MerchantService, MerchantServicePayload } from '~/composables/useMerchantApi'
+import type { MerchantService, MerchantServiceCategory, MerchantServicePayload } from '~/composables/useMerchantApi'
 
 definePageMeta({
   layout: 'merchant'
@@ -63,6 +63,11 @@ function resetForm() {
 }
 
 function openCreate() {
+  if (!canCreateService.value) {
+    useApiClient().notifyError(new Error('categories are required'), 'Сначала создайте хотя бы одну категорию.')
+    return
+  }
+
   editingId.value = null
   resetForm()
   createOpen.value = true
@@ -83,12 +88,46 @@ const { data, pending, refresh } = await useAsyncData('merchant-services', async
   return await merchantApi.services(true)
 })
 
+const { data: categoriesData, pending: categoriesPending, refresh: refreshCategories, error: categoriesError } = await useAsyncData(
+  'merchant-service-categories',
+  async () => await merchantApi.categories(true),
+  { server: false }
+)
+
 const rows = computed<ServiceRow[]>(() =>
   ((data.value as any)?.items || []).flatMap((item: MerchantService) => {
     const row = toRow(item)
     return row ? [row] : []
   })
 )
+
+type CategoryOption = { label: string, value: string }
+
+const categoryOptions = computed<CategoryOption[]>(() =>
+  ((categoriesData.value as any)?.items || []).flatMap((item: MerchantServiceCategory) => {
+    const name = normalizeText(item?.name)
+    if (!name) return []
+    return [{ label: name, value: name }]
+  })
+)
+
+const canCreateService = computed(() => categoryOptions.value.length > 0)
+
+const categoriesErrorMessage = computed(() => {
+  const error: any = categoriesError.value
+  const data = error?.data || error?.response?._data
+
+  if (typeof data === 'string') return data
+  if (data?.message) return data.message
+  if (error?.statusMessage) return error.statusMessage
+  if (error?.message) return error.message
+
+  return null
+})
+
+async function refreshAll() {
+  await Promise.all([refresh(), refreshCategories()])
+}
 
 const columns: TableColumn<ServiceRow>[] = [
   { accessorKey: 'name', header: 'Услуга' },
@@ -99,16 +138,24 @@ const columns: TableColumn<ServiceRow>[] = [
   { id: 'actions', header: '' }
 ]
 
-function toNumberOrNull(value: string) {
-  const text = value.trim()
+function toNumberOrNull(value: unknown) {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+
+  const text = String(value).trim()
   if (!text) return null
+
   const num = Number(text)
   return Number.isFinite(num) ? num : null
 }
 
-function toIntegerOrNull(value: string) {
-  const text = value.trim()
+function toIntegerOrNull(value: unknown) {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : null
+
+  const text = String(value).trim()
   if (!text) return null
+
   const num = Number.parseInt(text, 10)
   return Number.isFinite(num) ? num : null
 }
@@ -120,10 +167,16 @@ async function submitCreate() {
     return
   }
 
+  const category_name = normalizeText(form.category_name)
+  if (!category_name) {
+    useApiClient().notifyError(new Error('category is required'), 'Выберите категорию.')
+    return
+  }
+
   submitting.value = true
   try {
     const payload: MerchantServicePayload = {
-      category_name: normalizeText(form.category_name),
+      category_name,
       duration_minutes: toIntegerOrNull(form.duration_minutes),
       image: normalizeText(form.image),
       is_active: Boolean(form.is_active),
@@ -150,10 +203,16 @@ async function submitEdit() {
     return
   }
 
+  const category_name = normalizeText(form.category_name)
+  if (!category_name) {
+    useApiClient().notifyError(new Error('category is required'), 'Выберите категорию.')
+    return
+  }
+
   submitting.value = true
   try {
     const payload: Partial<MerchantServicePayload> = {
-      category_name: normalizeText(form.category_name),
+      category_name,
       duration_minutes: toIntegerOrNull(form.duration_minutes),
       image: normalizeText(form.image),
       is_active: Boolean(form.is_active),
@@ -198,14 +257,14 @@ async function removeRow(row: ServiceRow) {
           <UButton
             color="neutral"
             icon="i-lucide-refresh-cw"
-            :loading="pending"
+            :loading="pending || categoriesPending"
             variant="outline"
-            @click="refresh()"
+            @click="refreshAll()"
           >
             Обновить
           </UButton>
-          <UButton color="primary" icon="i-lucide-plus" @click="openCreate">
-            Добавить
+          <UButton color="primary" icon="i-lucide-plus" :disabled="!canCreateService" @click="openCreate">
+            Добавить услугу
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -213,6 +272,25 @@ async function removeRow(row: ServiceRow) {
 
     <template #body>
       <div class="space-y-6">
+        <div v-if="!categoriesPending && (categoriesError || !canCreateService)" class="space-y-3">
+          <UAlert
+            color="error"
+            icon="i-lucide-triangle-alert"
+            variant="soft"
+            :title="categoriesError ? 'Категории не загружены' : 'Категории не созданы'"
+            :description="categoriesError ? (categoriesErrorMessage || 'Не удалось загрузить категории.') : 'Чтобы создать услугу, сначала создайте хотя бы одну категорию.'"
+          />
+
+          <div class="flex flex-wrap gap-2">
+            <UButton color="primary" icon="i-lucide-folder" to="/merchant/categories">
+              Перейти в категории
+            </UButton>
+            <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" :loading="pending || categoriesPending" @click="refreshAll()">
+              Повторить загрузку
+            </UButton>
+          </div>
+        </div>
+
         <UCard class="warm-card">
           <template #header>
             <div class="flex items-center justify-between gap-3">
@@ -308,8 +386,14 @@ async function removeRow(row: ServiceRow) {
               </UFormField>
             </div>
 
-            <UFormField label="Категория">
-              <UInput v-model="form.category_name" placeholder="Например: Стрижки" />
+            <UFormField label="Категория" required>
+              <USelectMenu
+                v-model="form.category_name"
+                class="w-full"
+                :items="categoryOptions"
+                placeholder="Выберите категорию"
+                value-key="value"
+              />
             </UFormField>
 
             <UFormField label="Картинка (URL)">
@@ -327,7 +411,7 @@ async function removeRow(row: ServiceRow) {
             <UButton color="neutral" variant="ghost" :disabled="submitting" @click="createOpen = false">
               Отмена
             </UButton>
-            <UButton color="primary" :loading="submitting" @click="submitCreate">
+            <UButton color="primary" :loading="submitting" :disabled="!canCreateService" @click="submitCreate">
               Создать
             </UButton>
           </div>
@@ -356,8 +440,14 @@ async function removeRow(row: ServiceRow) {
               </UFormField>
             </div>
 
-            <UFormField label="Категория">
-              <UInput v-model="form.category_name" placeholder="Например: Стрижки" />
+            <UFormField label="Категория" required>
+              <USelectMenu
+                v-model="form.category_name"
+                class="w-full"
+                :items="categoryOptions"
+                placeholder="Выберите категорию"
+                value-key="value"
+              />
             </UFormField>
 
             <UFormField label="Картинка (URL)">
