@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useStorage } from '@vueuse/core'
-import { serviceFormSchema, type ServiceCategory } from '~~/shared/schemas'
+import { serviceFormSchema, type ServiceCategory, type ServiceFormPayload } from '~~/shared/schemas'
 import { formatMoney } from '~/utils/format'
 import { flattenServicesPayload } from '~/utils/services'
 
@@ -337,6 +337,38 @@ function handleImageInput(event: Event) {
   imageFile.value = file
 }
 
+function buildServiceFormData(payload: ServiceFormPayload) {
+  const formData = new FormData()
+
+  formData.append('name', payload.name)
+
+  if (payload.category_name) {
+    formData.append('category', payload.category_name)
+  }
+
+  if (payload.price !== undefined && payload.price !== null) {
+    formData.append('base_price', String(payload.price))
+  }
+
+  if (payload.duration !== undefined && payload.duration !== null) {
+    formData.append('duration_minutes', String(payload.duration))
+  }
+
+  if (payload.image) {
+    formData.append('image', payload.image)
+  }
+
+  if (payload.is_active !== undefined && payload.is_active !== null) {
+    formData.append('is_active', payload.is_active ? 'true' : 'false')
+  }
+
+  if (imageFile.value) {
+    formData.append('file', imageFile.value)
+  }
+
+  return formData
+}
+
 async function submit() {
   const categoryName = normalizeText(form.category_name)
 
@@ -359,10 +391,12 @@ async function submit() {
     return
   }
 
+  const body = imageFile.value ? buildServiceFormData(payload.data) : payload.data
+
   if (form.id) {
-    await servicesApi.update(form.id, payload.data)
+    await servicesApi.update(form.id, body)
   } else {
-    await servicesApi.create(payload.data)
+    await servicesApi.create(body)
   }
   await refresh()
   serviceModalOpen.value = false
