@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-import type { MerchantServiceCategory, MerchantServiceCategoryPayload } from '~/composables/useMerchantApi'
-
-definePageMeta({
-  layout: 'merchant'
-})
+import type { ServiceCategory, ServiceCategoryFormPayload } from '~~/shared/schemas'
 
 type CategoryRow = {
   id: string
@@ -20,19 +16,33 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
-function toRow(value: MerchantServiceCategory): CategoryRow | null {
+function toIntegerOrNull(value: unknown) {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : null
+
+  const text = String(value).trim()
+  if (!text) return null
+
+  const num = Number.parseInt(text, 10)
+  return Number.isFinite(num) ? num : null
+}
+
+function toRow(value: ServiceCategory): CategoryRow | null {
   const id = normalizeText(value?.id)
   if (!id) return null
 
   return {
     id,
     is_active: value.is_active ?? null,
-    name: normalizeText(value.name) || 'Категория',
+    name: normalizeText(value.name || value.title) || 'Категория',
     sort_order: value.sort_order ?? null
   }
 }
 
-const merchantApi = useMerchantApi()
+const branchStore = useBranchStore()
+const categoriesApi = useServiceCategoriesApi()
+
+await branchStore.ensureLoaded()
 
 const createOpen = ref(false)
 const editOpen = ref(false)
@@ -52,6 +62,11 @@ function resetForm() {
 }
 
 function openCreate() {
+  if (!branchStore.activeBranchId) {
+    useApiClient().notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
+    return
+  }
+
   editingId.value = null
   resetForm()
   createOpen.value = true
@@ -65,12 +80,18 @@ function openEdit(row: CategoryRow) {
   editOpen.value = true
 }
 
-const { data, pending, refresh } = await useAsyncData('merchant-categories', async () => {
-  return await merchantApi.categories(true)
+const { data, pending, refresh } = await useAsyncData('admin-service-categories', async () => {
+  if (!branchStore.activeBranchId) {
+    return { items: [], total: 0 }
+  }
+
+  return await categoriesApi.list(true)
+}, {
+  watch: [() => branchStore.activeBranchId]
 })
 
 const rows = computed<CategoryRow[]>(() =>
-  ((data.value as any)?.items || []).flatMap((item: MerchantServiceCategory) => {
+  ((data.value as any)?.items || []).flatMap((item: ServiceCategory) => {
     const row = toRow(item)
     return row ? [row] : []
   })
@@ -92,18 +113,13 @@ const columns: TableColumn<CategoryRow>[] = [
   { id: 'actions', header: '' }
 ]
 
-function toIntegerOrNull(value: unknown) {
-  if (value === undefined || value === null) return null
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.trunc(value) : null
-
-  const text = String(value).trim()
-  if (!text) return null
-
-  const num = Number.parseInt(text, 10)
-  return Number.isFinite(num) ? num : null
-}
-
 async function submitCreate() {
+  const branchId = branchStore.activeBranchId
+  if (!branchId) {
+    useApiClient().notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
+    return
+  }
+
   const name = normalizeText(form.name)
   if (!name) {
     useApiClient().notifyError(new Error('name is required'), 'Введите название категории.')
@@ -112,13 +128,14 @@ async function submitCreate() {
 
   submitting.value = true
   try {
-    const payload: MerchantServiceCategoryPayload = {
+    const payload: ServiceCategoryFormPayload = {
+      branch_id: branchId,
       is_active: Boolean(form.is_active),
       name,
       sort_order: toIntegerOrNull(form.sort_order) ?? nextSortOrder.value
     }
 
-    await merchantApi.createCategory(payload)
+    await categoriesApi.create(payload)
     createOpen.value = false
     await refresh()
   }
@@ -139,7 +156,7 @@ async function submitEdit() {
 
   submitting.value = true
   try {
-    await merchantApi.updateCategory(id, {
+    await categoriesApi.update(id, {
       is_active: Boolean(form.is_active),
       name,
       sort_order: toIntegerOrNull(form.sort_order)
@@ -160,7 +177,7 @@ async function removeRow(row: CategoryRow) {
 
   submitting.value = true
   try {
-    await merchantApi.deleteCategory(row.id)
+    await categoriesApi.remove(row.id)
     await refresh()
   }
   finally {
@@ -170,9 +187,9 @@ async function removeRow(row: CategoryRow) {
 </script>
 
 <template>
-  <UDashboardPanel id="merchant-categories">
+  <UDashboardPanel id="service-categories">
     <template #header>
-      <UDashboardNavbar title="Категории" :ui="{ right: 'gap-3' }">
+      <UDashboardNavbar title="Категории услуг" :ui="{ right: 'gap-3' }">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -187,7 +204,7 @@ async function removeRow(row: CategoryRow) {
           >
             Обновить
           </UButton>
-          <UButton color="primary" icon="i-lucide-plus" @click="openCreate">
+          <UButton color="primary" icon="i-lucide-plus" :disabled="!branchStore.activeBranchId" @click="openCreate">
             Добавить категорию
           </UButton>
         </template>
@@ -196,6 +213,15 @@ async function removeRow(row: CategoryRow) {
 
     <template #body>
       <div class="space-y-6">
+        <UAlert
+          v-if="!branchStore.activeBranchId"
+          color="warning"
+          icon="i-lucide-map-pin"
+          title="Филиал не выбран"
+          description="Выберите филиал в панели, чтобы управлять категориями услуг."
+          variant="soft"
+        />
+
         <UCard class="warm-card">
           <template #header>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -204,7 +230,7 @@ async function removeRow(row: CategoryRow) {
                   Список категорий
                 </h2>
                 <p class="text-sm text-charcoal-500">
-                  Сначала создайте категорию, затем добавляйте услуги.
+                  {{ branchStore.activeBranch?.name || 'Активный филиал не выбран' }}
                 </p>
               </div>
 
@@ -261,7 +287,7 @@ async function removeRow(row: CategoryRow) {
         v-model:open="createOpen"
         class="sm:max-w-xl"
         title="Новая категория"
-        description="Категория будет доступна для услуг вашего барбершопа."
+        description="Категория будет доступна в CRUD услуг активного филиала."
       >
         <template #body>
           <div class="space-y-4">
@@ -295,7 +321,7 @@ async function removeRow(row: CategoryRow) {
         v-model:open="editOpen"
         class="sm:max-w-xl"
         title="Редактировать категорию"
-        description="Изменения применяются только в кабинете мерчанта."
+        description="Если изменить название, услуги этой категории будут переименованы в бэкенде."
       >
         <template #body>
           <div class="space-y-4">

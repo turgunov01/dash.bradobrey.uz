@@ -55,6 +55,7 @@ export type MerchantServicePayload = {
 export type MerchantServiceCategory = {
   id: string
   name: string
+  sort_order?: string | number | null
   is_active: boolean | null
   created_at?: string | null
   updated_at?: string | null
@@ -62,6 +63,7 @@ export type MerchantServiceCategory = {
 
 export type MerchantServiceCategoryPayload = {
   name: string
+  sort_order?: string | number | null
   is_active?: boolean | null
 }
 

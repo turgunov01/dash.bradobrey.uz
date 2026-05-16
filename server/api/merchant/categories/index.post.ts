@@ -6,7 +6,8 @@ import { supabaseRequest } from '~~/server/utils/supabase'
 
 const payloadSchema = z.object({
   is_active: z.boolean().optional().nullable(),
-  name: z.string().trim().min(1, 'Введите название категории')
+  name: z.string().trim().min(1, 'Введите название категории'),
+  sort_order: z.union([z.string(), z.number()]).optional().nullable()
 })
 
 function getSupabaseErrorPayload(error: any) {
@@ -23,10 +24,40 @@ function isMissingMarketplaceCategoriesTableError(error: any) {
     || (/marketplace_service_categories/i.test(message) && /does not exist|not found|schema cache/i.test(message))
 }
 
+function isMissingSortOrderColumnError(error: any) {
+  const payload = getSupabaseErrorPayload(error)
+  const code = String(payload?.code || error?.code || '').trim()
+  const message = [payload?.message, payload?.details, error?.message].filter(Boolean).join(' ')
+
+  return (code === '42703' || code === 'PGRST204')
+    && /sort_order/i.test(message)
+}
+
 function isUniqueViolation(error: any) {
   const payload = getSupabaseErrorPayload(error)
   const code = String(payload?.code || '').trim()
   return code === '23505'
+}
+
+function toIntegerOrNull(value: unknown) {
+  if (value === undefined || value === null || value === '') return null
+  const num = Number.parseInt(String(value), 10)
+  return Number.isFinite(num) ? num : null
+}
+
+async function getNextSortOrder(event: any, barbershopId: string) {
+  const rows = await supabaseRequest(event, 'marketplace_service_categories', {
+    method: 'GET',
+    query: {
+      marketplace_barbershop_id: `eq.${barbershopId}`,
+      limit: 1,
+      order: 'sort_order.desc.nullslast',
+      select: 'sort_order'
+    }
+  })
+
+  const current = Array.isArray(rows) ? toIntegerOrNull(rows[0]?.sort_order) : null
+  return (current ?? 0) + 1
 }
 
 export default defineEventHandler(async (event) => {
@@ -34,15 +65,17 @@ export default defineEventHandler(async (event) => {
   const payload = payloadSchema.parse(await readBody(event))
 
   try {
+    const sortOrder = toIntegerOrNull(payload.sort_order) ?? await getNextSortOrder(event, access.barbershopId)
     const rows = await supabaseRequest(event, 'marketplace_service_categories', {
       method: 'POST',
       prefer: 'return=representation',
       query: {
-        select: 'id,marketplace_barbershop_id,name,is_active,created_at,updated_at'
+        select: 'id,marketplace_barbershop_id,name,sort_order,is_active,created_at,updated_at'
       },
       body: {
         marketplace_barbershop_id: access.barbershopId,
         name: payload.name,
+        sort_order: sortOrder,
         is_active: payload.is_active === undefined || payload.is_active === null ? true : Boolean(payload.is_active)
       }
     })
@@ -67,6 +100,14 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    if (isMissingSortOrderColumnError(error)) {
+      throw createError({
+        data: getSupabaseErrorPayload(error),
+        statusCode: 501,
+        statusMessage: 'В Supabase нет поля sort_order для marketplace_service_categories. Примените SQL-миграцию scripts/supabase/2026-05-16_add_sort_order_to_marketplace_service_categories.sql.'
+      })
+    }
+
     if (isUniqueViolation(error)) {
       throw createError({
         statusCode: 409,
@@ -77,4 +118,3 @@ export default defineEventHandler(async (event) => {
     throw error
   }
 })
-

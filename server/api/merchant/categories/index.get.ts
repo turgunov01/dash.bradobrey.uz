@@ -17,6 +17,15 @@ function isMissingMarketplaceCategoriesTableError(error: any) {
     || (/marketplace_service_categories/i.test(message) && /does not exist|not found|schema cache/i.test(message))
 }
 
+function isMissingSortOrderColumnError(error: any) {
+  const payload = getSupabaseErrorPayload(error)
+  const code = String(payload?.code || error?.code || '').trim()
+  const message = [payload?.message, payload?.details, error?.message].filter(Boolean).join(' ')
+
+  return (code === '42703' || code === 'PGRST204')
+    && /sort_order/i.test(message)
+}
+
 function isTruthy(value: unknown) {
   if (Array.isArray(value)) {
     return isTruthy(value[0])
@@ -41,8 +50,8 @@ export default defineEventHandler(async (event) => {
       query: {
         marketplace_barbershop_id: `eq.${access.barbershopId}`,
         ...(includeInactive ? {} : { is_active: 'eq.true' }),
-        order: 'name.asc.nullslast',
-        select: 'id,marketplace_barbershop_id,name,is_active,created_at,updated_at'
+        order: 'sort_order.asc.nullslast,name.asc.nullslast',
+        select: 'id,marketplace_barbershop_id,name,sort_order,is_active,created_at,updated_at'
       }
     })
 
@@ -62,7 +71,14 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    if (isMissingSortOrderColumnError(error)) {
+      throw createError({
+        data: getSupabaseErrorPayload(error),
+        statusCode: 501,
+        statusMessage: 'В Supabase нет поля sort_order для marketplace_service_categories. Примените SQL-миграцию scripts/supabase/2026-05-16_add_sort_order_to_marketplace_service_categories.sql.'
+      })
+    }
+
     throw error
   }
 })
-

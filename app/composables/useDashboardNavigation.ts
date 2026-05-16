@@ -10,6 +10,7 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-users', label: 'Сотрудники', to: '/barbers' },
     { icon: 'i-lucide-store', label: 'Филиалы', to: '/branches' },
     { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
+    { icon: 'i-lucide-folder', label: 'Категории', to: '/service-categories' },
     { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' },
     { icon: 'i-lucide-history', label: 'История', to: '/history' },
     { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },

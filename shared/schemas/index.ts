@@ -86,11 +86,26 @@ export const serviceSchema = z.object({
 }).passthrough()
 
 export const serviceCategorySchema = z.object({
+  branch_id: identifierSchema.optional().nullable(),
   id: identifierSchema.optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
   name: optionalTextSchema,
+  sort_order: z.union([z.string(), z.number()]).optional().nullable(),
   title: optionalTextSchema,
   services: z.array(serviceSchema).default([])
 }).passthrough()
+
+export const serviceCategoryFormSchema = z.object({
+  branch_id: identifierSchema.optional().nullable(),
+  is_active: z.boolean().optional().nullable(),
+  name: z.string().trim().min(1, 'Введите название категории'),
+  sort_order: z.union([z.string(), z.number()]).optional().nullable()
+}).passthrough()
+
+export const serviceCategoryUpdateSchema = serviceCategoryFormSchema.partial().refine(
+  value => Object.keys(value).length > 0,
+  { message: 'Нет данных для обновления категории' }
+)
 
 export const queueItemSchema = z.object({
   id: identifierSchema,
@@ -314,6 +329,8 @@ export type BarberUser = z.infer<typeof barberUserSchema>
 export type BarberProfile = z.infer<typeof barberSchema>
 export type ServiceItem = z.infer<typeof serviceSchema>
 export type ServiceCategory = z.infer<typeof serviceCategorySchema>
+export type ServiceCategoryFormPayload = z.infer<typeof serviceCategoryFormSchema>
+export type ServiceCategoryUpdatePayload = z.infer<typeof serviceCategoryUpdateSchema>
 export type QueueItem = z.infer<typeof queueItemSchema>
 export type HistoryItem = z.infer<typeof historyItemSchema>
 export type PromoCode = z.infer<typeof promoCodeSchema>

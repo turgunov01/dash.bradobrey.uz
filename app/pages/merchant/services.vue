@@ -107,7 +107,8 @@ const categoryOptions = computed<CategoryOption[]>(() =>
   ((categoriesData.value as any)?.items || []).flatMap((item: MerchantServiceCategory) => {
     const name = normalizeText(item?.name)
     if (!name) return []
-    return [{ label: name, value: name }]
+    const order = normalizeText(item?.sort_order)
+    return [{ label: order ? `${order}. ${name}` : name, value: name }]
   })
 )
 
