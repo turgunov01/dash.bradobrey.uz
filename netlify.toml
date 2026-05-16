@@ -4,6 +4,7 @@
 
 [build.environment]
   NITRO_PRESET = "netlify"
+  NODE_OPTIONS = "--max-old-space-size=4096"
   NODE_VERSION = "20"
   # Required runtime secrets (set real values in Netlify UI)
   NUXT_SUPABASE_URL = ""
