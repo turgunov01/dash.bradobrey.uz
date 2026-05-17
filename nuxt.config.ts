@@ -170,6 +170,16 @@ export default defineNuxtConfig({
   },
 
   hooks: {
+    'nitro:config': (nitroConfig) => {
+      if (nitroConfig.dev) {
+        nitroConfig.externals = {
+          ...nitroConfig.externals,
+          // Dev tracing can prune Vue SSR files while rewriting conditional exports to production paths.
+          trace: false
+        }
+      }
+    },
+
     'app:templatesGenerated': async () => {
       await Promise.all([
         stripRouteBlockPlugin('.nuxt', 'tsconfig.json'),

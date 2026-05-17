@@ -24,6 +24,7 @@
     "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.2.1",
     "vue": "^3.5.30",
+    "vue-router": "5.0.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

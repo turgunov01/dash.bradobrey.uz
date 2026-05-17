@@ -12,6 +12,8 @@ type ClientRow = {
   lastSeen: string | null
 }
 
+type BarberDirectoryItem = Record<string, any>
+
 function extractHistoryItems(response: unknown): Record<string, any>[] {
   if (Array.isArray(response)) {
     return response as Record<string, any>[]
@@ -36,6 +38,44 @@ function extractHistoryItems(response: unknown): Record<string, any>[] {
 
   if (Array.isArray(payload.data?.items)) {
     return payload.data.items
+  }
+
+  return []
+}
+
+function extractBarberItems(response: unknown): BarberDirectoryItem[] {
+  if (Array.isArray(response)) {
+    return response as BarberDirectoryItem[]
+  }
+
+  if (!response || typeof response !== 'object') {
+    return []
+  }
+
+  const payload = response as {
+    barbers?: BarberDirectoryItem[]
+    data?: BarberDirectoryItem[] | { items?: BarberDirectoryItem[], barbers?: BarberDirectoryItem[] }
+    items?: BarberDirectoryItem[]
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items
+  }
+
+  if (Array.isArray(payload.barbers)) {
+    return payload.barbers
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  if (Array.isArray(payload.data?.items)) {
+    return payload.data.items
+  }
+
+  if (Array.isArray(payload.data?.barbers)) {
+    return payload.data.barbers
   }
 
   return []
@@ -111,10 +151,218 @@ function getVisitAmount(item: Record<string, any>) {
   return null
 }
 
+function shortId(value: string) {
+  return value.length > 8 ? value.slice(0, 8) : value
+}
+
+function pickTextValue(source: Record<string, any> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const rawValue = source?.[key]
+
+    if (rawValue && typeof rawValue === 'object') {
+      continue
+    }
+
+    const value = normalizeText(rawValue)
+
+    if (value) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function pickRecordValue(source: Record<string, any> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = source?.[key]
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, any>
+    }
+  }
+
+  return null
+}
+
+function getRecordDisplayName(record: Record<string, any> | null | undefined) {
+  if (!record) {
+    return null
+  }
+
+  return pickTextValue(record, ['name', 'full_name', 'title', 'login', 'phone'])
+    || pickTextValue(record.user, ['name', 'login', 'phone'])
+}
+
+function getRecordId(record: Record<string, any> | null | undefined) {
+  return pickTextValue(record, ['id', 'user_id', 'userId'])
+}
+
+function getRecordDisplayNameForId(record: Record<string, any> | null | undefined, expectedId: string | null) {
+  const recordId = getRecordId(record)
+
+  if (expectedId && recordId && recordId !== expectedId) {
+    return null
+  }
+
+  return getRecordDisplayName(record)
+}
+
+function getVisitBranchId(visit: Record<string, any>) {
+  return pickTextValue(visit, ['branch_id', 'branchId'])
+    || pickTextValue(pickRecordValue(visit, ['branch', 'branches']), ['id'])
+}
+
+function getVisitBranchName(visit: Record<string, any>) {
+  const branchId = getVisitBranchId(visit)
+
+  return pickTextValue(visit, ['branch_name', 'branchName'])
+    || getRecordDisplayName(pickRecordValue(visit, ['branch', 'branches']))
+    || (branchId ? branchNameMap.value.get(branchId) || `Филиал ${shortId(branchId)}` : 'Филиал не указан')
+}
+
+const selectedBarberRecordKeys = [
+  'selected_barber',
+  'selectedBarber',
+  'requested_barber',
+  'requestedBarber',
+  'assigned_barber',
+  'assignedBarber',
+  'initial_barber',
+  'initialBarber',
+  'original_barber',
+  'originalBarber',
+  'barber'
+]
+
+const selectedBarberIdKeys = [
+  'selected_barber_id',
+  'selectedBarberId',
+  'requested_barber_id',
+  'requestedBarberId',
+  'assigned_barber_id',
+  'assignedBarberId',
+  'initial_barber_id',
+  'initialBarberId',
+  'original_barber_id',
+  'originalBarberId',
+  'barber_id',
+  'barberId'
+]
+
+const executingBarberRecordKeys = [
+  'executing_barber',
+  'executingBarber',
+  'actual_barber',
+  'actualBarber',
+  'performer_barber',
+  'performerBarber',
+  'serving_barber',
+  'servingBarber',
+  'completed_by_barber',
+  'completedByBarber',
+  'performed_by',
+  'performedBy',
+  'barber'
+]
+
+const executingBarberIdKeys = [
+  'executing_barber_id',
+  'executingBarberId',
+  'actual_barber_id',
+  'actualBarberId',
+  'performer_barber_id',
+  'performerBarberId',
+  'serving_barber_id',
+  'servingBarberId',
+  'completed_by_barber_id',
+  'completedByBarberId',
+  'performed_by_barber_id',
+  'performedByBarberId',
+  'performed_by',
+  'performedBy',
+  'barber_id',
+  'barberId'
+]
+
+function getVisitSelectedBarberId(visit: Record<string, any>) {
+  return pickTextValue(visit, selectedBarberIdKeys)
+    || pickTextValue(pickRecordValue(visit, selectedBarberRecordKeys), ['id', 'user_id', 'userId'])
+}
+
+function getVisitExecutingBarberId(visit: Record<string, any>) {
+  return pickTextValue(visit, executingBarberIdKeys)
+    || pickTextValue(pickRecordValue(visit, executingBarberRecordKeys), ['id', 'user_id', 'userId'])
+    || getVisitSelectedBarberId(visit)
+}
+
+function getVisitSelectedBarberName(visit: Record<string, any>) {
+  const barberId = getVisitSelectedBarberId(visit)
+
+  return getRecordDisplayNameForId(pickRecordValue(visit, selectedBarberRecordKeys), barberId)
+    || (barberId ? barberNameMap.value.get(barberId) || `Барбер ${shortId(barberId)}` : 'Барбер не указан')
+}
+
+function getVisitExecutingBarberName(visit: Record<string, any>) {
+  const barberId = getVisitExecutingBarberId(visit)
+
+  return getRecordDisplayNameForId(pickRecordValue(visit, executingBarberRecordKeys), barberId)
+    || (barberId ? barberNameMap.value.get(barberId) || `Барбер ${shortId(barberId)}` : 'Барбер не указан')
+}
+
+function toBooleanOrNull(value: unknown) {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value === 1 ? true : value === 0 ? false : null
+  }
+
+  const text = normalizeText(value)?.toLowerCase()
+
+  if (!text) {
+    return null
+  }
+
+  if (['1', 'true', 'yes', 'y', 'да'].includes(text)) {
+    return true
+  }
+
+  if (['0', 'false', 'no', 'n', 'нет'].includes(text)) {
+    return false
+  }
+
+  return null
+}
+
+function hasBarberSwap(visit: Record<string, any>) {
+  const explicit = toBooleanOrNull(
+    visit.swapped_flag
+    ?? visit.swappedFlag
+    ?? visit.barber_swapped
+    ?? visit.barberSwapped
+    ?? visit.barber_changed
+    ?? visit.barberChanged
+    ?? visit.has_barber_change
+    ?? visit.hasBarberChange
+  )
+
+  if (explicit !== null) {
+    return explicit
+  }
+
+  const selectedBarberId = getVisitSelectedBarberId(visit)
+  const executingBarberId = getVisitExecutingBarberId(visit)
+
+  return Boolean(selectedBarberId && executingBarberId && selectedBarberId !== executingBarberId)
+}
+
 const uiStore = useUiStore()
 const historyApi = useHistoryApi()
 const branchStore = useBranchStore()
 const kioskApi = useKioskApi()
+const apiClient = useApiClient()
 
 await branchStore.ensureLoaded()
 
@@ -158,6 +406,45 @@ const { data: servicesData } = await useAsyncData('clients-services', async () =
   return flattenServicesPayload(response)
 }, {
   watch: [() => branchStore.activeBranchId]
+})
+
+const { data: barbersData } = await useAsyncData('clients-barbers-directory', async () => {
+  const branchId = branchStore.activeBranchId || undefined
+
+  try {
+    return await apiClient.request<{ items?: BarberDirectoryItem[] }>('/api/barbers', {
+      query: {
+        mode: 'employees',
+        ...(branchId ? { branch_id: branchId } : {})
+      },
+      silent: true
+    })
+  }
+  catch {
+    return { items: [] }
+  }
+}, {
+  server: false,
+  watch: [() => branchStore.activeBranchId]
+})
+
+const branchNameMap = computed(() =>
+  new Map(branchStore.branches.map(branch => [String(branch.id), branch.name]))
+)
+
+const barberNameMap = computed(() => {
+  const map = new Map<string, string>()
+
+  for (const item of extractBarberItems(barbersData.value)) {
+    const id = pickTextValue(item, ['id', 'user_id', 'userId'])
+    const name = getRecordDisplayName(item)
+
+    if (id && name) {
+      map.set(id, name)
+    }
+  }
+
+  return map
 })
 
 const clientRows = computed<ClientRow[]>(() => {
@@ -495,6 +782,27 @@ function getVisitServiceIds(visit: Record<string, any>) {
                     </p>
                   </div>
                 </div>
+                <div class="mt-3 grid gap-2 text-xs text-charcoal-600 sm:grid-cols-2">
+                  <div class="rounded-lg bg-charcoal-50/70 px-3 py-2">
+                    <p class="font-semibold uppercase tracking-[0.14em] text-charcoal-500">Филиал</p>
+                    <p class="mt-1 font-medium text-charcoal-900">{{ getVisitBranchName(visit) }}</p>
+                  </div>
+                  <div class="rounded-lg bg-charcoal-50/70 px-3 py-2">
+                    <p class="font-semibold uppercase tracking-[0.14em] text-charcoal-500">Выбранный барбер</p>
+                    <p class="mt-1 font-medium text-charcoal-900">{{ getVisitSelectedBarberName(visit) }}</p>
+                  </div>
+                  <div class="rounded-lg bg-charcoal-50/70 px-3 py-2">
+                    <p class="font-semibold uppercase tracking-[0.14em] text-charcoal-500">Исполняющий барбер</p>
+                    <p class="mt-1 font-medium text-charcoal-900">{{ getVisitExecutingBarberName(visit) }}</p>
+                  </div>
+                  <div class="flex items-center justify-between gap-3 rounded-lg bg-charcoal-50/70 px-3 py-2">
+                    <span class="font-semibold uppercase tracking-[0.14em] text-charcoal-500">Смена барбера</span>
+                    <UBadge :color="hasBarberSwap(visit) ? 'warning' : 'neutral'" size="xs" variant="soft">
+                      {{ hasBarberSwap(visit) ? 'Да' : 'Нет' }}
+                    </UBadge>
+                  </div>
+                </div>
+
                 <div v-if="visit.service_ids?.length" class="mt-2 text-xs text-charcoal-600 space-y-1">
                   <p class="font-semibold text-charcoal-800">Услуги:</p>
                   <ul class="list-disc space-y-1 pl-4">

@@ -3,6 +3,7 @@ import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import { formatCount, formatMoney } from '~/utils/format'
+import { flattenServicesPayload, type FlatServiceItem } from '~/utils/services'
 
 type FinanceEmployeeDraft = {
   advances: number
@@ -29,6 +30,8 @@ type FinanceDraftStorage = Record<string, FinanceSnapshotPayload>
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
 const financeApi = useFinanceApi()
+const historyApi = useHistoryApi()
+const kioskApi = useKioskApi()
 const apiClient = useApiClient()
 
 await branchStore.ensureLoaded()
@@ -44,6 +47,263 @@ function currentPeriodKey() {
 function normalizeNumber(value: unknown, fallback = 0) {
   const amount = Number(value)
   return Number.isFinite(amount) ? amount : fallback
+}
+
+function normalizeText(value: unknown) {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const text = String(value).trim()
+
+  return text || null
+}
+
+function toNumberOrNull(value: unknown) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  const amount = Number(value)
+
+  return Number.isFinite(amount) ? amount : null
+}
+
+function extractHistoryItems(response: unknown): Record<string, any>[] {
+  if (Array.isArray(response)) {
+    return response as Record<string, any>[]
+  }
+
+  if (!response || typeof response !== 'object') {
+    return []
+  }
+
+  const payload = response as {
+    data?: Record<string, any>[] | { history?: Record<string, any>[], items?: Record<string, any>[], records?: Record<string, any>[] }
+    history?: Record<string, any>[]
+    items?: Record<string, any>[]
+    records?: Record<string, any>[]
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items
+  }
+
+  if (Array.isArray(payload.history)) {
+    return payload.history
+  }
+
+  if (Array.isArray(payload.records)) {
+    return payload.records
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  if (Array.isArray(payload.data?.items)) {
+    return payload.data.items
+  }
+
+  if (Array.isArray(payload.data?.history)) {
+    return payload.data.history
+  }
+
+  if (Array.isArray(payload.data?.records)) {
+    return payload.data.records
+  }
+
+  return []
+}
+
+function getPeriodRange(key: string) {
+  const [yearPart = '', monthPart = ''] = key.split('-')
+  const yearRaw = Number(yearPart)
+  const monthRaw = Number(monthPart)
+  const now = new Date()
+  const year = Number.isInteger(yearRaw) && yearRaw > 0 ? yearRaw : now.getFullYear()
+  const month = Number.isInteger(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
+  const monthKey = String(month).padStart(2, '0')
+  const lastDay = new Date(year, month, 0).getDate()
+
+  return {
+    end_date: `${year}-${monthKey}-${String(lastDay).padStart(2, '0')}`,
+    start_date: `${year}-${monthKey}-01`
+  }
+}
+
+function normalizeStatus(value: unknown) {
+  return String(value || 'unknown').trim().toLowerCase()
+}
+
+function isCompletedStatus(value: unknown) {
+  return ['completed', 'done', 'paid'].includes(normalizeStatus(value))
+}
+
+function pickTextValue(source: Record<string, any> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const rawValue = source?.[key]
+
+    if (rawValue && typeof rawValue === 'object') {
+      continue
+    }
+
+    const value = normalizeText(rawValue)
+
+    if (value) {
+      return value
+    }
+  }
+
+  return null
+}
+
+function pickRecordValue(source: Record<string, any> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = source?.[key]
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, any>
+    }
+  }
+
+  return null
+}
+
+const executingBarberRecordKeys = [
+  'executing_barber',
+  'executingBarber',
+  'actual_barber',
+  'actualBarber',
+  'performer_barber',
+  'performerBarber',
+  'serving_barber',
+  'servingBarber',
+  'completed_by_barber',
+  'completedByBarber',
+  'performed_by',
+  'performedBy',
+  'barber'
+]
+
+const executingBarberIdKeys = [
+  'executing_barber_id',
+  'executingBarberId',
+  'actual_barber_id',
+  'actualBarberId',
+  'performer_barber_id',
+  'performerBarberId',
+  'serving_barber_id',
+  'servingBarberId',
+  'completed_by_barber_id',
+  'completedByBarberId',
+  'performed_by_barber_id',
+  'performedByBarberId',
+  'performed_by',
+  'performedBy',
+  'barber_id',
+  'barberId'
+]
+
+function getHistoryBarberId(item: Record<string, any>) {
+  return pickTextValue(item, executingBarberIdKeys)
+    || pickTextValue(pickRecordValue(item, executingBarberRecordKeys), ['id', 'user_id', 'userId'])
+}
+
+function uniqueStrings(values: unknown[]) {
+  return [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))]
+}
+
+function getHistoryServiceIds(item: Record<string, any>) {
+  const ids: unknown[] = []
+
+  if (item.service_id) {
+    ids.push(item.service_id)
+  }
+
+  if (Array.isArray(item.service_ids)) {
+    ids.push(...item.service_ids)
+  }
+
+  if (Array.isArray(item.services)) {
+    ids.push(...item.services.map((service: any) => service?.id ?? service?.service_id))
+  }
+
+  return uniqueStrings(ids)
+}
+
+function getServicePrice(service?: FlatServiceItem | Record<string, any> | null) {
+  return Math.max(0, normalizeNumber(service?.base_price ?? service?.price ?? service?.amount))
+}
+
+function getHistoryTimestamp(item: Record<string, any>) {
+  const value = normalizeText(
+    item.completed_at
+    || item.completedAt
+    || item.finished_at
+    || item.finishedAt
+    || item.created_at
+    || item.createdAt
+  )
+
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+}
+
+function isHistoryInPeriod(item: Record<string, any>, range: { end_date: string, start_date: string }) {
+  const dateKey = getHistoryTimestamp(item)
+
+  return !dateKey || (dateKey >= range.start_date && dateKey <= range.end_date)
+}
+
+function getHistoryDirectAmount(item: Record<string, any>) {
+  const amountFields = [
+    item.amount,
+    item.order_total,
+    item.orderTotal,
+    item.total_amount,
+    item.totalAmount,
+    item.price_override,
+    item.priceOverride,
+    item.price
+  ]
+
+  for (const value of amountFields) {
+    const amount = toNumberOrNull(value)
+
+    if (amount !== null) {
+      return Math.max(0, amount)
+    }
+  }
+
+  return null
+}
+
+function getHistoryAmount(item: Record<string, any>, servicePriceMap: Map<string, number>) {
+  const directAmount = getHistoryDirectAmount(item)
+
+  if (directAmount !== null) {
+    return directAmount
+  }
+
+  if (Array.isArray(item.services)) {
+    const servicesAmount = item.services.reduce((sum: number, service: Record<string, any>) => {
+      return sum + getServicePrice(service)
+    }, 0)
+
+    if (servicesAmount > 0) {
+      return servicesAmount
+    }
+  }
+
+  return getHistoryServiceIds(item).reduce((sum, serviceId) => {
+    return sum + (servicePriceMap.get(serviceId) ?? 0)
+  }, 0)
 }
 
 function createEmptyEmployeeDraft(): FinanceEmployeeDraft {
@@ -117,6 +377,7 @@ function buildEmployeeTitle(item: Record<string, any>) {
 
 const period = ref(currentPeriodKey())
 const periodKey = computed(() => (/^\d{4}-\d{2}$/.test(period.value) ? period.value : currentPeriodKey()))
+const periodRange = computed(() => getPeriodRange(periodKey.value))
 const saving = ref(false)
 const remoteLoading = ref(false)
 const remoteError = ref<unknown>(null)
@@ -222,6 +483,8 @@ async function saveToRemote() {
     return
   }
 
+  syncBarberProfitsFromHistory()
+
   saving.value = true
 
   try {
@@ -243,6 +506,8 @@ async function saveToRemote() {
 async function refreshAll() {
   await Promise.allSettled([
     refreshEmployees(),
+    refreshFinanceHistory(),
+    refreshFinanceServices(),
     loadRemoteSnapshot()
   ])
 }
@@ -259,6 +524,40 @@ const { data: employeeItems, pending: employeesPending, refresh: refreshEmployee
   watch: [() => branchStore.activeBranchId]
 })
 
+const { data: serviceItems, pending: financeServicesPending, refresh: refreshFinanceServices } = await useAsyncData('finance-services', async () => {
+  const branchId = branchStore.activeBranchId || undefined
+  const response = await kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) })
+
+  return flattenServicesPayload(response)
+}, {
+  default: () => [] as FlatServiceItem[],
+  server: false,
+  watch: [() => branchStore.activeBranchId]
+})
+
+const {
+  data: financeHistoryItems,
+  pending: financeHistoryPending,
+  refresh: refreshFinanceHistory,
+  status: financeHistoryStatus
+} = await useAsyncData('finance-history-profit', async () => {
+  const branchId = branchStore.activeBranchId || undefined
+  const range = periodRange.value
+  const response = await historyApi.list({
+    ...(branchId ? { branch_id: branchId } : {}),
+    end_date: range.end_date,
+    from: range.start_date,
+    start_date: range.start_date,
+    to: range.end_date
+  })
+
+  return extractHistoryItems(response)
+}, {
+  default: () => [] as Record<string, any>[],
+  server: false,
+  watch: [() => branchStore.activeBranchId, periodKey]
+})
+
 const employees = computed<FinanceEmployeeRow[]>(() =>
   (employeeItems.value || [])
     .map((item) => ({
@@ -269,6 +568,60 @@ const employees = computed<FinanceEmployeeRow[]>(() =>
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 )
+
+const servicePriceMap = computed(() =>
+  new Map<string, number>(
+    (serviceItems.value || []).map((service): [string, number] => [
+      String(service.id),
+      getServicePrice(service)
+    ])
+  )
+)
+
+const historyProfitReady = computed(() => financeHistoryStatus.value === 'success')
+
+const barberProfitMap = computed(() => {
+  const rows = new Map<string, number>()
+  const range = periodRange.value
+
+  for (const item of financeHistoryItems.value || []) {
+    if (!isCompletedStatus(item.status) || !isHistoryInPeriod(item, range)) {
+      continue
+    }
+
+    const barberId = getHistoryBarberId(item)
+
+    if (!barberId) {
+      continue
+    }
+
+    rows.set(barberId, (rows.get(barberId) || 0) + getHistoryAmount(item, servicePriceMap.value))
+  }
+
+  return rows
+})
+
+function syncBarberProfitsFromHistory() {
+  if (!historyProfitReady.value) {
+    return
+  }
+
+  for (const employee of employees.value) {
+    const draft = getEmployeeDraft(employee.id)
+    const profit = Math.round(barberProfitMap.value.get(employee.id) || 0)
+
+    if (draft.profit !== profit) {
+      draft.profit = profit
+    }
+  }
+}
+
+watch([
+  employees,
+  barberProfitMap,
+  historyProfitReady,
+  () => payload.value
+], syncBarberProfitsFromHistory, { immediate: true })
 
 const totals = computed(() => {
   let salary = 0
@@ -303,8 +656,8 @@ const totals = computed(() => {
 
 const columns: TableColumn<FinanceEmployeeRow>[] = [
   { accessorKey: 'name', header: 'Сотрудник' },
-  { id: 'salary', header: 'Цель' },
-  { id: 'profit', header: 'Прибыль' },
+  { id: 'salary', header: 'План' },
+  { id: 'profit', header: 'Val' },
   { id: 'profitPercent', header: 'Процент' },
   { id: 'bonusProfitPercent', header: 'Бонусный процент' },
   { id: 'advances', header: 'Авансы' },
@@ -344,7 +697,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             color="neutral"
             variant="outline"
             icon="i-lucide-refresh-cw"
-            :loading="employeesPending || remoteLoading"
+            :loading="employeesPending || financeHistoryPending || financeServicesPending || remoteLoading"
             @click="refreshAll"
           >
             Обновить
@@ -374,7 +727,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             </div>
             <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
-                Прибыль
+                Val
               </p>
               <p class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.profit) }}
@@ -420,7 +773,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
           <UTable
             :columns="columns"
             :data="employees"
-            :loading="employeesPending"
+            :loading="employeesPending || financeHistoryPending"
             sticky="header"
             :ui="{
               root: 'w-full overflow-auto',
@@ -454,14 +807,14 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             </template>
 
             <template #profit-cell="{ row }">
-              <UInput
-                v-model.number="getEmployeeDraft(row.original.id).profit"
-                type="number"
-                min="0"
-                size="sm"
-                class="w-32"
-                @update:model-value="dirty = true"
-              />
+              <div class="space-y-1">
+                <p class="font-semibold text-charcoal-950">
+                  {{ formatMoney(getEmployeeDraft(row.original.id).profit) }}
+                </p>
+                <p class="text-xs text-charcoal-500">
+                  {{ financeHistoryPending ? 'Загрузка истории' : 'Из истории' }}
+                </p>
+              </div>
             </template>
 
             <template #profitPercent-cell="{ row }">
