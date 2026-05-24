@@ -15,8 +15,8 @@ export function usePromoApi() {
         successMessage: 'Промокод создан'
       })
     },
-    dashboard() {
-      return client.request('/api/promo-code/dashboard')
+    dashboard(query?: Record<string, unknown>) {
+      return client.request('/api/promo-code/dashboard', { query })
     },
     detail(id: string) {
       return client.request(`/api/promo-code/dashboard/${id}`)

@@ -370,6 +370,33 @@ function hasBarberSwap(visit: Record<string, any>) {
   return Boolean(selectedBarberId && executingBarberId && selectedBarberId !== executingBarberId)
 }
 
+function toDateKey(value: unknown) {
+  const text = normalizeText(value)
+
+  if (!text) {
+    return null
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+    return text.slice(0, 10)
+  }
+
+  const date = new Date(text)
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+}
+
+function getVisitDateKey(visit: Record<string, any>) {
+  return toDateKey(
+    visit.created_at
+    || visit.createdAt
+    || visit.completed_at
+    || visit.completedAt
+    || visit.finished_at
+    || visit.finishedAt
+  )
+}
+
 const serviceNameMap = computed(() =>
   new Map(
     (servicesData.value || []).map((svc: any) => [String(svc.id), svc.name || `Услуга ${svc.id}`])
@@ -448,12 +475,17 @@ const apiClient = useApiClient()
 const page = ref(1)
 const itemsPerPage = 10
 const exporting = ref(false)
+const allBarbersValue = '__all_barbers__'
+const selectedBarberId = ref(allBarbersValue)
+const dateFrom = ref('')
+const dateTo = ref('')
 
 await branchStore.ensureLoaded()
 
 const columns: TableColumn<any>[] = [
   { accessorKey: 'client', header: 'КЛИЕНТ' },
   { accessorKey: 'phone', header: 'ТЕЛЕФОН' },
+  { accessorKey: 'barber', header: 'БАРБЕР' },
   { accessorKey: 'status', header: 'СТАТУС' },
   { accessorKey: 'payment_method', header: 'ОПЛАТА' },
   { accessorKey: 'amount', header: 'СУММА' },
@@ -461,17 +493,55 @@ const columns: TableColumn<any>[] = [
   { id: 'actions', header: '' }
 ]
 
-const { data, pending, refresh } = await useAsyncData('history-current-filter', async () => {
-  const query = branchStore.activeBranchId
-    ? { branch_id: branchStore.activeBranchId }
-    : {}
+const historyDateRange = computed(() => {
+  const from = dateFrom.value || ''
+  const to = dateTo.value || ''
 
-  const response = await historyApi.list(query)
+  if (from && to && from > to) {
+    return {
+      end: from,
+      start: to
+    }
+  }
+
+  return {
+    end: to,
+    start: from
+  }
+})
+
+const historyQuery = computed(() => {
+  const query: Record<string, string> = {}
+  const range = historyDateRange.value
+
+  if (branchStore.activeBranchId) {
+    query.branch_id = branchStore.activeBranchId
+  }
+
+  if (range.start) {
+    query.from = range.start
+    query.start_date = range.start
+  }
+
+  if (range.end) {
+    query.to = range.end
+    query.end_date = range.end
+  }
+
+  return query
+})
+
+const hasActiveFilters = computed(() =>
+  Boolean(selectedBarberId.value !== allBarbersValue || dateFrom.value || dateTo.value)
+)
+
+const { data, pending, refresh } = await useAsyncData('history-current-filter', async () => {
+  const response = await historyApi.list(historyQuery.value)
 
   return extractHistoryItems(response)
 }, {
   server: false,
-  watch: [() => branchStore.activeBranchId]
+  watch: [() => branchStore.activeBranchId, dateFrom, dateTo]
 })
 
 const { data: servicesData } = await useAsyncData('history-services', async () => {
@@ -488,6 +558,7 @@ const { data: barbersData } = await useAsyncData('history-barbers-directory', as
   try {
     return await apiClient.request<{ items?: BarberDirectoryItem[] }>('/api/barbers', {
       query: {
+        __skipBranchScope: true,
         mode: 'employees',
         ...(branchId ? { branch_id: branchId } : {})
       },
@@ -523,12 +594,75 @@ const barberNameMap = computed(() => {
 
 const historyItems = computed<HistoryItem[]>(() => data.value || [])
 
+const barberFilterOptions = computed(() => {
+  const options = new Map<string, string>()
+
+  for (const item of extractBarberItems(barbersData.value)) {
+    const id = pickTextValue(item, ['id', 'user_id', 'userId'])
+    const name = getRecordDisplayName(item)
+
+    if (id) {
+      options.set(id, name || `Барбер ${shortId(id)}`)
+    }
+  }
+
+  for (const item of historyItems.value) {
+    const visit = item as Record<string, any>
+
+    for (const id of [getVisitSelectedBarberId(visit), getVisitExecutingBarberId(visit)]) {
+      if (id && !options.has(id)) {
+        options.set(id, barberNameMap.value.get(id) || `Барбер ${shortId(id)}`)
+      }
+    }
+  }
+
+  return [
+    { label: 'Все барберы', value: allBarbersValue },
+    ...[...options.entries()]
+      .map(([value, label]) => ({ label, value }))
+      .sort((left, right) => left.label.localeCompare(right.label, 'ru'))
+  ]
+})
+
+function isVisitInSelectedDateRange(visit: Record<string, any>) {
+  const range = historyDateRange.value
+
+  if (!range.start && !range.end) {
+    return true
+  }
+
+  const dateKey = getVisitDateKey(visit)
+
+  if (!dateKey) {
+    return false
+  }
+
+  return (!range.start || dateKey >= range.start)
+    && (!range.end || dateKey <= range.end)
+}
+
+function isVisitBySelectedBarber(visit: Record<string, any>) {
+  if (selectedBarberId.value === allBarbersValue) {
+    return true
+  }
+
+  return [
+    getVisitSelectedBarberId(visit),
+    getVisitExecutingBarberId(visit)
+  ].includes(selectedBarberId.value)
+}
+
 const filteredHistory = computed(() =>
-  historyItems.value.filter(item =>
-    branchStore.activeBranchId
-      ? String(item.branch_id || (item as any).branch?.id || '') === String(branchStore.activeBranchId)
+  historyItems.value.filter((item) => {
+    const visit = item as Record<string, any>
+    const branchMatches = branchStore.activeBranchId
+      ? String(visit.branch_id || visit.branch?.id || '') === String(branchStore.activeBranchId)
       : true
-  )
+
+    return branchMatches
+      && isVisitBySelectedBarber(visit)
+      && isVisitInSelectedDateRange(visit)
+  })
 )
 
 const rows = computed(() =>
@@ -536,6 +670,7 @@ const rows = computed(() =>
     ...item,
     client: getClientName(item) || 'Клиент',
     phone: getClientPhone(item) || 'Не указан',
+    barber: getVisitExecutingBarberName(item),
     created_at: item.created_at || (item as any).createdAt || '',
     amount: item.amount
       ?? (item as any).order_total
@@ -566,7 +701,7 @@ const pageTo = computed(() =>
 )
 
 watch(
-  () => branchStore.activeBranchId,
+  [() => branchStore.activeBranchId, selectedBarberId, dateFrom, dateTo],
   () => {
     page.value = 1
   }
@@ -585,6 +720,12 @@ watch(
 
 const detailModalOpen = ref(false)
 const selectedEntry = ref<any | null>(null)
+
+function resetHistoryFilters() {
+  selectedBarberId.value = allBarbersValue
+  dateFrom.value = ''
+  dateTo.value = ''
+}
 
 function openDetails(row: any) {
   selectedEntry.value = row
@@ -608,7 +749,7 @@ async function exportHistoryToExcel() {
     const branchNameMap = new Map(branchStore.branches.map(branch => [String(branch.id), branch.name]))
 
     const exportRows: string[][] = [
-      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Статус', 'Оплата', 'Сумма', 'Оригинальная сумма', 'Причина изменения', 'Создано', 'Услуги']
+      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Барбер', 'Статус', 'Оплата', 'Сумма', 'Оригинальная сумма', 'Причина изменения', 'Создано', 'Услуги']
     ]
 
     for (const entry of rows.value) {
@@ -620,6 +761,7 @@ async function exportHistoryToExcel() {
         branchName,
         getClientName(entry) || '',
         getClientPhone(entry) || '',
+        getVisitExecutingBarberName(entry),
         normalizeText((entry as any).status) || '',
         formatPaymentMethod((entry as any).payment_method),
         (entry as any).amount == null ? '' : String((entry as any).amount),
@@ -656,7 +798,7 @@ async function exportHistoryToExcel() {
         </UBadge>
         <div class="flex items-center gap-2">
           <UBadge color="neutral" variant="outline">
-            {{ historyItems.length }} записей
+            {{ rows.length }} записей
           </UBadge>
           <UButton
             color="neutral"
@@ -674,11 +816,40 @@ async function exportHistoryToExcel() {
         </div>
       </div>
 
+      <div class="mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
+        <UFormField label="Барбер">
+          <USelect
+            v-model="selectedBarberId"
+            class="w-full"
+            :items="barberFilterOptions"
+            value-key="value"
+          />
+        </UFormField>
+
+        <UFormField label="От">
+          <UInput v-model="dateFrom" type="date" />
+        </UFormField>
+
+        <UFormField label="До">
+          <UInput v-model="dateTo" type="date" />
+        </UFormField>
+
+        <UButton
+          color="neutral"
+          icon="i-lucide-rotate-ccw"
+          :disabled="!hasActiveFilters"
+          variant="outline"
+          @click="resetHistoryFilters"
+        >
+          Сбросить
+        </UButton>
+      </div>
+
       <div v-if="rows.length" class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
         <div class="flex-1 overflow-auto">
           <UTable :columns="columns" :data="paginatedHistory" :loading="pending" sticky="header" :ui="{
             root: 'w-full overflow-auto',
-            base: 'w-full min-w-[64rem]',
+            base: 'w-full min-w-[72rem]',
             thead: 'bg-charcoal-50/90',
             tbody: 'divide-y divide-charcoal-100',
             th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
@@ -690,6 +861,10 @@ async function exportHistoryToExcel() {
 
             <template #phone-cell="{ row }">
               <span class="text-sm text-charcoal-700">{{ row.original.phone }}</span>
+            </template>
+
+            <template #barber-cell="{ row }">
+              <span class="font-medium text-charcoal-950">{{ row.original.barber }}</span>
             </template>
 
             <template #status-cell="{ row }">
@@ -745,7 +920,7 @@ async function exportHistoryToExcel() {
       </div>
 
       <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
-        Для выбранного филиала записи отсутствуют.
+        По выбранным фильтрам записи отсутствуют.
       </div>
 
       <UModal v-model:open="detailModalOpen" title="Детали визита">

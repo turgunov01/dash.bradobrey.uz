@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Branch } from '~~/shared/schemas'
 
-import { formatCount } from '~/utils/format'
-import { asNumber, pickValue, toKeyLabel } from '~/utils/normalize'
+import { formatCount, formatMoney } from '~/utils/format'
+import { createServicePriceMap, extractHistoryItems, summarizeHistoryMetrics } from '~/utils/historyMetrics'
+import { asNumber, toKeyLabel } from '~/utils/normalize'
+import { flattenServicesPayload } from '~/utils/services'
 
 definePageMeta({
 })
@@ -11,8 +13,9 @@ const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
 const uiStore = useUiStore()
 const barbersApi = useBarbersApi()
+const historyApi = useHistoryApi()
+const kioskApi = useKioskApi()
 const promoApi = usePromoApi()
-const statisticsApi = useStatisticsApi()
 
 useRealtimeQueue()
 
@@ -22,21 +25,41 @@ await Promise.all([
 ])
 
 const { data, pending, refresh } = await useAsyncData('overview-dashboard', async () => {
-  const branchId = branchStore.activeBranchId || undefined
-  const [health, queue, promoDashboard, statistics] = await Promise.all([
-    $fetch('/api/health'),
-    sessionStore.barber?.id
+  const emptyQueue = { count: 0, items: [] }
+  const rangeQuery = {
+    end_date: uiStore.statisticsRange.end,
+    from: uiStore.statisticsRange.start,
+    start_date: uiStore.statisticsRange.start,
+    to: uiStore.statisticsRange.end
+  }
+  const [health, branches, queue, promoDashboard, history, servicesPayload] = await Promise.all([
+    $fetch('/api/health').catch(() => null),
+    branchStore.ensureLoaded({ force: true }).catch(() => branchStore.branches),
+    (sessionStore.barber?.id || sessionStore.user
       ? barbersApi.queue()
-      : Promise.resolve({ count: 0, items: [] }),
-    promoApi.dashboard(),
-    statisticsApi.global({
-      end_date: uiStore.statisticsRange.end,
-      start_date: uiStore.statisticsRange.start,
-      ...(branchId ? { branch_id: branchId } : {})
-    })
+      : Promise.resolve(emptyQueue)).catch(() => emptyQueue),
+    promoApi.dashboard({ __skipBranchScope: true }).catch(() => ({ items: [] })),
+    historyApi.list({
+      __skipBranchScope: true,
+      ...rangeQuery
+    }).catch(() => ({ items: [] })),
+    kioskApi.services({
+      __skipBranchScope: true,
+      active: true,
+      grouped: true
+    }).catch(() => ({ services: [] }))
   ])
+  const statistics = summarizeHistoryMetrics(
+    extractHistoryItems(history),
+    createServicePriceMap(flattenServicesPayload(servicesPayload)),
+    {
+      endDate: uiStore.statisticsRange.end,
+      startDate: uiStore.statisticsRange.start
+    }
+  )
 
   return {
+    branchCount: branches.length,
     health,
     promoDashboard,
     queue,
@@ -69,31 +92,26 @@ const branchSummaries = computed(() =>
 )
 
 const statisticsHighlights = computed(() => {
-  const payload = data.value?.statistics as Record<string, any> || {}
-  const desired = [
-    pickValue(payload, ['revenue', 'total_revenue', 'amount', 'total_amount'], '0'),
-    pickValue(payload, ['orders', 'queue_count', 'total_clients', 'count'], '0'),
-    pickValue(payload, ['completed', 'completed_orders', 'done'], '0')
-  ]
+  const payload = data.value?.statistics || { completed: 0, orders: 0, revenue: 0 }
 
   return [
     {
       description: 'Итог по всей системе за выбранный период',
       icon: 'i-lucide-wallet',
       label: 'Выручка',
-      value: desired[0] ?? '0'
+      value: formatMoney(payload.revenue)
     },
     {
       description: 'Объем очереди по данным аналитики',
       icon: 'i-lucide-users-round',
       label: 'Заказы',
-      value: desired[1] ?? '0'
+      value: formatCount(payload.orders)
     },
     {
       description: 'Количество завершенных записей в аналитике',
       icon: 'i-lucide-check-check',
       label: 'Завершено',
-      value: desired[2] ?? '0'
+      value: formatCount(payload.completed)
     }
   ]
 })
@@ -144,11 +162,11 @@ const shortcuts = computed(() =>
 
     <template #body>
       <div class="space-y-6">
-        <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
-          <DashboardMetricCard description="Текущие записи очереди, назначенные авторизованному барберу."
-            icon="i-lucide-clock-3" label="Активная очередь" :value="formatCount(data?.queue?.count)" />
+        <div class="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
+          <!-- <DashboardMetricCard description="Текущие записи очереди, назначенные авторизованному барберу."
+            icon="i-lucide-clock-3" label="Активная очередь" :value="formatCount(data?.queue?.count)" /> -->
           <DashboardMetricCard description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
-            label="Филиалы" :value="formatCount(branchStore.branches.length)" />
+            label="Филиалы" :value="formatCount(data?.branchCount)" />
           <DashboardMetricCard description="Промокоды, полученные с панели управления." icon="i-lucide-ticket-percent"
             label="Промокоды" :value="formatCount(promoItems.length)" />
           <DashboardMetricCard description="Состояние основного health-эндпоинта." icon="i-lucide-heart-pulse"
@@ -173,7 +191,7 @@ const shortcuts = computed(() =>
                 :description="card.description" :icon="card.icon" :label="card.label" :value="card.value" />
             </div>
 
-            <div class="mt-6 grid gap-3">
+            <!-- <div class="mt-6 grid gap-3">
               <div v-for="[key, value] in statRows" :key="key"
                 class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3">
                 <div class="flex items-center justify-between gap-4">
@@ -185,7 +203,7 @@ const shortcuts = computed(() =>
                     :style="{ width: `${Math.min(asNumber(value, 0), 100)}%` }" />
                 </div>
               </div>
-            </div>
+            </div> -->
           </UCard>
 
           <div class="space-y-6">
