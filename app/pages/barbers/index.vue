@@ -208,8 +208,13 @@ function commissionForDraft(draft: FinanceEmployeeDraft, fallbackProfit: number)
 function getHistoryBarberId(item: Record<string, any>) {
   return normalizeText(item.barber_id)
     || normalizeText(item.barberId)
+    || normalizeText(item.completed_by_barber_id)
+    || normalizeText(item.completedByBarberId)
     || normalizeText(item.barber?.id)
     || normalizeText(item.barber?.user_id)
+    || normalizeText(item.barber?.userId)
+    || normalizeText(item.completed_by_barber?.id)
+    || normalizeText(item.completedByBarber?.id)
 }
 
 function getHistoryTimestamp(item: Record<string, any>) {
@@ -237,6 +242,10 @@ function isCompletedStatus(value: unknown) {
 
 function isCancelledStatus(value: unknown) {
   return ['cancelled', 'no_show', 'not_in_time', 'rejected'].includes(String(value || '').trim().toLowerCase())
+}
+
+function isFinalHistoryStatus(value: unknown) {
+  return isCompletedStatus(value) || isCancelledStatus(value)
 }
 
 function getHistoryServiceIds(item: Record<string, any>) {
@@ -385,27 +394,31 @@ const employeeInsightMap = computed(() => {
   const financeEmployees = insightsData.value?.financePayload?.employees || {}
 
   for (const row of employeeRows.value) {
-    const history = (insightsData.value?.historyItems || [])
+    const rawHistory = (insightsData.value?.historyItems || [])
       .filter(item => getHistoryBarberId(item) === row.id)
       .sort((a, b) => {
         const left = getHistoryTimestamp(a)
         const right = getHistoryTimestamp(b)
         return (right ? new Date(right).getTime() : 0) - (left ? new Date(left).getTime() : 0)
       })
+    const history = rawHistory.filter(item => isFinalHistoryStatus(item.status))
+    const completedHistory = history.filter(item => isCompletedStatus(item.status))
+    const cancelledHistory = history.filter(item => isCancelledStatus(item.status))
     const periodHistory = history.filter((item) => {
       const timestamp = getHistoryTimestamp(item)
       const dateKey = timestamp ? timestamp.slice(0, 10) : null
       return !dateKey || (dateKey >= range.start_date && dateKey <= range.end_date)
     })
-    const revenue = history.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
-    const periodRevenue = periodHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
+    const periodCompletedHistory = periodHistory.filter(item => isCompletedStatus(item.status))
+    const revenue = completedHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
+    const periodRevenue = periodCompletedHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
     const draft = normalizeFinanceDraft(financeEmployees[row.id])
     const reportProfit = draft.profit > 0 ? draft.profit : periodRevenue
     const commission = commissionForDraft(draft, periodRevenue)
 
     map.set(row.id, {
-      cancelled: history.filter(item => isCancelledStatus(item.status)).length,
-      completed: history.filter(item => isCompletedStatus(item.status)).length,
+      cancelled: cancelledHistory.length,
+      completed: completedHistory.length,
       finance: {
         ...draft,
         commission,

@@ -27,9 +27,16 @@ export function useDashboardNavigation() {
 
   const primaryLinks = [[
     { icon: 'i-lucide-layout-dashboard', label: 'Обзор', to: '/' },
-    { icon: 'i-lucide-users', label: 'Сотрудники', to: '/barbers' },
-    { icon: 'i-lucide-store', label: 'Филиалы', to: '/branches' },
-    { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
+    {
+      icon: 'i-lucide-briefcase-business',
+      label: 'Управление',
+      children: [
+        { icon: 'i-lucide-users', label: 'Сотрудники', to: '/barbers' },
+        { icon: 'i-lucide-store', label: 'Филиалы', to: '/branches' },
+        { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
+        { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' }
+      ]
+    },
     {
       icon: 'i-lucide-folder-tree',
       label: 'Каталог',
@@ -40,8 +47,6 @@ export function useDashboardNavigation() {
     },
     { icon: 'i-lucide-history', label: 'История', to: '/history' },
     { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },
-    { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' },
-    { icon: 'i-lucide-fingerprint', label: 'Verifix', to: '/verifix' },
     {
       icon: 'i-lucide-shopping-bag',
       label: 'Маркетплейс',
