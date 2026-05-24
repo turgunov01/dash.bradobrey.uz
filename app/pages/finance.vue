@@ -26,6 +26,7 @@ type FinanceEmployeeRow = {
 }
 
 type FinanceDraftStorage = Record<string, FinanceSnapshotPayload>
+type FinanceMoneyField = 'advances' | 'penalty' | 'salary'
 
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
@@ -422,6 +423,27 @@ function getEmployeeDraft(id: string): FinanceEmployeeDraft {
   return created
 }
 
+function formatMoneyInputValue(value: unknown) {
+  const digits = String(value ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '')
+
+  if (!digits) {
+    return '0'
+  }
+
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+function parseMoneyInputValue(value: unknown) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+
+  return normalizeNumber(digits)
+}
+
+function updateMoneyDraft(id: string, field: FinanceMoneyField, value: unknown) {
+  getEmployeeDraft(id)[field] = parseMoneyInputValue(value)
+  dirty.value = true
+}
+
 function commissionForDraft(draft: FinanceEmployeeDraft) {
   const profit = Math.max(0, draft.profit)
   const goal = Math.max(0, draft.salary)
@@ -797,12 +819,12 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
 
             <template #salary-cell="{ row }">
               <UInput
-                v-model.number="getEmployeeDraft(row.original.id).salary"
-                type="number"
-                min="0"
+                :model-value="formatMoneyInputValue(getEmployeeDraft(row.original.id).salary)"
+                inputmode="numeric"
+                type="text"
                 size="sm"
                 class="w-32"
-                @update:model-value="dirty = true"
+                @update:model-value="value => updateMoneyDraft(row.original.id, 'salary', value)"
               />
             </template>
 
@@ -843,23 +865,23 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
 
             <template #advances-cell="{ row }">
               <UInput
-                v-model.number="getEmployeeDraft(row.original.id).advances"
-                type="number"
-                min="0"
+                :model-value="formatMoneyInputValue(getEmployeeDraft(row.original.id).advances)"
+                inputmode="numeric"
+                type="text"
                 size="sm"
                 class="w-32"
-                @update:model-value="dirty = true"
+                @update:model-value="value => updateMoneyDraft(row.original.id, 'advances', value)"
               />
             </template>
 
             <template #penalty-cell="{ row }">
               <UInput
-                v-model.number="getEmployeeDraft(row.original.id).penalty"
-                type="number"
-                min="0"
+                :model-value="formatMoneyInputValue(getEmployeeDraft(row.original.id).penalty)"
+                inputmode="numeric"
+                type="text"
                 size="sm"
                 class="w-32"
-                @update:model-value="dirty = true"
+                @update:model-value="value => updateMoneyDraft(row.original.id, 'penalty', value)"
               />
             </template>
 

@@ -95,6 +95,32 @@ function toNumberOrNull(value: unknown) {
   return Number.isFinite(amount) ? amount : null
 }
 
+function getPaymentBreakdown(item: Record<string, any>) {
+  const payments = Array.isArray(item.payments) ? item.payments : []
+  const amountsByMethod = new Map<string, number>()
+
+  for (const payment of payments) {
+    const method = normalizeText(payment?.method)
+    const amount = toNumberOrNull(payment?.amount)
+
+    if (!method || amount === null || amount <= 0) {
+      continue
+    }
+
+    amountsByMethod.set(method, (amountsByMethod.get(method) || 0) + amount)
+  }
+
+  return Array.from(amountsByMethod.entries()).map(([method, amount]) => ({
+    amount,
+    method
+  }))
+}
+
+function isMixedPayment(item: Record<string, any>) {
+  return normalizeText(item.payment_method)?.toLowerCase() === 'mixed'
+    || getPaymentBreakdown(item).length > 1
+}
+
 function getOriginalAmount(item: Record<string, any>) {
   return toNumberOrNull(
     item.original_amount
@@ -739,6 +765,16 @@ async function exportHistoryToExcel() {
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Оплата</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatPaymentMethod(selectedEntry.payment_method) }}</p>
+                <div v-if="isMixedPayment(selectedEntry) && getPaymentBreakdown(selectedEntry).length" class="mt-2 space-y-1 text-xs text-charcoal-600">
+                  <div
+                    v-for="part in getPaymentBreakdown(selectedEntry)"
+                    :key="part.method"
+                    class="flex items-center justify-between gap-3"
+                  >
+                    <span>{{ formatPaymentMethod(part.method) }}</span>
+                    <span class="font-semibold text-charcoal-950">{{ formatMoney(part.amount) }}</span>
+                  </div>
+                </div>
               </div>
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Сумма</p>

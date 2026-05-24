@@ -15,7 +15,7 @@ export function useFinanceApi() {
   const client = useApiClient()
 
   return {
-    snapshot(query: { period: string }, options: { silent?: boolean } = {}) {
+    snapshot(query: { branch_id?: string | null, object_id?: string | null, period: string }, options: { silent?: boolean } = {}) {
       return client.request<FinanceSnapshotResponse>('/api/finance', { query, silent: options.silent })
     },
     upsert(payload: FinanceSnapshotUpsertPayload) {

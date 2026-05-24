@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import { formatCount, formatDateTime, formatMoney } from '~/utils/format'
@@ -36,6 +37,12 @@ type FinanceEmployeeDraft = {
   salary: number
 }
 
+type FinanceSnapshotPayload = {
+  employees: Record<string, FinanceEmployeeDraft>
+}
+
+type FinanceDraftStorage = Record<string, FinanceSnapshotPayload>
+
 const roleDescriptions: Record<EmployeeRole, string> = {
   admin: 'Полный контроль над настройками, сотрудниками и внутренними разделами.',
   barber: 'Рабочее место мастера, своя очередь, своя история и личная статистика.',
@@ -49,6 +56,10 @@ const barbersApi = useBarbersApi()
 const financeApi = useFinanceApi()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
+const financeDraftsStorage = useStorage<FinanceDraftStorage>('finance-drafts', {}, undefined, {
+  deep: true,
+  listenToStorageChanges: true
+})
 
 await branchStore.ensureLoaded()
 
@@ -189,6 +200,72 @@ function normalizeFinanceDraft(value: unknown): FinanceEmployeeDraft {
     profit_percent: normalizeNumber(source.profit_percent),
     salary: normalizeNumber(source.salary)
   }
+}
+
+function normalizeFinancePayload(value: unknown): FinanceSnapshotPayload {
+  const source = value && typeof value === 'object' ? value as Partial<FinanceSnapshotPayload> : {}
+  const employeesSource = source.employees && typeof source.employees === 'object'
+    ? source.employees as Record<string, unknown>
+    : {}
+  const employees: Record<string, FinanceEmployeeDraft> = {}
+
+  for (const [id, draft] of Object.entries(employeesSource)) {
+    const key = String(id || '').trim()
+
+    if (key) {
+      employees[key] = normalizeFinanceDraft(draft)
+    }
+  }
+
+  return { employees }
+}
+
+function hasFinanceDraftValues(draft: FinanceEmployeeDraft) {
+  return Object.values(draft).some(value => value > 0)
+}
+
+function hasManualFinanceDraftValues(draft: FinanceEmployeeDraft) {
+  return [
+    draft.advances,
+    draft.bonus_profit_percent,
+    draft.penalty,
+    draft.profit_percent,
+    draft.salary
+  ].some(value => value > 0)
+}
+
+function getLocalFinanceDraft(employeeId: string, branchId?: string | null) {
+  const period = currentPeriodKey()
+  const keys = [
+    branchId ? `${branchId}:${period}` : null,
+    branchStore.activeBranchId ? `${branchStore.activeBranchId}:${period}` : null,
+    `global:${period}`
+  ].filter((key, index, list): key is string => Boolean(key) && list.indexOf(key) === index)
+
+  for (const key of keys) {
+    const draft = normalizeFinancePayload(financeDraftsStorage.value?.[key]).employees[employeeId]
+
+    if (draft && hasFinanceDraftValues(draft)) {
+      return draft
+    }
+  }
+
+  return null
+}
+
+function resolveFinanceDraft(remoteValue: unknown, employeeId: string, branchId?: string | null) {
+  const remoteDraft = normalizeFinanceDraft(remoteValue)
+  const localDraft = getLocalFinanceDraft(employeeId, branchId)
+
+  if (!localDraft) {
+    return remoteDraft
+  }
+
+  if (hasManualFinanceDraftValues(localDraft) || !hasManualFinanceDraftValues(remoteDraft)) {
+    return localDraft
+  }
+
+  return remoteDraft
 }
 
 function commissionForDraft(draft: FinanceEmployeeDraft, fallbackProfit: number) {
@@ -335,12 +412,12 @@ const { data: insightsData, pending: insightsPending, refresh: refreshInsights }
       : historyApi.list(range),
     kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) }),
     branchId
-      ? financeApi.snapshot({ period: currentPeriodKey() }, { silent: true })
+      ? financeApi.snapshot({ branch_id: branchId, object_id: branchId, period: currentPeriodKey() }, { silent: true })
       : Promise.resolve(null)
   ])
 
-  const financePayload = financeResult.status === 'fulfilled' && financeResult.value?.payload && typeof financeResult.value.payload === 'object'
-    ? financeResult.value.payload as { employees?: Record<string, unknown> }
+  const financePayload = financeResult.status === 'fulfilled'
+    ? normalizeFinancePayload(financeResult.value?.payload)
     : { employees: {} }
 
   return {
@@ -412,7 +489,7 @@ const employeeInsightMap = computed(() => {
     const periodCompletedHistory = periodHistory.filter(item => isCompletedStatus(item.status))
     const revenue = completedHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
     const periodRevenue = periodCompletedHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
-    const draft = normalizeFinanceDraft(financeEmployees[row.id])
+    const draft = resolveFinanceDraft(financeEmployees[row.id], row.id, row.branch_id)
     const reportProfit = draft.profit > 0 ? draft.profit : periodRevenue
     const commission = commissionForDraft(draft, periodRevenue)
 
@@ -422,7 +499,7 @@ const employeeInsightMap = computed(() => {
       finance: {
         ...draft,
         commission,
-        payout: Math.round(commission - draft.advances - draft.penalty),
+        payout: Math.round(draft.salary + commission - draft.advances - draft.penalty),
         reportProfit
       },
       history,
