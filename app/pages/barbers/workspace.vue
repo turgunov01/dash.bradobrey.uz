@@ -1,23 +1,72 @@
 <script setup lang="ts">
+import type { QueueCompletePayload, QueueItem } from '~~/shared/schemas'
+import { flattenServicesPayload } from '~/utils/services'
+
 const sessionStore = useSessionStore()
 const barbersApi = useBarbersApi()
+const kioskApi = useKioskApi()
 const breakMinutes = ref(10)
+const completing = ref(false)
+const paymentModalOpen = ref(false)
+const completingItem = ref<QueueItem | null>(null)
 
 useRealtimeQueue()
 
 await sessionStore.ensureLoaded()
 
 const { data, pending, refresh } = await useAsyncData('barber-workspace', async () => {
-  const [me, queue] = await Promise.all([
+  const [me, queue, services] = await Promise.all([
     barbersApi.me({ silent: true }),
-    barbersApi.queue()
+    barbersApi.queue(),
+    kioskApi.services({ active: true, grouped: true })
   ])
 
   return {
     me,
-    queue
+    queue,
+    services
   }
 })
+
+const servicePriceMap = computed(() =>
+  new Map(
+    flattenServicesPayload(data.value?.services).map((service: any) => [
+      String(service.id),
+      Number(service.base_price ?? service.price ?? 0) || 0
+    ])
+  )
+)
+const queueItems = computed(() =>
+  (data.value?.queue?.items || []).map((item: QueueItem) => ({
+    ...item,
+    amount: getQueueItemAmount(item)
+  }))
+)
+const completingAmount = computed(() =>
+  completingItem.value ? getQueueItemAmount(completingItem.value) : 0
+)
+
+function getQueueItemServiceIds(item: QueueItem) {
+  const ids = Array.isArray(item.service_ids) && item.service_ids.length
+    ? item.service_ids
+    : item.service_id
+      ? [item.service_id]
+      : []
+
+  return ids.map(id => String(id))
+}
+
+function getQueueItemAmount(item: QueueItem) {
+  const directAmount = Number(item.amount ?? item.price_override ?? 0)
+
+  if (Number.isFinite(directAmount) && directAmount > 0) {
+    return directAmount
+  }
+
+  return getQueueItemServiceIds(item).reduce((sum, serviceId) => {
+    return sum + (servicePriceMap.value.get(serviceId) || 0)
+  }, 0)
+}
 
 async function startBreak() {
   await barbersApi.break({ minutes: Number(breakMinutes.value) })
@@ -39,9 +88,27 @@ async function startItem(item: any) {
   await refresh()
 }
 
-async function completeItem(item: any) {
-  await barbersApi.completeQueue(String(item.id))
-  await refresh()
+function completeItem(item: QueueItem) {
+  completingItem.value = item
+  paymentModalOpen.value = true
+}
+
+async function submitComplete(payload: QueueCompletePayload) {
+  if (!completingItem.value) {
+    return
+  }
+
+  completing.value = true
+
+  try {
+    await barbersApi.completeQueue(String(completingItem.value.id), payload)
+    paymentModalOpen.value = false
+    completingItem.value = null
+    await refresh()
+  }
+  finally {
+    completing.value = false
+  }
 }
 
 function openItem(item: any) {
@@ -161,7 +228,7 @@ function openItem(item: any) {
 
             <div v-if="data?.queue?.items?.length">
               <QueueTable
-                :items="data.queue.items"
+                :items="queueItems"
                 :loading="pending"
                 @call="callItem"
                 @complete="completeItem"
@@ -178,6 +245,14 @@ function openItem(item: any) {
           </UCard>
         </div>
       </div>
+
+      <QueueCompletePaymentModal
+        v-model:open="paymentModalOpen"
+        :amount="completingAmount"
+        :loading="completing"
+        title="Завершить заказ"
+        @submit="submitComplete"
+      />
     </template>
   </UDashboardPanel>
 </template>

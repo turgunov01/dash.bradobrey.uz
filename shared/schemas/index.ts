@@ -129,6 +129,11 @@ export const queueItemSchema = z.object({
   service_ids: z.array(identifierSchema).optional().nullable(),
   service: serviceSchema.optional().nullable(),
   services: z.array(serviceSchema).optional().nullable(),
+  payments: z.array(z.object({
+    amount: z.union([z.number(), z.string()]).optional().nullable(),
+    created_at: optionalTextSchema,
+    method: optionalTextSchema
+  }).passthrough()).optional().nullable(),
   barber: barberSchema.optional().nullable()
 }).passthrough()
 
@@ -213,6 +218,16 @@ export const queueUpdateSchema = z.object({
   value => Boolean(value.status || value.payment_method || value.service_id || value.service_ids?.length),
   { message: 'Укажите хотя бы одно поле для обновления очереди.' }
 )
+
+export const queuePaymentPartSchema = z.object({
+  amount: numberLikeSchema.refine(value => value > 0, 'Сумма оплаты должна быть больше нуля'),
+  method: z.enum(['cash', 'card', 'certificate'])
+})
+
+export const queueCompleteSchema = z.object({
+  payment_method: optionalTextSchema,
+  payments: z.array(queuePaymentPartSchema).optional()
+}).passthrough()
 
 export const queueEditBeforeCompleteSchema = z.object({
   amount: numberLikeSchema,
@@ -339,6 +354,7 @@ export type LoginPayload = z.infer<typeof loginSchema>
 export type BarberRegisterPayload = z.infer<typeof barberRegisterSchema>
 export type BarberUpdatePayload = z.infer<typeof barberUpdateSchema>
 export type QueueUpdatePayload = z.infer<typeof queueUpdateSchema>
+export type QueueCompletePayload = z.infer<typeof queueCompleteSchema>
 export type QueueEditBeforeCompletePayload = z.infer<typeof queueEditBeforeCompleteSchema>
 export type BreakPayload = z.infer<typeof breakSchema>
 export type KioskRegisterPayload = z.infer<typeof kioskRegisterSchema>

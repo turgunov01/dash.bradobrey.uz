@@ -5,6 +5,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   const sessionStore = useSessionStore();
 
+  if (import.meta.client) {
+    useAdminToken().clearExpired();
+  }
+
   await sessionStore.ensureLoaded();
 
   if (!sessionStore.isAuthenticated) {

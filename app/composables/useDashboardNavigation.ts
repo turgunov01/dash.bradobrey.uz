@@ -1,6 +1,26 @@
 import { useCalculatorModal } from '#imports'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
+function flattenNavigationItems(items: NavigationMenuItem[]): NavigationMenuItem[] {
+  return items.flatMap((item) => [
+    item,
+    ...('children' in item && Array.isArray(item.children) ? flattenNavigationItems(item.children) : [])
+  ])
+}
+
+function toSearchItem(item: NavigationMenuItem) {
+  const source = item as Record<string, any>
+
+  return {
+    description: source.description,
+    icon: source.icon,
+    label: source.label,
+    onSelect: source.onSelect,
+    target: source.target,
+    to: source.to
+  }
+}
+
 export function useDashboardNavigation() {
   const route = useRoute()
   const { openCalculator } = useCalculatorModal()
@@ -10,15 +30,27 @@ export function useDashboardNavigation() {
     { icon: 'i-lucide-users', label: 'Сотрудники', to: '/barbers' },
     { icon: 'i-lucide-store', label: 'Филиалы', to: '/branches' },
     { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
-    { icon: 'i-lucide-folder', label: 'Категории', to: '/service-categories' },
-    { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' },
+    {
+      icon: 'i-lucide-folder-tree',
+      label: 'Каталог',
+      children: [
+        { icon: 'i-lucide-folder', label: 'Категории', to: '/service-categories' },
+        { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' }
+      ]
+    },
     { icon: 'i-lucide-history', label: 'История', to: '/history' },
     { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },
     { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' },
     { icon: 'i-lucide-fingerprint', label: 'Verifix', to: '/verifix' },
-    { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
-    { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' },
-    { icon: 'i-lucide-shopping-bag', label: 'Маркетплейс', to: '/dashboard/marketplace' },
+    {
+      icon: 'i-lucide-shopping-bag',
+      label: 'Маркетплейс',
+      children: [
+        { icon: 'i-lucide-store', label: 'Обзор', to: '/dashboard/marketplace' },
+        { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
+        { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' }
+      ]
+    },
     {
       icon: 'i-lucide-settings',
       label: 'Настройки',
@@ -38,7 +70,9 @@ export function useDashboardNavigation() {
   const searchGroups = computed(() => [
     {
       id: 'dashboard',
-      items: primaryLinks.flat(),
+      items: flattenNavigationItems(primaryLinks.flat())
+        .filter(item => Boolean((item as any).to || (item as any).onSelect))
+        .map(toSearchItem),
       label: 'Панель'
     },
     {

@@ -21,6 +21,7 @@ const paymentLabels: Record<string, string> = {
   card: 'Карта',
   cash: 'Наличные',
   certificate: 'Сертификат',
+  mixed: 'Смешанная',
   pending: 'Не указан'
 }
 

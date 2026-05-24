@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+import { formatCount, formatDateTime, formatMoney } from '~/utils/format'
+import { flattenServicesPayload } from '~/utils/services'
 import {
   employeePermissionDefinitions,
   employeePermissionSections,
@@ -25,6 +27,15 @@ type EmployeeRow = {
   specialization: string | null
 }
 
+type FinanceEmployeeDraft = {
+  advances: number
+  bonus_profit_percent: number
+  penalty: number
+  profit: number
+  profit_percent: number
+  salary: number
+}
+
 const roleDescriptions: Record<EmployeeRole, string> = {
   admin: 'Полный контроль над настройками, сотрудниками и внутренними разделами.',
   barber: 'Рабочее место мастера, своя очередь, своя история и личная статистика.',
@@ -35,14 +46,19 @@ const roleDescriptions: Record<EmployeeRole, string> = {
 
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
+const financeApi = useFinanceApi()
+const historyApi = useHistoryApi()
+const kioskApi = useKioskApi()
 
 await branchStore.ensureLoaded()
 
 const formModalOpen = ref(false)
+const detailsModalOpen = ref(false)
 const isSyncingRolePreset = ref(false)
 const submitting = ref(false)
 const removingId = ref('')
 const editingId = ref('')
+const selectedEmployeeId = ref('')
 const avatarFile = ref<File | null>(null)
 const avatarObjectUrl = ref('')
 
@@ -98,6 +114,161 @@ const branchMap = computed(() =>
   new Map(branchStore.branches.map(branch => [branch.id, branch.name]))
 )
 
+function currentPeriodKey() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+
+  return `${year}-${month}`
+}
+
+function currentPeriodRange() {
+  const [yearPart, monthPart] = currentPeriodKey().split('-')
+  const year = Number(yearPart)
+  const month = Number(monthPart)
+  const lastDay = new Date(year, month, 0).getDate()
+
+  return {
+    end_date: `${yearPart}-${monthPart}-${String(lastDay).padStart(2, '0')}`,
+    start_date: `${yearPart}-${monthPart}-01`
+  }
+}
+
+function normalizeNumber(value: unknown) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.max(0, number) : 0
+}
+
+function normalizeText(value: unknown) {
+  if (value === undefined || value === null) {
+    return null
+  }
+
+  const text = String(value).trim()
+
+  return text || null
+}
+
+function extractHistoryItems(response: unknown): Record<string, any>[] {
+  if (Array.isArray(response)) {
+    return response as Record<string, any>[]
+  }
+
+  if (!response || typeof response !== 'object') {
+    return []
+  }
+
+  const payload = response as {
+    data?: Record<string, any>[] | { items?: Record<string, any>[] }
+    items?: Record<string, any>[]
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items
+  }
+
+  if (Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  if (Array.isArray(payload.data?.items)) {
+    return payload.data.items
+  }
+
+  return []
+}
+
+function normalizeFinanceDraft(value: unknown): FinanceEmployeeDraft {
+  const source = value && typeof value === 'object' ? value as Partial<FinanceEmployeeDraft> : {}
+
+  return {
+    advances: normalizeNumber(source.advances),
+    bonus_profit_percent: normalizeNumber(source.bonus_profit_percent),
+    penalty: normalizeNumber(source.penalty),
+    profit: normalizeNumber(source.profit),
+    profit_percent: normalizeNumber(source.profit_percent),
+    salary: normalizeNumber(source.salary)
+  }
+}
+
+function commissionForDraft(draft: FinanceEmployeeDraft, fallbackProfit: number) {
+  const profit = draft.profit > 0 ? draft.profit : fallbackProfit
+  const goal = draft.salary
+  const basePercent = draft.profit_percent
+  const bonusPercent = draft.bonus_profit_percent > 0 ? draft.bonus_profit_percent : basePercent
+  const profitToGoal = goal > 0 ? Math.min(profit, goal) : 0
+  const profitAboveGoal = Math.max(0, profit - profitToGoal)
+
+  return Math.round(
+    (profitToGoal * basePercent) / 100
+    + (profitAboveGoal * bonusPercent) / 100
+  )
+}
+
+function getHistoryBarberId(item: Record<string, any>) {
+  return normalizeText(item.barber_id)
+    || normalizeText(item.barberId)
+    || normalizeText(item.barber?.id)
+    || normalizeText(item.barber?.user_id)
+}
+
+function getHistoryTimestamp(item: Record<string, any>) {
+  const value = normalizeText(
+    item.completed_at
+    || item.completedAt
+    || item.finished_at
+    || item.finishedAt
+    || item.created_at
+    || item.createdAt
+  )
+
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function isCompletedStatus(value: unknown) {
+  return ['completed', 'done', 'paid'].includes(String(value || '').trim().toLowerCase())
+}
+
+function isCancelledStatus(value: unknown) {
+  return ['cancelled', 'no_show', 'not_in_time', 'rejected'].includes(String(value || '').trim().toLowerCase())
+}
+
+function getHistoryServiceIds(item: Record<string, any>) {
+  const ids: unknown[] = []
+
+  if (item.service_id) {
+    ids.push(item.service_id)
+  }
+
+  if (Array.isArray(item.service_ids)) {
+    ids.push(...item.service_ids)
+  }
+
+  return [...new Set(ids.map(id => String(id || '').trim()).filter(Boolean))]
+}
+
+function getHistoryAmount(item: Record<string, any>, priceByServiceId: Map<string, number>) {
+  const directAmount = [
+    item.amount,
+    item.order_total,
+    item.total_amount,
+    item.price_override,
+    item.price
+  ].map(normalizeNumber).find(amount => amount > 0)
+
+  if (directAmount) {
+    return directAmount
+  }
+
+  return getHistoryServiceIds(item).reduce((sum, serviceId) => sum + (priceByServiceId.get(serviceId) || 0), 0)
+}
+
 const columns: TableColumn<EmployeeRow>[] = [
   { accessorKey: 'login', header: 'Логин' },
   { accessorKey: 'name', header: 'Сотрудник' },
@@ -145,6 +316,34 @@ const { data, pending, refresh } = await useAsyncData('employees-directory', asy
   watch: [() => branchStore.activeBranchId]
 })
 
+const { data: insightsData, pending: insightsPending, refresh: refreshInsights } = await useAsyncData('employees-insights', async () => {
+  const branchId = branchStore.activeBranchId || undefined
+  const range = currentPeriodRange()
+
+  const [historyResult, servicesResult, financeResult] = await Promise.allSettled([
+    branchId
+      ? historyApi.branch(branchId, range)
+      : historyApi.list(range),
+    kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) }),
+    branchId
+      ? financeApi.snapshot({ period: currentPeriodKey() }, { silent: true })
+      : Promise.resolve(null)
+  ])
+
+  const financePayload = financeResult.status === 'fulfilled' && financeResult.value?.payload && typeof financeResult.value.payload === 'object'
+    ? financeResult.value.payload as { employees?: Record<string, unknown> }
+    : { employees: {} }
+
+  return {
+    financePayload,
+    historyItems: historyResult.status === 'fulfilled' ? extractHistoryItems(historyResult.value) : [],
+    services: servicesResult.status === 'fulfilled' ? flattenServicesPayload(servicesResult.value) : []
+  }
+}, {
+  server: false,
+  watch: [() => branchStore.activeBranchId]
+})
+
 const employeeRows = computed<EmployeeRow[]>(() => data.value?.rows || [])
 const filteredRows = computed<EmployeeRow[]>(() => {
   const loginNeedle = searchLogin.value.trim().toLowerCase()
@@ -160,6 +359,74 @@ const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize
   return filteredRows.value.slice(start, start + pageSize)
 })
+const servicePriceMap = computed(() =>
+  new Map(
+    (insightsData.value?.services || []).map((service: any) => [
+      String(service.id),
+      normalizeNumber(service.base_price ?? service.price)
+    ])
+  )
+)
+const employeeInsightMap = computed(() => {
+  const map = new Map<string, {
+    cancelled: number
+    completed: number
+    finance: FinanceEmployeeDraft & {
+      commission: number
+      payout: number
+      reportProfit: number
+    }
+    history: Record<string, any>[]
+    periodRevenue: number
+    revenue: number
+    visits: number
+  }>()
+  const range = currentPeriodRange()
+  const financeEmployees = insightsData.value?.financePayload?.employees || {}
+
+  for (const row of employeeRows.value) {
+    const history = (insightsData.value?.historyItems || [])
+      .filter(item => getHistoryBarberId(item) === row.id)
+      .sort((a, b) => {
+        const left = getHistoryTimestamp(a)
+        const right = getHistoryTimestamp(b)
+        return (right ? new Date(right).getTime() : 0) - (left ? new Date(left).getTime() : 0)
+      })
+    const periodHistory = history.filter((item) => {
+      const timestamp = getHistoryTimestamp(item)
+      const dateKey = timestamp ? timestamp.slice(0, 10) : null
+      return !dateKey || (dateKey >= range.start_date && dateKey <= range.end_date)
+    })
+    const revenue = history.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
+    const periodRevenue = periodHistory.reduce((sum, item) => sum + getHistoryAmount(item, servicePriceMap.value), 0)
+    const draft = normalizeFinanceDraft(financeEmployees[row.id])
+    const reportProfit = draft.profit > 0 ? draft.profit : periodRevenue
+    const commission = commissionForDraft(draft, periodRevenue)
+
+    map.set(row.id, {
+      cancelled: history.filter(item => isCancelledStatus(item.status)).length,
+      completed: history.filter(item => isCompletedStatus(item.status)).length,
+      finance: {
+        ...draft,
+        commission,
+        payout: Math.round(commission - draft.advances - draft.penalty),
+        reportProfit
+      },
+      history,
+      periodRevenue,
+      revenue,
+      visits: history.length
+    })
+  }
+
+  return map
+})
+const selectedEmployee = computed(() =>
+  employeeRows.value.find(row => row.id === selectedEmployeeId.value) || null
+)
+const selectedEmployeeInsight = computed(() =>
+  selectedEmployeeId.value ? employeeInsightMap.value.get(selectedEmployeeId.value) || null : null
+)
 
 const selectedRoleDescription = computed(() => roleDescriptions[form.role])
 const selectedPermissionCount = computed(() => form.permissions.length)
@@ -278,6 +545,18 @@ function setPermission(permission: EmployeePermission, enabled: boolean) {
 function openCreateModal() {
   resetForm()
   formModalOpen.value = true
+}
+
+async function refreshDirectory() {
+  await Promise.allSettled([
+    refresh(),
+    refreshInsights()
+  ])
+}
+
+function openEmployeeDetails(row: EmployeeRow) {
+  selectedEmployeeId.value = row.id
+  detailsModalOpen.value = true
 }
 
 function clearAvatar() {
@@ -420,7 +699,7 @@ async function submitEmployee() {
       await barbersApi.register(body)
     }
 
-    await refresh()
+    await refreshDirectory()
     formModalOpen.value = false
   }
   finally {
@@ -439,7 +718,7 @@ async function removeEmployee(row: EmployeeRow) {
 
   try {
     await barbersApi.remove(row.id)
-    await refresh()
+    await refreshDirectory()
 
     if (editingId.value === row.id) {
       formModalOpen.value = false
@@ -485,7 +764,7 @@ onBeforeUnmount(() => {
               <UButton color="primary" icon="i-lucide-user-plus" @click="openCreateModal">
                 Добавить сотрудника
               </UButton>
-              <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
+              <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending || insightsPending" variant="outline" @click="refreshDirectory()">
                 Обновить список
               </UButton>
             </div>
@@ -526,7 +805,11 @@ onBeforeUnmount(() => {
                 </template>
 
                 <template #name-cell="{ row }">
-                  <div class="flex items-center gap-3">
+                  <button
+                    class="flex w-full items-center gap-3 text-left"
+                    type="button"
+                    @click="openEmployeeDetails(row.original)"
+                  >
                     <div class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
                       <img
                         v-if="row.original.photo_url"
@@ -542,7 +825,7 @@ onBeforeUnmount(() => {
                         {{ row.original.specialization }}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 </template>
 
                 <template #phone-cell="{ row }">
@@ -574,6 +857,17 @@ onBeforeUnmount(() => {
 
                 <template #actions-cell="{ row }">
                   <div class="flex justify-end gap-2">
+                    <UTooltip text="Статистика">
+                      <UButton
+                        aria-label="Открыть статистику сотрудника"
+                        color="neutral"
+                        icon="i-lucide-chart-no-axes-combined"
+                        square
+                        variant="ghost"
+                        @click="openEmployeeDetails(row.original)"
+                      />
+                    </UTooltip>
+
                     <UTooltip text="Редактировать">
                       <UButton
                         aria-label="Редактировать сотрудника"
@@ -602,12 +896,12 @@ onBeforeUnmount(() => {
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-charcoal-100 px-4 py-3">
               <span class="text-xs text-charcoal-500">
-                Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize, employeeRows.length) }} из {{ employeeRows.length }}
+                Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize, filteredRows.length) }} из {{ filteredRows.length }}
               </span>
               <UPagination
                 v-model="page"
                 :page-count="pageCount"
-                :total="employeeRows.length"
+                :total="filteredRows.length"
                 :per-page="pageSize"
                 size="sm"
               />
@@ -623,6 +917,136 @@ onBeforeUnmount(() => {
       </div>
     </template>
   </UDashboardPanel>
+
+  <UModal
+    v-model:open="detailsModalOpen"
+    class="sm:max-w-[760px]"
+    :title="selectedEmployee?.name || 'Сотрудник'"
+    :description="selectedEmployee ? `${selectedEmployee.branch} · ${getEmployeeRoleLabel(selectedEmployee.role)}` : undefined"
+  >
+    <template #body>
+      <div v-if="selectedEmployee" class="space-y-5">
+        <div class="flex flex-col gap-4 rounded-[1.5rem] border border-charcoal-200 bg-white/90 p-4 sm:flex-row sm:items-center">
+          <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
+            <img
+              v-if="selectedEmployee.photo_url"
+              :alt="selectedEmployee.name"
+              :src="selectedEmployee.photo_url"
+              class="size-full object-cover"
+            >
+            <UIcon v-else class="text-2xl text-charcoal-400" name="i-lucide-user-round" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-lg font-semibold text-charcoal-950">{{ selectedEmployee.name }}</p>
+            <p class="text-sm text-charcoal-600">{{ selectedEmployee.login }} · {{ selectedEmployee.phone || 'Телефон не указан' }}</p>
+            <p v-if="selectedEmployee.specialization" class="text-sm text-charcoal-500">{{ selectedEmployee.specialization }}</p>
+          </div>
+          <UBadge color="primary" variant="soft">
+            {{ getEmployeeRoleLabel(selectedEmployee.role) }}
+          </UBadge>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-4">
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Визиты</p>
+            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatCount(selectedEmployeeInsight?.visits || 0) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Завершено</p>
+            <p class="mt-2 text-lg font-semibold text-emerald-600">{{ formatCount(selectedEmployeeInsight?.completed || 0) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Отмены</p>
+            <p class="mt-2 text-lg font-semibold text-amber-600">{{ formatCount(selectedEmployeeInsight?.cancelled || 0) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Выручка</p>
+            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.revenue || 0) }}</p>
+          </div>
+        </div>
+
+        <div class="rounded-[1.5rem] border border-charcoal-200 bg-white/90 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Финансы</p>
+              <p class="mt-1 text-sm text-charcoal-600">Период {{ currentPeriodKey() }}</p>
+            </div>
+            <UBadge color="neutral" variant="outline">
+              {{ formatMoney(selectedEmployeeInsight?.finance.reportProfit || 0) }}
+            </UBadge>
+          </div>
+
+          <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Цель</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.salary || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Комиссия</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.commission || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">К выплате</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.payout || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Аванс</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.advances || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Штраф</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.penalty || 0) }}</p>
+            </div>
+            <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
+              <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Процент</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ selectedEmployeeInsight?.finance.profit_percent || 0 }}%</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-[1.5rem] border border-charcoal-200 bg-white/90 p-4">
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">История</p>
+            <UBadge color="neutral" variant="outline">
+              {{ formatCount(selectedEmployeeInsight?.history.length || 0) }}
+            </UBadge>
+          </div>
+
+          <div v-if="selectedEmployeeInsight?.history.length" class="mt-4 max-h-[18rem] space-y-2 overflow-auto pr-1">
+            <div
+              v-for="item in selectedEmployeeInsight.history.slice(0, 8)"
+              :key="item.id"
+              class="rounded-xl border border-charcoal-200 bg-charcoal-50/50 px-3 py-2"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="text-sm font-semibold text-charcoal-950">
+                    {{ item.client?.name || item.customer_name || 'Клиент' }}
+                  </p>
+                  <p class="text-xs text-charcoal-500">
+                    {{ formatDateTime(getHistoryTimestamp(item) || '') }}
+                  </p>
+                </div>
+                <div class="text-right">
+                  <SharedStatusBadge :label="item.status" />
+                  <p class="mt-1 text-xs font-semibold text-charcoal-700">
+                    {{ formatMoney(getHistoryAmount(item, servicePriceMap)) }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <SharedEmptyState
+            v-else
+            description="По выбранному филиалу история этого сотрудника не найдена."
+            icon="i-lucide-history"
+            title="История пуста"
+          />
+        </div>
+      </div>
+    </template>
+  </UModal>
 
   <UModal v-model:open="formModalOpen" class="sm:max-w-[650px]" :title="modalTitle" :description="modalDescription">
     <template #body>

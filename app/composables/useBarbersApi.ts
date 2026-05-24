@@ -6,6 +6,7 @@ import type {
   BreakPayload,
   EmployeePermission,
   LoginPayload,
+  QueueCompletePayload,
   QueueEditBeforeCompletePayload,
   QueueItem,
   QueueUpdatePayload,
@@ -28,8 +29,9 @@ export function useBarbersApi() {
         successMessage: "Клиент вызван",
       });
     },
-    completeQueue(id: string) {
+    completeQueue(id: string, payload: QueueCompletePayload = {}) {
       return client.request(`/api/barbers/queue/${id}/complete`, {
+        body: payload,
         method: "PATCH",
         successMessage: "Запись очереди завершена",
       });

@@ -379,6 +379,7 @@ const page = ref(1)
 const pageSize = 10
 const detailModalOpen = ref(false)
 const selectedPhone = ref('')
+const searchName = ref('')
 const searchPhone = ref('')
 const minVisits = ref<number | null>(null)
 const serviceFilter = ref('')
@@ -511,22 +512,24 @@ const visitsByPhone = computed(() => {
 })
 
 const filteredClientRows = computed<ClientRow[]>(() => {
+  const nameNeedle = searchName.value.trim().toLowerCase()
   const phoneNeedle = searchPhone.value.trim()
   const selectedService = serviceFilter.value.trim()
   const hasServiceFilter = Boolean(selectedService && selectedService !== ALL_SERVICES_VALUE)
   const min = minVisits.value ?? null
 
   return clientRows.value.filter((row) => {
+    const matchesName = !nameNeedle || row.name.toLowerCase().includes(nameNeedle)
     const matchesPhone = !phoneNeedle || row.phone.includes(phoneNeedle)
     const matchesVisits = min === null || row.visits >= min
 
     if (hasServiceFilter) {
       const visits = visitsByPhone.value.get(row.phone) || []
       const hasService = visits.some(v => getVisitServiceIds(v).includes(selectedService))
-      return matchesPhone && matchesVisits && hasService
+      return matchesName && matchesPhone && matchesVisits && hasService
     }
 
-    return matchesPhone && matchesVisits
+    return matchesName && matchesPhone && matchesVisits
   })
 })
 
@@ -630,7 +633,12 @@ function getVisitServiceIds(visit: Record<string, any>) {
         </UButton>
       </div>
 
-      <div class="grid gap-3 pb-4 md:grid-cols-3">
+      <div class="grid gap-3 pb-4 md:grid-cols-4">
+        <UInput
+          v-model="searchName"
+          icon="i-lucide-user-round-search"
+          placeholder="Имя"
+        />
         <UInput
           v-model="searchPhone"
           icon="i-lucide-search"
@@ -699,12 +707,12 @@ function getVisitServiceIds(visit: Record<string, any>) {
         </div>
         <div class="flex items-center justify-end gap-3 border-t border-charcoal-100 px-4 py-3">
           <span class="text-xs text-charcoal-500">
-            Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize, clientRows.length) }} из {{ clientRows.length }}
+            Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize, filteredClientRows.length) }} из {{ filteredClientRows.length }}
           </span>
           <UPagination
             v-model:page="page"
             :page-count="pageCount"
-            :total="clientRows.length"
+            :total="filteredClientRows.length"
             :per-page="pageSize"
             size="sm"
           />

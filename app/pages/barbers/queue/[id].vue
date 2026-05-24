@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { queueEditBeforeCompleteSchema, queueUpdateSchema } from '~~/shared/schemas'
+import { queueEditBeforeCompleteSchema, queueUpdateSchema, type QueueCompletePayload } from '~~/shared/schemas'
 import { formatDateTime, formatMoney } from '~/utils/format'
 import { formatPaymentMethod } from '~/utils/display'
 import { flattenServicesPayload } from '~/utils/services'
@@ -9,6 +9,8 @@ const barbersApi = useBarbersApi()
 const kioskApi = useKioskApi()
 
 const queueId = computed(() => String(route.params.id))
+const completing = ref(false)
+const paymentModalOpen = ref(false)
 const updateForm = reactive({
   payment_method: '',
   service_ids: [] as string[],
@@ -37,6 +39,14 @@ const queueItem = computed<Record<string, any> | null>(() => (data.value?.detail
 const queueStatusCode = computed(() => (data.value?.detail as any)?.status || 200)
 
 const flatServices = computed(() => flattenServicesPayload(data.value?.services))
+const servicePriceMap = computed(() =>
+  new Map(
+    flatServices.value.map((service: any) => [
+      String(service.id),
+      Number(service.base_price ?? service.price ?? 0) || 0
+    ])
+  )
+)
 
 const serviceOptions = computed(() =>
   flatServices.value.map((service: any) => ({
@@ -44,6 +54,17 @@ const serviceOptions = computed(() =>
     value: String(service.id)
   }))
 )
+const completionAmount = computed(() => {
+  const directAmount = Number(queueItem.value?.amount ?? queueItem.value?.price_override ?? 0)
+
+  if (Number.isFinite(directAmount) && directAmount > 0) {
+    return directAmount
+  }
+
+  return updateForm.service_ids.reduce((sum, serviceId) => {
+    return sum + (servicePriceMap.value.get(String(serviceId)) || 0)
+  }, 0)
+})
 
 watch(
   queueItem,
@@ -100,9 +121,21 @@ async function startEntry() {
   await refresh()
 }
 
-async function completeEntry() {
-  await barbersApi.completeQueue(queueId.value)
-  await refresh()
+function completeEntry() {
+  paymentModalOpen.value = true
+}
+
+async function submitComplete(payload: QueueCompletePayload) {
+  completing.value = true
+
+  try {
+    await barbersApi.completeQueue(queueId.value, payload)
+    paymentModalOpen.value = false
+    await refresh()
+  }
+  finally {
+    completing.value = false
+  }
 }
 
 async function markNoShow() {
@@ -281,6 +314,14 @@ async function markNotInTime() {
           <SharedJsonBlock label="Сырые данные очереди" :value="queueItem || {}" />
         </div>
       </div>
+
+      <QueueCompletePaymentModal
+        v-model:open="paymentModalOpen"
+        :amount="completionAmount"
+        :loading="completing"
+        title="Завершить заказ"
+        @submit="submitComplete"
+      />
     </template>
   </UDashboardPanel>
 </template>
