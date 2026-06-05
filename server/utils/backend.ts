@@ -57,6 +57,30 @@ function buildForwardedHeaders(event: H3Event, headers?: HeadersInit) {
   return Object.fromEntries(mergedHeaders.entries())
 }
 
+function isHtmlResponse(value: unknown) {
+  return typeof value === 'string' && /<html[\s>]/i.test(value)
+}
+
+function getUpstreamErrorMessage(error: any, method: BackendMethod, path: string) {
+  const data = error?.response?._data
+  const statusCode = error?.response?.status || 500
+  const statusText = error?.response?.statusText || error?.response?.statusMessage || ''
+
+  if (data && typeof data === 'object' && typeof data.message === 'string') {
+    return data.message
+  }
+
+  if (isHtmlResponse(data)) {
+    return `Upstream API returned ${statusCode}${statusText ? ` ${statusText}` : ''} for ${method} ${path}.`
+  }
+
+  if (typeof data === 'string' && data.trim()) {
+    return data
+  }
+
+  return error?.message || 'РћС€РёР±РєР° Р·Р°РїСЂРѕСЃР° Рє Р±СЌРєРµРЅРґСѓ.'
+}
+
 export async function readIncomingBody(event: H3Event): Promise<BackendBody> {
   const method = getMethod(event)
 
@@ -84,6 +108,7 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
   const authMode = options.auth ?? 'optional'
   const forwardedHeaders = buildForwardedHeaders(event, options.headers)
   const hasAuthorizationHeader = Boolean((forwardedHeaders as any).authorization)
+  const method = normalizeMethod(options.method || getMethod(event))
 
   if (authMode === 'required' && !token && !hasAuthorizationHeader) {
     throw createError({
@@ -100,7 +125,7 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
         ...forwardedHeaders,
         ...(authMode !== 'none' && token && !hasAuthorizationHeader ? { Authorization: `Bearer ${token}` } : {})
       },
-      method: normalizeMethod(options.method || getMethod(event)),
+      method,
       query: options.query
     })
 
@@ -114,10 +139,15 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
     const statusCode = error?.response?.status || 500
     const statusMessage = error?.response?._data?.message || error?.message || 'Ошибка запроса к бэкенду.'
 
+    const message = isHtmlResponse(error?.response?._data)
+      ? getUpstreamErrorMessage(error, method, options.path)
+      : statusMessage
+
     throw createError({
-      data: error?.response?._data,
+      data: isHtmlResponse(error?.response?._data) ? undefined : error?.response?._data,
+      message,
       statusCode,
-      statusMessage
+      statusMessage: error?.response?.statusText || 'Upstream API Error'
     })
   }
 }

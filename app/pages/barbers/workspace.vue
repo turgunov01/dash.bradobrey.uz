@@ -15,15 +15,14 @@ useRealtimeQueue()
 await sessionStore.ensureLoaded()
 
 const { data, pending, refresh } = await useAsyncData('barber-workspace', async () => {
-  const [me, queue, services] = await Promise.all([
+  const [me, services] = await Promise.all([
     barbersApi.me({ silent: true }),
-    barbersApi.queue(),
     kioskApi.services({ active: true, grouped: true })
   ])
 
   return {
     me,
-    queue,
+    queue: { count: 0, items: [] },
     services
   }
 })

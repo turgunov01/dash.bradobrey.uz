@@ -10,9 +10,7 @@ definePageMeta({
 })
 
 const branchStore = useBranchStore()
-const sessionStore = useSessionStore()
 const uiStore = useUiStore()
-const barbersApi = useBarbersApi()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
 const promoApi = usePromoApi()
@@ -25,19 +23,15 @@ await Promise.all([
 ])
 
 const { data, pending, refresh } = await useAsyncData('overview-dashboard', async () => {
-  const emptyQueue = { count: 0, items: [] }
   const rangeQuery = {
     end_date: uiStore.statisticsRange.end,
     from: uiStore.statisticsRange.start,
     start_date: uiStore.statisticsRange.start,
     to: uiStore.statisticsRange.end
   }
-  const [health, branches, queue, promoDashboard, history, servicesPayload] = await Promise.all([
+  const [health, branches, promoDashboard, history, servicesPayload] = await Promise.all([
     $fetch('/api/health').catch(() => null),
     branchStore.ensureLoaded({ force: true }).catch(() => branchStore.branches),
-    (sessionStore.barber?.id || sessionStore.user
-      ? barbersApi.queue()
-      : Promise.resolve(emptyQueue)).catch(() => emptyQueue),
     promoApi.dashboard({ __skipBranchScope: true }).catch(() => ({ items: [] })),
     historyApi.list({
       __skipBranchScope: true,
@@ -62,7 +56,6 @@ const { data, pending, refresh } = await useAsyncData('overview-dashboard', asyn
     branchCount: branches.length,
     health,
     promoDashboard,
-    queue,
     statistics
   }
 }, {

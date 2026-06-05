@@ -47,10 +47,32 @@ function buildScopedQuery(query: Record<string, unknown> | undefined, method?: R
   return nextQuery;
 }
 
+function isHtmlResponse(value: unknown) {
+  return typeof value === "string" && /<html[\s>]/i.test(value);
+}
+
+function htmlErrorMessage(error: any, html: string) {
+  const title = html.match(/<title>\s*([^<]+?)\s*<\/title>/i)?.[1]
+    || html.match(/<h1>\s*([^<]+?)\s*<\/h1>/i)?.[1];
+  const status = error?.statusCode || error?.status || error?.response?.status;
+
+  if (title) {
+    return status && !title.includes(String(status))
+      ? `${status} ${title}`
+      : title;
+  }
+
+  return status ? `Server returned ${status}.` : "Server returned an HTML error page.";
+}
+
 function extractErrorMessage(error: any) {
   const data = error?.data || error?.response?._data;
 
   if (typeof data === "string") {
+    if (isHtmlResponse(data)) {
+      return htmlErrorMessage(error, data);
+    }
+
     return data;
   }
 

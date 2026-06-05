@@ -78,17 +78,6 @@ export function useBarbersApi() {
         silent: options.silent,
       });
     },
-    queue(query?: Record<string, unknown>) {
-      return client.request<{ count: number; items: QueueItem[] }>(
-        "/api/barbers/queue",
-        {
-          query: {
-            __skipBranchScope: true,
-            ...(query || {}),
-          },
-        },
-      );
-    },
     queueHistory(query?: Record<string, unknown>) {
       return client.request<{ items: QueueItem[]; total?: number }>(
         "/api/history/barber",

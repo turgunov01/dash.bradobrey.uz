@@ -13,7 +13,6 @@ const presets = computed(() => [
   { body: '', label: 'Проверка API', method: 'GET', path: '/api/health', value: 'health' },
   { body: '', label: 'Конфиг киоска', method: 'GET', path: '/api/kiosk/config', value: 'kiosk-config' },
   { body: '', label: 'Профиль барбера', method: 'GET', path: '/api/barbers/me', value: 'barber-me' },
-  { body: '', label: 'Активная очередь', method: 'GET', path: '/api/barbers/queue', value: 'queue' },
   { body: '', label: 'Услуги', method: 'GET', path: '/api/services', value: 'services' },
   { body: '', label: 'Статистика', method: 'GET', path: '/api/statistics', value: 'statistics' },
   { body: '{"code":"TEST"}', label: 'Проверка промокода', method: 'POST', path: '/api/promo-code/validate', value: 'promo-validate' },
