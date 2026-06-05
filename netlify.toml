@@ -11,7 +11,7 @@
   NUXT_SUPABASE_SERVICE_ROLE_KEY = ""
   NUXT_ADMIN_SESSION_SECRET = ""
   NUXT_COOKIE_SECURE = "true"
-  NUXT_PUBLIC_API_BASE = "https://api.turgunovsardor.uz"
+  NUXT_PUBLIC_API_BASE = "https://api.bradobrey.uz"
 
 [functions]
   directory = ".netlify/functions-internal"
