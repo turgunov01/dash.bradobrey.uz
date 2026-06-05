@@ -21,7 +21,7 @@ useRealtimeQueue()
 
 await Promise.all([
   branchStore.ensureLoaded(),
-  sessionStore.ensureLoaded()
+  // sessionStore.ensureLoaded()
 ])
 
 const { data, pending, refresh } = await useAsyncData('overview-dashboard', async () => {
