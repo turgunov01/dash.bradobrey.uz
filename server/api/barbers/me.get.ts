@@ -9,6 +9,19 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   const adminSession = getAdminSession(event)
 
   if (adminSession) {
+    if (adminSession.role) {
+      return {
+        barber: null,
+        user: toDashboardUser({
+          branch_id: adminSession.branch_id ?? null,
+          id: adminSession.id,
+          login: adminSession.login,
+          marketplace_barbershop_id: adminSession.marketplace_barbershop_id ?? null,
+          role: adminSession.role
+        })
+      }
+    }
+
     try {
       const accessUser = await ensureAdminNetworkAccess(event, adminSession)
 

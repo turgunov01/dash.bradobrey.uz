@@ -256,6 +256,7 @@ export function toDashboardUser(accessUser: AccessUser) {
   const login = accessUser.login ? String(accessUser.login).trim() : null
 
   return {
+    branch_id: accessUser.branch_id ?? null,
     id: String(accessUser.id),
     login,
     name: login || 'Администратор',

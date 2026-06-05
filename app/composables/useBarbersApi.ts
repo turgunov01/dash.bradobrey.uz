@@ -57,8 +57,12 @@ export function useBarbersApi() {
     },
     login(payload: LoginPayload) {
       return client.request<any>("/api/barbers/login", {
-        body: payload,
+        body: {
+          login: payload.login,
+          password: payload.password,
+        },
         method: "POST",
+        skipAuth: true,
         successMessage: "Вход выполнен",
       });
     },

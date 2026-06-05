@@ -10,6 +10,7 @@ type RequestOptions<TBody = unknown> = {
    */
   query?: Record<string, unknown>;
   silent?: boolean;
+  skipAuth?: boolean;
   successMessage?: string;
 };
 
@@ -91,12 +92,12 @@ function extractErrorMessage(error: any) {
   return "Не удалось выполнить запрос.";
 }
 
-function buildRequestHeaders(headers?: HeadersInit) {
+function buildRequestHeaders(headers?: HeadersInit, options: { skipAuth?: boolean } = {}) {
   const mergedHeaders = new Headers(
     import.meta.server ? useRequestHeaders(["cookie", "authorization"]) : undefined,
   );
 
-  if (import.meta.client) {
+  if (import.meta.client && !options.skipAuth) {
     const header = useAdminToken().authHeader.value;
 
     if (header && !mergedHeaders.has("authorization")) {
@@ -153,7 +154,7 @@ export function useApiClient() {
       const data = await $fetch<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
-        headers: buildRequestHeaders(options.headers),
+        headers: buildRequestHeaders(options.headers, { skipAuth: options.skipAuth }),
         method: options.method || "GET",
         query: scopedQuery,
       });
@@ -205,7 +206,7 @@ export function useApiClient() {
       const response = await $fetch.raw<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
-        headers: buildRequestHeaders(options.headers),
+        headers: buildRequestHeaders(options.headers, { skipAuth: options.skipAuth }),
         method: options.method || "GET",
         query: scopedQuery,
       });

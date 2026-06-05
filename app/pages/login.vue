@@ -12,7 +12,6 @@ const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
 
 const form = reactive({
-  branch_id: branchStore.activeBranchId || null,
   login: '',
   password: ''
 })
@@ -57,7 +56,7 @@ async function submit() {
   try {
     await sessionStore.login(parsed.data)
 
-    const sessionBranchId = sessionStore.barber?.branch_id || parsed.data.branch_id || null
+    const sessionBranchId = sessionStore.barber?.branch_id || sessionStore.user?.branch_id || parsed.data.branch_id || null
 
     if (sessionBranchId) {
       branchStore.setActiveBranch(sessionBranchId)

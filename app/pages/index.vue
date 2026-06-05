@@ -23,6 +23,7 @@ await Promise.all([
 ])
 
 const { data, pending, refresh } = await useAsyncData('overview-dashboard', async () => {
+  const emptyQueue = { count: 0, items: [] }
   const rangeQuery = {
     end_date: uiStore.statisticsRange.end,
     from: uiStore.statisticsRange.start,
@@ -56,6 +57,7 @@ const { data, pending, refresh } = await useAsyncData('overview-dashboard', asyn
     branchCount: branches.length,
     health,
     promoDashboard,
+    queue: emptyQueue,
     statistics
   }
 }, {

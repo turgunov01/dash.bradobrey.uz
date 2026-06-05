@@ -106,7 +106,13 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
   const config = useRuntimeConfig(event)
   const token = getBarberToken(event) || getAdminBackendToken(event)
   const authMode = options.auth ?? 'optional'
+  const explicitHeaders = new Headers(options.headers)
   const forwardedHeaders = buildForwardedHeaders(event, options.headers)
+
+  if (authMode === 'none' && !explicitHeaders.has('authorization')) {
+    delete (forwardedHeaders as any).authorization
+  }
+
   const hasAuthorizationHeader = Boolean((forwardedHeaders as any).authorization)
   const method = normalizeMethod(options.method || getMethod(event))
 

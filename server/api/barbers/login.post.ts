@@ -1,13 +1,9 @@
-import { compare } from 'bcryptjs'
-import { createError, readBody } from 'h3'
+import { createError, readBody, type H3Event } from 'h3'
 
-import { loginSchema } from '~~/shared/schemas'
+import { dashboardLegacyRoles } from '~~/shared/auth/employees'
+import { loginSchema, type LoginPayload } from '~~/shared/schemas'
 
-import {
-  ensureAdminNetworkAccess,
-  findSupabaseUserByLogin,
-  toDashboardUser
-} from '~~/server/utils/admin-access'
+import { ensureAdminNetworkAccess } from '~~/server/utils/admin-access'
 import {
   clearAdminBackendToken,
   clearAdminSession,
@@ -17,80 +13,149 @@ import {
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken, setBarberToken } from '~~/server/utils/session'
 
-export default defineEventHandler(async (event): Promise<{ authenticated: boolean, user: Record<string, any> | null, token?: string }> => {
-  const payload = loginSchema.parse(await readBody(event))
-  const supabaseUser = await findSupabaseUserByLogin(event, payload.login, { includePasswordHash: true })
+type LoginResult = {
+  authenticated: boolean
+  token?: string
+  user: Record<string, any> | null
+}
 
-  if (supabaseUser) {
-    const hasValidPassword = Boolean(
-      supabaseUser.password_hash && await compare(payload.password, supabaseUser.password_hash)
-    )
+type AdminLoginResponse = {
+  token?: string | null
+  user?: Record<string, any> | null
+}
 
-    if (!hasValidPassword) {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Неверный логин или пароль.'
-      })
-    }
+type LegacyLoginResponse = {
+  token?: string | null
+  user?: Record<string, any> | null
+}
 
-    const accessUser = await ensureAdminNetworkAccess(event, {
-      id: supabaseUser.id,
-      login: supabaseUser.login || payload.login
+const adminRoles = new Set<string>(dashboardLegacyRoles)
+
+function normalizeText(value: unknown) {
+  return String(value ?? '').trim()
+}
+
+function normalizeOptionalId(value: unknown) {
+  const normalized = normalizeText(value)
+  return normalized || null
+}
+
+function getErrorStatus(error: any) {
+  return Number(error?.statusCode || error?.response?.status || error?.status || 500)
+}
+
+function shouldTryLegacyLogin(error: any) {
+  return [401, 403, 404, 405].includes(getErrorStatus(error))
+}
+
+function buildAdminUser(rawUser: Record<string, any>, fallbackLogin: string) {
+  const login = normalizeText(rawUser.login) || fallbackLogin
+  const role = normalizeText(rawUser.role).toLowerCase()
+
+  return {
+    branch_id: normalizeOptionalId(rawUser.branch_id),
+    id: normalizeText(rawUser.id),
+    login,
+    marketplace_barbershop_id: normalizeOptionalId(rawUser.marketplace_barbershop_id),
+    name: normalizeText(rawUser.name) || login || 'Administrator',
+    phone: rawUser.phone ?? null,
+    role
+  }
+}
+
+function assertAdminLoginResponse(data: AdminLoginResponse, fallbackLogin: string) {
+  const token = normalizeText(data.token)
+  const rawUser = data.user || null
+  const role = normalizeText(rawUser?.role).toLowerCase()
+
+  if (!token) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Admin login did not return token.'
     })
-
-    clearBarberToken(event)
-    clearAdminBackendToken(event)
-    clearAdminSession(event)
-    setAdminSession(event, {
-      id: String(accessUser.id),
-      login: accessUser.login || payload.login
-    })
-
-    let adminToken: string | undefined
-
-    try {
-      const response = await backendRequest<{ token?: string }>(event, {
-        auth: 'none',
-        body: {
-          login: payload.login,
-          password: payload.password
-        },
-        method: 'POST',
-        path: '/api/barbers/admin/login'
-      })
-
-      if (typeof response.data?.token === 'string' && response.data.token.trim()) {
-        adminToken = response.data.token.trim()
-        setAdminBackendToken(event, adminToken)
-      }
-    }
-    catch {
-      // Dashboard login should still work even if backend admin token is unavailable.
-      adminToken = undefined
-    }
-
-    return {
-      authenticated: true,
-      user: toDashboardUser(accessUser),
-      token: adminToken
-    }
   }
 
-  const backendPayload = {
-    login: payload.login,
-    password: payload.password,
-    ...(payload.branch_id ? { branch_id: payload.branch_id } : {})
+  if (!rawUser || !normalizeText(rawUser.id)) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Admin login did not return user id.'
+    })
   }
-  const response = await backendRequest<{ token?: string, user?: Record<string, any> }>(event, {
+
+  if (!adminRoles.has(role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Admin dashboard login is allowed only for admin_network/admin_branch.'
+    })
+  }
+
+  return {
+    token,
+    user: buildAdminUser(rawUser, fallbackLogin)
+  }
+}
+
+async function loginAdmin(event: H3Event, payload: LoginPayload): Promise<LoginResult> {
+  const response = await backendRequest<AdminLoginResponse>(event, {
     auth: 'none',
-    body: backendPayload,
+    body: {
+      login: payload.login,
+      password: payload.password
+    },
+    method: 'POST',
+    path: '/api/barbers/admin/login'
+  })
+
+  const { token, user } = assertAdminLoginResponse(response.data || {}, payload.login)
+
+  clearBarberToken(event)
+  clearAdminBackendToken(event)
+  clearAdminSession(event)
+  setAdminBackendToken(event, token)
+  setAdminSession(event, {
+    branch_id: user.branch_id,
+    id: user.id,
+    login: user.login,
+    marketplace_barbershop_id: user.marketplace_barbershop_id,
+    role: user.role
+  })
+
+  return {
+    authenticated: true,
+    token,
+    user
+  }
+}
+
+async function loginLegacyMerchant(event: H3Event, payload: LoginPayload, adminError: any): Promise<LoginResult> {
+  const response = await backendRequest<LegacyLoginResponse>(event, {
+    auth: 'none',
+    body: {
+      login: payload.login,
+      password: payload.password,
+      ...(payload.branch_id ? { branch_id: payload.branch_id } : {})
+    },
     method: 'POST',
     path: '/api/barbers/login'
   })
+
   const accessUser = await ensureAdminNetworkAccess(event, {
     id: response.data?.user?.id,
     login: response.data?.user?.login || payload.login
   })
+
+  const user = response.data?.user
+    ? {
+        ...response.data.user,
+        ...(accessUser?.role ? { role: accessUser.role } : {}),
+        ...(accessUser?.marketplace_barbershop_id ? { marketplace_barbershop_id: accessUser.marketplace_barbershop_id } : {})
+      }
+    : null
+  const role = normalizeText(user?.role).toLowerCase()
+
+  if (role !== 'merchant' && role !== 'partner') {
+    throw adminError
+  }
 
   if (response.data?.token) {
     clearAdminBackendToken(event)
@@ -100,12 +165,27 @@ export default defineEventHandler(async (event): Promise<{ authenticated: boolea
 
   return {
     authenticated: Boolean(response.data?.token),
-    user: response.data?.user
-      ? {
-          ...response.data.user,
-          ...(accessUser?.role ? { role: accessUser.role } : {})
-        }
-      : null,
-    token: response.data?.token
+    token: response.data?.token || undefined,
+    user
+  }
+}
+
+export default defineEventHandler(async (event): Promise<LoginResult> => {
+  const payload = loginSchema.parse(await readBody(event))
+
+  try {
+    return await loginAdmin(event, payload)
+  }
+  catch (adminError: any) {
+    if (!shouldTryLegacyLogin(adminError)) {
+      throw adminError
+    }
+
+    try {
+      return await loginLegacyMerchant(event, payload, adminError)
+    }
+    catch {
+      throw adminError
+    }
   }
 })

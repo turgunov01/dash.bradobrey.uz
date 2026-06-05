@@ -22,6 +22,10 @@ export async function ensureDashboardAccess(event: H3Event) {
   const adminSession = getAdminSession(event)
 
   if (adminSession) {
+    if (adminSession.role) {
+      return assertNotMerchant(adminSession)
+    }
+
     try {
       const accessUser = await ensureAdminNetworkAccess(event, adminSession)
       return assertNotMerchant(accessUser)

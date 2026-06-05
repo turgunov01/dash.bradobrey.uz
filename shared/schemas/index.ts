@@ -46,6 +46,7 @@ export const branchFormSchema = z.object({
 export const branchUpdateSchema = branchFormSchema.partial().passthrough()
 
 export const barberUserSchema = z.object({
+  branch_id: identifierSchema.optional().nullable(),
   id: identifierSchema.optional(),
   login: optionalTextSchema,
   name: z.string().catch('Неизвестный барбер'),

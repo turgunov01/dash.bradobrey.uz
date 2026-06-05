@@ -6,8 +6,11 @@ import { z } from 'zod'
 import { shouldUseSecureCookie } from './cookie-security'
 
 const adminSessionSchema = z.object({
+  branch_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
   id: z.string().trim().min(1),
-  login: z.string().trim().min(1)
+  login: z.string().trim().min(1),
+  marketplace_barbershop_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
+  role: z.string().trim().optional().nullable()
 })
 
 export type AdminSession = z.infer<typeof adminSessionSchema>
