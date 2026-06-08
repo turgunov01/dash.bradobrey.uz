@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 
 const routeBlockPlugin = 'vue-router/volar/sfc-route-blocks'
 const env = process.env
-const apiBase = String(env.NUXT_PUBLIC_API_BASE || env.API_BASE || 'http://localhost:4000').trim().replace(/\/+$/, '')
+const apiBase = String(env.NUXT_PUBLIC_API_BASE || env.API_BASE || 'https://api.bradobrey.uz').trim().replace(/\/+$/, '')
 const nitroPreset = env.SERVER_PRESET || env.NITRO_PRESET || (env.NETLIFY ? 'netlify' : 'node-server')
 const inlineAllServerDeps = env.NITRO_INLINE_SERVER_DEPS === 'true'
 const minimalServerDepsToInline = ['@vue/shared']
