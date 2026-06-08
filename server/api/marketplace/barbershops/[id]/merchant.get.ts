@@ -1,7 +1,10 @@
 import { createError } from 'h3'
 
+import { marketplaceMerchantRoles } from '~~/shared/auth/employees'
 import { ensureDashboardAccess } from '~~/server/utils/dashboard-access'
 import { supabaseRequest } from '~~/server/utils/supabase'
+
+const merchantRoleFilter = `in.(${marketplaceMerchantRoles.map(role => `"${role}"`).join(',')})`
 
 function requireBarbershopId(value: unknown) {
   const id = String(value || '').trim()
@@ -25,7 +28,7 @@ export default defineEventHandler(async (event) => {
     method: 'GET',
     query: {
       marketplace_barbershop_id: `eq.${barbershopId}`,
-      role: 'in.("merchant","partner")',
+      role: merchantRoleFilter,
       order: 'login.asc.nullslast',
       select: 'id,login,role,marketplace_barbershop_id'
     }

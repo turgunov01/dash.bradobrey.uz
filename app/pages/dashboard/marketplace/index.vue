@@ -47,6 +47,7 @@ const status = ref<'active' | 'inactive' | 'all'>(
 
 const createModalOpen = ref(false)
 const submitting = ref(false)
+const deletingBarbershopId = ref('')
 
 const createForm = reactive({
   address: '',
@@ -175,6 +176,23 @@ async function submitCreate() {
     submitting.value = false
   }
 }
+
+async function deleteBarbershop(row: BarbershopRow) {
+  const label = row.name ? `«${row.name}»` : row.id
+
+  if (import.meta.client && !window.confirm(`Удалить барбершоп ${label}? Филиалы и пользователи будут отвязаны от него, а услуги и мастера маркетплейса будут удалены.`)) {
+    return
+  }
+
+  deletingBarbershopId.value = row.id
+  try {
+    await marketplaceBarbershopsApi.remove(row.id)
+    await refresh()
+  }
+  finally {
+    deletingBarbershopId.value = ''
+  }
+}
 </script>
 
 <template>
@@ -288,6 +306,14 @@ async function submitCreate() {
                     variant="ghost"
                     size="xs"
                     :to="`/dashboard/marketplace/barbershops/${row.original.id}`"
+                  />
+                  <UButton
+                    icon="i-lucide-trash-2"
+                    color="error"
+                    variant="ghost"
+                    size="xs"
+                    :loading="deletingBarbershopId === row.original.id"
+                    @click="deleteBarbershop(row.original)"
                   />
                 </div>
               </template>

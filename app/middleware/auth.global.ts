@@ -16,7 +16,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   const role = String(sessionStore.user?.role || "").trim().toLowerCase();
-  const isMerchant = role === "merchant" || role === "partner";
+  const marketplaceBarbershopId = String(sessionStore.user?.marketplace_barbershop_id || "").trim();
+  const isMerchant = Boolean(marketplaceBarbershopId) || role === "merchant" || role === "partner";
 
   if (isMerchant && !to.path.startsWith("/merchant")) {
     return navigateTo("/merchant");

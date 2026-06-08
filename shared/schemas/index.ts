@@ -49,6 +49,7 @@ export const barberUserSchema = z.object({
   branch_id: identifierSchema.optional().nullable(),
   id: identifierSchema.optional(),
   login: optionalTextSchema,
+  marketplace_barbershop_id: optionalTextSchema,
   name: z.string().catch('Неизвестный барбер'),
   phone: optionalTextSchema,
   permissions: employeePermissionsSchema.optional(),

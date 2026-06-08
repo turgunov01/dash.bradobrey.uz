@@ -5,10 +5,11 @@ import { clearAdminSession, getAdminSession } from './admin-session'
 import { backendRequest } from './backend'
 import { clearBarberToken } from './session'
 
-function assertNotMerchant(accessUser: { role?: unknown }) {
+function assertNotMerchant(accessUser: { marketplaceBarbershopId?: unknown, marketplace_barbershop_id?: unknown, role?: unknown }) {
   const role = String(accessUser?.role || '').trim().toLowerCase()
+  const barbershopId = String(accessUser?.marketplace_barbershop_id ?? accessUser?.marketplaceBarbershopId ?? '').trim()
 
-  if (role === 'merchant' || role === 'partner') {
+  if (barbershopId || role === 'merchant' || role === 'partner') {
     throw createError({
       statusCode: 403,
       statusMessage: 'Доступ в админ-панель запрещён для мерчантов.'

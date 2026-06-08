@@ -54,6 +54,13 @@ export function useMarketplaceBarbershopsApi() {
       })
     },
 
+    remove(id: string) {
+      return client.request<{ deleted: boolean, id: string }>(`/api/marketplace/barbershops/${id}`, {
+        method: 'DELETE',
+        successMessage: 'Барбершоп удалён'
+      })
+    },
+
     activate(id: string) {
       return client.request<{ entry?: unknown }>(`/api/marketplace/barbershops/${id}/activate`, {
         method: 'POST',
@@ -80,7 +87,14 @@ export function useMarketplaceBarbershopsApi() {
         method: 'POST',
         successMessage: 'Аккаунт мерчанта создан'
       })
+    },
+
+    deleteMerchant(barbershopId: string, merchantId: string) {
+      return client.request<{ deleted: boolean, id: string, item?: unknown }>(`/api/marketplace/barbershops/${barbershopId}/merchant`, {
+        body: { id: merchantId },
+        method: 'DELETE',
+        successMessage: 'Аккаунт мерчанта удалён'
+      })
     }
   }
 }
-

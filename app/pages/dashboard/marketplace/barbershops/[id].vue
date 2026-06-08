@@ -77,6 +77,7 @@ const branchWorkHours = reactive<Record<DayKey, { start_time: string, end_time: 
 })
 
 const merchantSubmitting = ref(false)
+const merchantDeleting = ref(false)
 const lastCreatedMerchant = ref<{ login: string, password: string } | null>(null)
 const isClient = import.meta.client
 
@@ -159,6 +160,33 @@ async function submitCreateMerchant() {
   }
   finally {
     merchantSubmitting.value = false
+  }
+}
+
+async function deleteMerchantAccount() {
+  const account = merchantAccount.value
+  const merchantId = normalizeText(account?.id)
+  const login = normalizeText(account?.login)
+
+  if (!merchantId) {
+    useApiClient().notifyError(new Error('merchant id is required'), 'Не удалось определить id мерчанта.')
+    return
+  }
+
+  const label = login ? `«${login}»` : merchantId
+
+  if (import.meta.client && !window.confirm(`Удалить аккаунт мерчанта ${label}? Вход в /merchant для этого логина перестанет работать.`)) {
+    return
+  }
+
+  merchantDeleting.value = true
+  try {
+    await marketplaceBarbershopsApi.deleteMerchant(barbershopId.value, merchantId)
+    lastCreatedMerchant.value = null
+    await refreshMerchants()
+  }
+  finally {
+    merchantDeleting.value = false
   }
 }
 
@@ -519,13 +547,26 @@ const columns: TableColumn<BranchRow>[] = [
                 Loading...
               </div>
 
-              <div v-else-if="merchantAccount" class="space-y-1">
-                <p class="text-sm font-medium text-charcoal-950">
-                  login: <span class="font-mono">{{ merchantAccount.login }}</span>
-                </p>
-                <p class="text-xs text-charcoal-500">
-                  Password is stored as hash and cannot be displayed.
-                </p>
+              <div v-else-if="merchantAccount" class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="space-y-1">
+                  <p class="text-sm font-medium text-charcoal-950">
+                    login: <span class="font-mono">{{ merchantAccount.login }}</span>
+                  </p>
+                  <p class="text-xs text-charcoal-500">
+                    Password is stored as hash and cannot be displayed.
+                  </p>
+                </div>
+
+                <UButton
+                  color="error"
+                  icon="i-lucide-trash-2"
+                  size="sm"
+                  variant="outline"
+                  :loading="merchantDeleting"
+                  @click="deleteMerchantAccount"
+                >
+                  Delete
+                </UButton>
               </div>
 
               <div v-else class="text-sm text-charcoal-500">

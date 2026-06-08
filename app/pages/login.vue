@@ -28,6 +28,41 @@ function resetFieldErrors() {
   fieldErrors.password = ''
 }
 
+function sanitizeDebugValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeDebugValue(item))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        /password|token|authorization/i.test(key) ? '[redacted]' : sanitizeDebugValue(item)
+      ])
+    )
+  }
+
+  return value
+}
+
+function getLoginDebugUser(user: any) {
+  if (!user) return null
+
+  return {
+    branch_id: user.branch_id || null,
+    id: user.id || null,
+    login: user.login || null,
+    marketplace_barbershop_id: user.marketplace_barbershop_id || null,
+    role: user.role || null
+  }
+}
+
+function logLoginDebug(label: string, payload: Record<string, unknown>) {
+  if (!import.meta.client) return
+
+  console.log(`[barbers-login-debug:client] ${label}`, sanitizeDebugValue(payload))
+}
+
 function applyFieldErrors(issues: ZodIssue[]) {
   resetFieldErrors()
 
@@ -54,7 +89,18 @@ async function submit() {
   loading.value = true
 
   try {
-    await sessionStore.login(parsed.data)
+    logLoginDebug('request', {
+      body: {
+        branch_id: parsed.data.branch_id || null,
+        login: parsed.data.login,
+        password: '[redacted]'
+      },
+      merchantLoginAttempt: !parsed.data.branch_id,
+      method: 'POST',
+      path: '/api/barbers/login'
+    })
+
+    const response = await sessionStore.login(parsed.data)
 
     const sessionBranchId = sessionStore.barber?.branch_id || sessionStore.user?.branch_id || parsed.data.branch_id || null
 
@@ -63,9 +109,28 @@ async function submit() {
     }
 
     const role = String(sessionStore.user?.role || '').trim().toLowerCase()
-    await navigateTo(role === 'merchant' || role === 'partner' ? '/merchant' : '/')
+    const marketplaceBarbershopId = String(sessionStore.user?.marketplace_barbershop_id || '').trim()
+    const isMerchant = Boolean(marketplaceBarbershopId) || role === 'merchant' || role === 'partner'
+    const redirectTo = isMerchant ? '/merchant' : '/'
+
+    logLoginDebug('response', {
+      authenticated: Boolean(response?.authenticated),
+      merchantLogin: isMerchant,
+      redirectTo,
+      responseUser: getLoginDebugUser(response?.user),
+      sessionUser: getLoginDebugUser(sessionStore.user)
+    })
+
+    await navigateTo(redirectTo)
 
   } catch (error: any) {
+    logLoginDebug('error', {
+      data: error?.data || error?.response?._data || null,
+      message: error?.message || null,
+      status: error?.statusCode || error?.response?.status || null,
+      statusMessage: error?.statusMessage || error?.response?.statusText || null
+    })
+
     fieldErrors.password = error?.statusMessage || error?.message || 'Неверный логин или пароль.'
   } finally {
     loading.value = false

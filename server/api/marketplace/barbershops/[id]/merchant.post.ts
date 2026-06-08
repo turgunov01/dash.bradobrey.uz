@@ -2,6 +2,7 @@ import { hash } from 'bcryptjs'
 import { createError, readBody } from 'h3'
 import { z } from 'zod'
 
+import { marketplaceMerchantRoles } from '~~/shared/auth/employees'
 import { ensureDashboardAccess } from '~~/server/utils/dashboard-access'
 import { supabaseRequest } from '~~/server/utils/supabase'
 
@@ -9,6 +10,8 @@ const payloadSchema = z.object({
   login: z.string().trim().min(3),
   password: z.string().min(6)
 })
+const merchantAccountRole = 'admin_branch'
+const merchantRoleFilter = `in.(${marketplaceMerchantRoles.map(role => `"${role}"`).join(',')})`
 
 function requireBarbershopId(value: unknown) {
   const id = String(value || '').trim()
@@ -45,7 +48,7 @@ export default defineEventHandler(async (event) => {
     method: 'GET',
     query: {
       marketplace_barbershop_id: `eq.${barbershopId}`,
-      role: 'in.("merchant","partner")',
+      role: merchantRoleFilter,
       limit: 1,
       select: 'id'
     }
@@ -60,13 +63,13 @@ export default defineEventHandler(async (event) => {
 
   const passwordHash = await hash(payload.password, 10)
 
-  const createMerchantUser = async (role: 'merchant' | 'partner') => {
+  const createMerchantUser = async () => {
     const rows = await supabaseRequest(event, 'users', {
       body: {
         login: payload.login,
         marketplace_barbershop_id: barbershopId,
         password_hash: passwordHash,
-        role
+        role: merchantAccountRole
       },
       method: 'POST',
       prefer: 'return=representation',
@@ -88,19 +91,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    let item: any
-
-    try {
-      item = await createMerchantUser('merchant')
-    }
-    catch (error: any) {
-      if (!isRoleConstraintError(error)) {
-        throw error
-      }
-
-      item = await createMerchantUser('partner')
-    }
-
+    const item = await createMerchantUser()
     return { item }
   }
   catch (error: any) {
@@ -126,7 +117,7 @@ export default defineEventHandler(async (event) => {
     if (isRoleConstraintError(error)) {
       throw createError({
         statusCode: 501,
-        statusMessage: 'В Supabase не обновлён users_role_check для ролей merchant/partner. Добавьте эти роли в check constraint и повторите.',
+        statusMessage: 'В Supabase users_role_check не принимает роль admin_branch. Обновите check constraint и повторите.',
         data: payload
       })
     }

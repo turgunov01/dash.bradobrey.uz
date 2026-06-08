@@ -10,17 +10,6 @@ type MerchantAccess = {
   user: Record<string, any>
 }
 
-function assertMerchantRole(user: Record<string, any>) {
-  const role = String(user?.role || '').trim().toLowerCase()
-
-  if (role !== 'merchant' && role !== 'partner') {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Доступ разрешён только мерчантам.'
-    })
-  }
-}
-
 function requireBarbershopId(user: Record<string, any>) {
   const value = user?.marketplace_barbershop_id ?? user?.marketplaceBarbershopId ?? null
   const barbershopId = String(value || '').trim()
@@ -28,7 +17,7 @@ function requireBarbershopId(user: Record<string, any>) {
   if (!barbershopId) {
     throw createError({
       statusCode: 403,
-      statusMessage: 'Для мерчанта не назначен `marketplace_barbershop_id` в таблице users Supabase (или колонки ещё нет).'
+      statusMessage: 'Для мерчанта не назначен `marketplace_barbershop_id` в таблице users Supabase.'
     })
   }
 
@@ -70,8 +59,6 @@ export async function ensureMerchantAccess(event: H3Event): Promise<MerchantAcce
       throw error
     }
   }
-
-  assertMerchantRole(accessUser)
 
   return {
     barbershopId: requireBarbershopId(accessUser),

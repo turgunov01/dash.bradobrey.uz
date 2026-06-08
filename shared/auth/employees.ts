@@ -16,6 +16,24 @@ export const dashboardLegacyRoles = [
   'admin_branch'
 ] as const
 
+export const backendDashboardRoles = [
+  'admin_network',
+  'admin_branch',
+  'admin',
+  'manager',
+  'super-manager'
+] as const
+
+export const legacyMarketplaceMerchantRoles = [
+  'merchant',
+  'partner'
+] as const
+
+export const marketplaceMerchantRoles = [
+  ...backendDashboardRoles,
+  ...legacyMarketplaceMerchantRoles
+] as const
+
 export const employeePermissions = [
   'dashboard.access',
   'employees.read',
