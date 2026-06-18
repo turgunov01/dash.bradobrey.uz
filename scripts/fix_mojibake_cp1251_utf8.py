@@ -26,7 +26,6 @@ DEFAULT_EXTENSIONS = (
 DEFAULT_IGNORED_DIRS = {
     ".git",
     ".github",
-    ".netlify",
     ".nuxt",
     ".output",
     ".pnpm-store",
