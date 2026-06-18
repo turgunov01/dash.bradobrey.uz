@@ -669,6 +669,7 @@ const totals = computed(() => {
   return {
     advances,
     commission,
+    netProfit: profit - payout,
     payout,
     penalties,
     profit,
@@ -738,7 +739,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
 
       <div class="grid gap-3 pb-4 md:grid-cols-5">
         <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200 bg-white/90 md:col-span-5">
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Оклад
@@ -777,6 +778,14 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
               </p>
               <p class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.penalties) }}
+              </p>
+            </div>
+            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
+                Прибыль
+              </p>
+              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+                {{ formatMoney(totals.netProfit) }}
               </p>
             </div>
           </div>
