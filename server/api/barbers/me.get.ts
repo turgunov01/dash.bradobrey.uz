@@ -1,7 +1,7 @@
 import { setResponseStatus } from 'h3'
 
 import { clearAdminBackendToken, clearAdminSession, getAdminSession } from '~~/server/utils/admin-session'
-import { ensureAdminNetworkAccess, toDashboardUser } from '~~/server/utils/admin-access'
+import { assertDashboardAccessUser, getCurrentBackendAccessUser, toDashboardUser } from '~~/server/utils/admin-access'
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken } from '~~/server/utils/session'
 
@@ -10,20 +10,16 @@ export default defineEventHandler(async (event): Promise<unknown> => {
 
   if (adminSession) {
     if (adminSession.role) {
+      const accessUser = assertDashboardAccessUser(adminSession)
+
       return {
         barber: null,
-        user: toDashboardUser({
-          branch_id: adminSession.branch_id ?? null,
-          id: adminSession.id,
-          login: adminSession.login,
-          marketplace_barbershop_id: adminSession.marketplace_barbershop_id ?? null,
-          role: adminSession.role
-        })
+        user: toDashboardUser(accessUser)
       }
     }
 
     try {
-      const accessUser = await ensureAdminNetworkAccess(event, adminSession)
+      const accessUser = await getCurrentBackendAccessUser(event)
 
       return {
         barber: null,
@@ -44,10 +40,7 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   })
 
   try {
-    const accessUser = await ensureAdminNetworkAccess(event, {
-      id: response.data?.user?.id,
-      login: response.data?.user?.login
-    })
+    const accessUser = assertDashboardAccessUser(response.data?.user)
 
     setResponseStatus(event, response.status)
 

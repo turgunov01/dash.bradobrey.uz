@@ -31,9 +31,10 @@ Required production environment:
 NUXT_PUBLIC_API_BASE=https://api.bradobrey.uz
 NUXT_ADMIN_SESSION_SECRET=<long-random-secret>
 NUXT_COOKIE_SECURE=true
-NUXT_SUPABASE_URL=<supabase-url>
-NUXT_SUPABASE_SERVICE_ROLE_KEY=<supabase-service-role-key>
 ```
+
+`NUXT_PUBLIC_API_BASE` must point to the backend API that owns PostgreSQL,
+auth, file uploads, and all admin data operations.
 
 ## Nginx
 

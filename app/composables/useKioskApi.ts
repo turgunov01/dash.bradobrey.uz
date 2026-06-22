@@ -16,9 +16,6 @@ export function useKioskApi() {
     certificate(code: string) {
       return client.request(`/api/kiosk/certificate/${code}`)
     },
-    config() {
-      return client.request<{ branches: any[] }>('/api/kiosk/config')
-    },
     index() {
       return client.request('/api/kiosk')
     },

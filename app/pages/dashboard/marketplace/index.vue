@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+const apiClient = useApiClient()
+
 type BarbershopRow = {
   id: string
   name: string
@@ -151,7 +153,7 @@ async function submitCreate() {
   const name = normalizeText(createForm.name)
 
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Укажите название барбершопа.')
+    apiClient.notifyError(new Error('name is required'), 'Укажите название барбершопа.')
     return
   }
 

@@ -1,5 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+
+const apiClient = useApiClient()
 
 type BranchRow = {
   id: string
@@ -143,12 +145,12 @@ async function submitCreateMerchant() {
   const password = normalizeText(merchantForm.password)
 
   if (!login) {
-    useApiClient().notifyError(new Error('login is required'), 'Укажите логин мерчанта.')
+    apiClient.notifyError(new Error('login is required'), 'Укажите логин мерчанта.')
     return
   }
 
   if (!password || password.length < 6) {
-    useApiClient().notifyError(new Error('password is required'), 'Пароль должен быть минимум 6 символов.')
+    apiClient.notifyError(new Error('password is required'), 'Пароль должен быть минимум 6 символов.')
     return
   }
 
@@ -169,7 +171,7 @@ async function deleteMerchantAccount() {
   const login = normalizeText(account?.login)
 
   if (!merchantId) {
-    useApiClient().notifyError(new Error('merchant id is required'), 'Не удалось определить id мерчанта.')
+    apiClient.notifyError(new Error('merchant id is required'), 'Не удалось определить id мерчанта.')
     return
   }
 
@@ -223,7 +225,7 @@ async function submitCreateBranch() {
   const name = normalizeText(branchForm.name)
 
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Укажите название филиала.')
+    apiClient.notifyError(new Error('name is required'), 'Укажите название филиала.')
     return
   }
 
@@ -313,7 +315,7 @@ async function deleteBranch(row: BranchRow) {
         }
       }
       else {
-        useApiClient().notifyError(error)
+        apiClient.notifyError(error)
         throw error
       }
     }

@@ -144,8 +144,6 @@ export default defineNuxtConfig({
     adminSessionSecret: env.NUXT_ADMIN_SESSION_SECRET || env.NUXT_SESSION_SECRET || env.ADMIN_SESSION_SECRET || '',
     barberTokenCookieName: 'brado_barber_token',
     cookieSecure: env.NUXT_COOKIE_SECURE || env.COOKIE_SECURE || '',
-    supabaseServiceRoleKey: env.NUXT_SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '',
-    supabaseUrl: env.NUXT_SUPABASE_URL || env.SUPABASE_URL || '',
     public: {
       apiBase
     }

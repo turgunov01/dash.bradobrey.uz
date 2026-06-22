@@ -1,8 +1,7 @@
 import { createError, type H3Event } from 'h3'
 
-import { ensureAdminNetworkAccess } from './admin-access'
+import { assertDashboardAccessUser, getCurrentBackendAccessUser } from './admin-access'
 import { clearAdminSession, getAdminSession } from './admin-session'
-import { backendRequest } from './backend'
 import { clearBarberToken } from './session'
 
 function assertNotMerchant(accessUser: { marketplaceBarbershopId?: unknown, marketplace_barbershop_id?: unknown, role?: unknown }) {
@@ -24,11 +23,11 @@ export async function ensureDashboardAccess(event: H3Event) {
 
   if (adminSession) {
     if (adminSession.role) {
-      return assertNotMerchant(adminSession)
+      return assertNotMerchant(assertDashboardAccessUser(adminSession))
     }
 
     try {
-      const accessUser = await ensureAdminNetworkAccess(event, adminSession)
+      const accessUser = await getCurrentBackendAccessUser(event)
       return assertNotMerchant(accessUser)
     }
     catch (error) {
@@ -38,17 +37,7 @@ export async function ensureDashboardAccess(event: H3Event) {
   }
 
   try {
-    const response = await backendRequest<{ user?: Record<string, any> | null }>(event, {
-      auth: 'required',
-      method: 'GET',
-      path: '/api/barbers/me'
-    })
-
-    const accessUser = await ensureAdminNetworkAccess(event, {
-      id: response.data?.user?.id,
-      login: response.data?.user?.login
-    })
-
+    const accessUser = await getCurrentBackendAccessUser(event)
     return assertNotMerchant(accessUser)
   }
   catch (error: any) {

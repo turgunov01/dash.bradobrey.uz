@@ -25,7 +25,6 @@ const mainLinks = computed(() =>
 
 const utilityLinks = computed(() =>
   (supportLinks[0] || []).map(item => ({
-    ...item,
     onSelect: closeSidebar
   }))
 )

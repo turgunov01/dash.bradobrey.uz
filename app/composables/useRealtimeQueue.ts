@@ -1,5 +1,4 @@
 import type { Socket } from 'socket.io-client'
-
 import { io } from 'socket.io-client'
 
 const REFRESH_KEYS = [
@@ -12,14 +11,18 @@ const REFRESH_KEYS = [
 ]
 
 export function useRealtimeQueue() {
+  const nuxtApp = useNuxtApp()
   const branchStore = useBranchStore()
   const sessionStore = useSessionStore()
   const runtimeConfig = useRuntimeConfig()
+
   const isConnected = useState('realtime-connected', () => false)
   const socketRef = useState<Socket | null>('realtime-socket', () => null)
 
   function refreshRelevantData() {
-    REFRESH_KEYS.forEach(key => refreshNuxtData(key))
+    nuxtApp.runWithContext(() => {
+      REFRESH_KEYS.forEach(key => refreshNuxtData(key))
+    })
   }
 
   function joinBranchRoom() {

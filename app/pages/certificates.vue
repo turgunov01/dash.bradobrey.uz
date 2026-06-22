@@ -5,6 +5,8 @@ import type { CertificateCreatePayload } from '~~/shared/schemas'
 import { formatDateTime, formatMoney } from '~/utils/format'
 import { flattenServicesPayload } from '~/utils/services'
 
+const apiClient = useApiClient()
+
 type CertificateRow = {
   id: string
   code: string
@@ -176,7 +178,7 @@ async function submitCertificate() {
   try {
     parsedMetadata = form.metadata ? JSON.parse(form.metadata) : undefined
   } catch (error) {
-    useApiClient().notifyError(error, 'Некорректный JSON метаданных')
+    apiClient.notifyError(error, 'Некорректный JSON метаданных')
     return
   }
 
@@ -205,7 +207,7 @@ async function submitCertificate() {
 async function deleteCertificate(id: string) {
   if (deleting.value) return
   if (!id) {
-    useApiClient().notifyError(new Error('Не найден ID сертификата'))
+    apiClient.notifyError(new Error('Не найден ID сертификата'))
     return
   }
   const confirmed = confirm('Удалить сертификат?')
@@ -221,7 +223,7 @@ async function deleteCertificate(id: string) {
 
 async function lookupCertificate() {
   if (!lookupCode.value.trim()) {
-    useApiClient().notifyError(new Error('Введите код'))
+    apiClient.notifyError(new Error('Введите код'))
     return
   }
   lookupResult.value = await certificatesApi.lookup(lookupCode.value.trim())

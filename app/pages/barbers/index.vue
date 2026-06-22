@@ -15,6 +15,8 @@ import {
 } from '~~/shared/auth/employees'
 import { barberRegisterSchema, barberUpdateSchema } from '~~/shared/schemas'
 
+const apiClient = useApiClient()
+
 type EmployeeRow = {
   branch: string
   branch_id: string
@@ -759,7 +761,7 @@ async function submitEmployee() {
 
       if (!parsed.success) {
         applyFieldErrors(parsed.error.issues)
-        useApiClient().notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные формы'))
+        apiClient.notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные формы'))
         return
       }
 
@@ -781,7 +783,7 @@ async function submitEmployee() {
 
       if (!parsed.success) {
         applyFieldErrors(parsed.error.issues)
-        useApiClient().notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные формы'))
+        apiClient.notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные формы'))
         return
       }
 

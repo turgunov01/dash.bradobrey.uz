@@ -3,7 +3,7 @@ import { createError, readBody, type H3Event } from 'h3'
 import { backendDashboardRoles, marketplaceMerchantRoles } from '~~/shared/auth/employees'
 import { loginSchema, type LoginPayload } from '~~/shared/schemas'
 
-import { ensureAdminNetworkAccess } from '~~/server/utils/admin-access'
+import { assertDashboardAccessUser } from '~~/server/utils/admin-access'
 import {
   clearAdminBackendToken,
   clearAdminSession,
@@ -312,10 +312,7 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
   logBackendLoginResponse(path, response.status, response.data || {}, 'primary')
 
   const { token, rawUser } = assertBackendLoginResponse(response.data || {})
-  const accessUser = await ensureAdminNetworkAccess(event, {
-    id: rawUser.id,
-    login: rawUser.login || payload.login
-  })
+  const accessUser = assertDashboardAccessUser(rawUser)
   const user = buildDashboardLoginUser(rawUser, accessUser, payload.login)
   const role = normalizeText(user.role).toLowerCase()
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
+const apiClient = useApiClient()
+
 type BranchRow = {
   id: string
   name: string
@@ -160,7 +162,7 @@ async function submitCreate() {
   const name = normalizeText(branchForm.name)
 
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Укажите название филиала.')
+    apiClient.notifyError(new Error('name is required'), 'Укажите название филиала.')
     return
   }
 
@@ -189,7 +191,7 @@ async function submitEdit() {
 
   const name = normalizeText(branchForm.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Укажите название филиала.')
+    apiClient.notifyError(new Error('name is required'), 'Укажите название филиала.')
     return
   }
 

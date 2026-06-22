@@ -3,6 +3,8 @@ import type { ZodIssue } from 'zod'
 
 import { loginSchema } from '~~/shared/schemas'
 
+const apiClient = useApiClient()
+
 definePageMeta({
   layout: 'auth',
   middleware: 'guest-only'
@@ -82,7 +84,7 @@ async function submit() {
 
   if (!parsed.success) {
     applyFieldErrors(parsed.error.issues)
-    useApiClient().notifyError(new Error(parsed.error.issues[0]?.message || 'Некорректные данные для входа'))
+    apiClient.notifyError(new Error(parsed.error.issues[0]?.message || 'Некорректные данные для входа'))
     return
   }
 

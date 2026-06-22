@@ -131,7 +131,6 @@ const shortcuts = computed(() =>
     //   : null,
     { description: 'Создание записей через киоск и проверка сценариев филиала', icon: 'i-lucide-monitor-smartphone', title: 'Киоск', to: '/kiosk' },
     { description: 'Управление сгруппированным каталогом услуг', icon: 'i-lucide-badge-dollar-sign', title: 'Услуги', to: '/services' },
-    { description: 'Просмотр всех запросов и ответов через Nuxt', icon: 'i-lucide-code-xml', title: 'Отладка API', to: '/api-debug' }
   ].filter((shortcut): shortcut is ShortcutItem => Boolean(shortcut))
 )
 </script>
@@ -146,7 +145,7 @@ const shortcuts = computed(() =>
 
         <template #right>
           <UBadge :color="data?.health ? 'primary' : 'neutral'" variant="soft">
-            {{ data?.health ? 'API доступен' : 'Проверка API' }}
+            <!-- {{ data?.health ? 'API доступен' : 'Проверка API' }} -->
           </UBadge>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить

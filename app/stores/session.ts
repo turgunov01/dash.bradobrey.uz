@@ -1,3 +1,4 @@
+import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import type {
   BarberProfile,
@@ -7,83 +8,85 @@ import type {
 
 type SessionStatus = "idle" | "loading" | "loaded";
 
-type SessionState = {
-  barber: BarberProfile | null;
-  status: SessionStatus;
-  user: BarberUser | null;
-};
-
 type SessionSnapshot = {
   barber: BarberProfile | null;
   user: BarberUser | null;
 };
 
-export const useSessionStore = defineStore("session", {
-  state: (): SessionState => ({
-    barber: null as BarberProfile | null,
-    user: null as BarberUser | null,
-    status: "idle" as SessionStatus,
-  }),
+export const useSessionStore = defineStore("session", () => {
+  const barbersApi = useBarbersApi();
+  const adminToken = useAdminToken();
 
-  getters: {
-    isAuthenticated: (state: SessionState): boolean => Boolean(state.user),
-  },
+  const barber = ref<BarberProfile | null>(null);
+  const user = ref<BarberUser | null>(null);
+  const status = ref<SessionStatus>("idle");
 
-  actions: {
-    async ensureLoaded(options: { force?: boolean } = {}): Promise<SessionSnapshot> {
-      if (this.status === "loaded" && !options.force) {
-        return { barber: this.barber, user: this.user };
+  const isAuthenticated = computed(() => Boolean(user.value));
+
+  async function ensureLoaded(options: { force?: boolean } = {}): Promise<SessionSnapshot> {
+    if (status.value === "loaded" && !options.force) {
+      return { barber: barber.value, user: user.value };
+    }
+
+    status.value = "loading";
+
+    try {
+      const response = await barbersApi.me({ silent: true });
+
+      barber.value = response?.barber ?? null;
+      user.value = response?.user ?? null;
+    } catch {
+      barber.value = null;
+      user.value = null;
+    } finally {
+      status.value = "loaded";
+    }
+
+    return { barber: barber.value, user: user.value };
+  }
+
+  async function login(payload: LoginPayload) {
+    const response = await barbersApi.login(payload);
+
+    if (response?.authenticated) {
+      if (import.meta.client) {
+        adminToken.set(typeof response?.token === "string" ? response.token : null);
       }
 
-      this.status = "loading";
+      await ensureLoaded({ force: true });
+    }
 
-      try {
-        const response = await useBarbersApi().me({ silent: true });
+    return response;
+  }
 
-        this.barber = response?.barber ?? null;
-        this.user = response?.user ?? null;
-      } catch (e) {
-        this.barber = null;
-        this.user = null;
-      } finally {
-        this.status = "loaded";
+  async function logout(payload?: Record<string, unknown>) {
+    try {
+      await barbersApi.logout(payload);
+    } finally {
+      if (import.meta.client) {
+        adminToken.clear();
       }
 
-      return { barber: this.barber, user: this.user };
-    },
+      barber.value = null;
+      user.value = null;
+      status.value = "idle";
+    }
+  }
 
-    async login(payload: LoginPayload) {
-      const response = await useBarbersApi().login(payload);
+  function setSession(payload: SessionSnapshot) {
+    barber.value = payload.barber;
+    user.value = payload.user;
+    status.value = "loaded";
+  }
 
-      if (response?.authenticated) {
-        if (import.meta.client) {
-          useAdminToken().set(typeof response?.token === 'string' ? response.token : null)
-        }
-
-        await this.ensureLoaded({ force: true });
-      }
-
-      return response;
-    },
-
-    async logout(payload?: Record<string, unknown>) {
-      try {
-        await useBarbersApi().logout(payload);
-      } finally {
-        if (import.meta.client) {
-          useAdminToken().clear()
-        }
-
-        this.barber = null;
-        this.user = null;
-        this.status = "idle";
-      }
-    },
-
-    setSession(payload: SessionSnapshot) {
-      this.barber = payload.barber;
-      this.user = payload.user;
-      this.status = "loaded";
-    },
-  },
+  return {
+    barber,
+    ensureLoaded,
+    isAuthenticated,
+    login,
+    logout,
+    setSession,
+    status,
+    user,
+  };
 });

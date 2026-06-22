@@ -1,29 +1,8 @@
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { DashboardMarketplaceAvailabilityQuery } from '~/composables/useDashboardMarketplaceApi'
 
 type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
-
-type DashboardMarketplaceState = {
-  barbershops: unknown[]
-  barbershopsStatus: LoadStatus
-  barbershopsError: string | null
-
-  selectedBarbershop: unknown | null
-  selectedBarbershopStatus: LoadStatus
-  selectedBarbershopError: string | null
-
-  branches: unknown[]
-  branchesStatus: LoadStatus
-  branchesError: string | null
-
-  selectedBranch: unknown | null
-  selectedBranchStatus: LoadStatus
-  selectedBranchError: string | null
-
-  availability: unknown | null
-  availabilityStatus: LoadStatus
-  availabilityError: string | null
-}
 
 function errorMessage(error: unknown) {
   const anyErr: any = error
@@ -36,153 +15,179 @@ function errorMessage(error: unknown) {
   )
 }
 
-export const useDashboardMarketplaceStore = defineStore('dashboard-marketplace', {
-  state: (): DashboardMarketplaceState => ({
-    availability: null,
-    availabilityError: null,
-    availabilityStatus: 'idle',
-    barbershops: [],
-    barbershopsError: null,
-    barbershopsStatus: 'idle',
-    branches: [],
-    branchesError: null,
-    branchesStatus: 'idle',
-    selectedBarbershop: null,
-    selectedBarbershopError: null,
-    selectedBarbershopStatus: 'idle',
-    selectedBranch: null,
-    selectedBranchError: null,
-    selectedBranchStatus: 'idle'
-  }),
+export const useDashboardMarketplaceStore = defineStore('dashboard-marketplace', () => {
+  const api = useDashboardMarketplaceApi()
 
-  actions: {
-    reset() {
-      this.barbershops = []
-      this.barbershopsStatus = 'idle'
-      this.barbershopsError = null
-      this.selectedBarbershop = null
-      this.selectedBarbershopStatus = 'idle'
-      this.selectedBarbershopError = null
-      this.branches = []
-      this.branchesStatus = 'idle'
-      this.branchesError = null
-      this.selectedBranch = null
-      this.selectedBranchStatus = 'idle'
-      this.selectedBranchError = null
-      this.availability = null
-      this.availabilityStatus = 'idle'
-      this.availabilityError = null
-    },
+  const barbershops = ref<unknown[]>([])
+  const barbershopsStatus = ref<LoadStatus>('idle')
+  const barbershopsError = ref<string | null>(null)
 
-    async fetchBarbershops(options: { city?: string, status?: 'active' | 'inactive' | 'all' } = {}) {
-      this.barbershopsStatus = 'loading'
-      this.barbershopsError = null
+  const selectedBarbershop = ref<unknown | null>(null)
+  const selectedBarbershopStatus = ref<LoadStatus>('idle')
+  const selectedBarbershopError = ref<string | null>(null)
 
-      try {
-        const api = useDashboardMarketplaceApi()
-        const city = options.city || undefined
-        const status = options.status || 'active'
+  const branches = ref<unknown[]>([])
+  const branchesStatus = ref<LoadStatus>('idle')
+  const branchesError = ref<string | null>(null)
 
-        if (status === 'all') {
-          const [activeRes, inactiveRes] = await Promise.all([
-            api.fetchBarbershops(city, { active: true }),
-            api.fetchBarbershops(city, { active: false })
-          ])
+  const selectedBranch = ref<unknown | null>(null)
+  const selectedBranchStatus = ref<LoadStatus>('idle')
+  const selectedBranchError = ref<string | null>(null)
 
-          const merged = [
-            ...(Array.isArray(activeRes?.items) ? activeRes.items : []),
-            ...(Array.isArray(inactiveRes?.items) ? inactiveRes.items : [])
-          ]
+  const availability = ref<unknown | null>(null)
+  const availabilityStatus = ref<LoadStatus>('idle')
+  const availabilityError = ref<string | null>(null)
 
-          const uniqueById = new Map<string, unknown>()
-          for (const item of merged) {
-            const id = (item as any)?.id
-            if (!id) continue
-            if (!uniqueById.has(String(id))) uniqueById.set(String(id), item)
-          }
+  function reset() {
+    barbershops.value = []
+    barbershopsStatus.value = 'idle'
+    barbershopsError.value = null
+    selectedBarbershop.value = null
+    selectedBarbershopStatus.value = 'idle'
+    selectedBarbershopError.value = null
+    branches.value = []
+    branchesStatus.value = 'idle'
+    branchesError.value = null
+    selectedBranch.value = null
+    selectedBranchStatus.value = 'idle'
+    selectedBranchError.value = null
+    availability.value = null
+    availabilityStatus.value = 'idle'
+    availabilityError.value = null
+  }
 
-          this.barbershops = Array.from(uniqueById.values())
-        } else {
-          const res = await api.fetchBarbershops(city, { active: status !== 'inactive' })
-          this.barbershops = Array.isArray(res?.items) ? res.items : []
+  async function fetchBarbershops(options: { city?: string, status?: 'active' | 'inactive' | 'all' } = {}) {
+    barbershopsStatus.value = 'loading'
+    barbershopsError.value = null
+
+    try {
+      const city = options.city || undefined
+      const status = options.status || 'active'
+
+      if (status === 'all') {
+        const [activeRes, inactiveRes] = await Promise.all([
+          api.fetchBarbershops(city, { active: true }),
+          api.fetchBarbershops(city, { active: false })
+        ])
+
+        const merged = [
+          ...(Array.isArray(activeRes?.items) ? activeRes.items : []),
+          ...(Array.isArray(inactiveRes?.items) ? inactiveRes.items : [])
+        ]
+
+        const uniqueById = new Map<string, unknown>()
+        for (const item of merged) {
+          const id = (item as any)?.id
+          if (!id) continue
+          if (!uniqueById.has(String(id))) uniqueById.set(String(id), item)
         }
 
-        this.barbershopsStatus = 'loaded'
-        return this.barbershops
-      } catch (e) {
-        this.barbershopsStatus = 'error'
-        this.barbershopsError = errorMessage(e)
-        throw e
+        barbershops.value = Array.from(uniqueById.values())
       }
-    },
-
-    async fetchBarbershop(id: string) {
-      this.selectedBarbershopStatus = 'loading'
-      this.selectedBarbershopError = null
-
-      try {
-        const api = useDashboardMarketplaceApi()
-        const res = await api.fetchBarbershop(id)
-        this.selectedBarbershop = (res as any)?.item ?? null
-        this.selectedBarbershopStatus = 'loaded'
-        return this.selectedBarbershop
-      } catch (e) {
-        this.selectedBarbershopStatus = 'error'
-        this.selectedBarbershopError = errorMessage(e)
-        throw e
+      else {
+        const res = await api.fetchBarbershops(city, { active: status !== 'inactive' })
+        barbershops.value = Array.isArray(res?.items) ? res.items : []
       }
-    },
 
-    async fetchBranches(barbershopId: string, options: { active?: boolean } = {}) {
-      this.branchesStatus = 'loading'
-      this.branchesError = null
-
-      try {
-        const api = useDashboardMarketplaceApi()
-        const res = await api.fetchBranches(barbershopId, options)
-        this.branches = Array.isArray(res?.items) ? res.items : []
-        this.branchesStatus = 'loaded'
-        return this.branches
-      } catch (e) {
-        this.branchesStatus = 'error'
-        this.branchesError = errorMessage(e)
-        throw e
-      }
-    },
-
-    async fetchBranch(id: string) {
-      this.selectedBranchStatus = 'loading'
-      this.selectedBranchError = null
-
-      try {
-        const api = useDashboardMarketplaceApi()
-        const res = await api.fetchBranch(id)
-        this.selectedBranch = res ?? null
-        this.selectedBranchStatus = 'loaded'
-        return this.selectedBranch
-      } catch (e) {
-        this.selectedBranchStatus = 'error'
-        this.selectedBranchError = errorMessage(e)
-        throw e
-      }
-    },
-
-    async fetchAvailability(branchId: string, query: DashboardMarketplaceAvailabilityQuery) {
-      this.availabilityStatus = 'loading'
-      this.availabilityError = null
-
-      try {
-        const api = useDashboardMarketplaceApi()
-        const res = await api.fetchAvailability(branchId, query)
-        this.availability = res ?? null
-        this.availabilityStatus = 'loaded'
-        return this.availability
-      } catch (e) {
-        this.availabilityStatus = 'error'
-        this.availabilityError = errorMessage(e)
-        throw e
-      }
+      barbershopsStatus.value = 'loaded'
+      return barbershops.value
+    }
+    catch (e) {
+      barbershopsStatus.value = 'error'
+      barbershopsError.value = errorMessage(e)
+      throw e
     }
   }
-})
 
+  async function fetchBarbershop(id: string) {
+    selectedBarbershopStatus.value = 'loading'
+    selectedBarbershopError.value = null
+
+    try {
+      const res = await api.fetchBarbershop(id)
+      selectedBarbershop.value = (res as any)?.item ?? null
+      selectedBarbershopStatus.value = 'loaded'
+      return selectedBarbershop.value
+    }
+    catch (e) {
+      selectedBarbershopStatus.value = 'error'
+      selectedBarbershopError.value = errorMessage(e)
+      throw e
+    }
+  }
+
+  async function fetchBranches(barbershopId: string, options: { active?: boolean } = {}) {
+    branchesStatus.value = 'loading'
+    branchesError.value = null
+
+    try {
+      const res = await api.fetchBranches(barbershopId, options)
+      branches.value = Array.isArray(res?.items) ? res.items : []
+      branchesStatus.value = 'loaded'
+      return branches.value
+    }
+    catch (e) {
+      branchesStatus.value = 'error'
+      branchesError.value = errorMessage(e)
+      throw e
+    }
+  }
+
+  async function fetchBranch(id: string) {
+    selectedBranchStatus.value = 'loading'
+    selectedBranchError.value = null
+
+    try {
+      const res = await api.fetchBranch(id)
+      selectedBranch.value = res ?? null
+      selectedBranchStatus.value = 'loaded'
+      return selectedBranch.value
+    }
+    catch (e) {
+      selectedBranchStatus.value = 'error'
+      selectedBranchError.value = errorMessage(e)
+      throw e
+    }
+  }
+
+  async function fetchAvailability(branchId: string, query: DashboardMarketplaceAvailabilityQuery) {
+    availabilityStatus.value = 'loading'
+    availabilityError.value = null
+
+    try {
+      const res = await api.fetchAvailability(branchId, query)
+      availability.value = res ?? null
+      availabilityStatus.value = 'loaded'
+      return availability.value
+    }
+    catch (e) {
+      availabilityStatus.value = 'error'
+      availabilityError.value = errorMessage(e)
+      throw e
+    }
+  }
+
+  return {
+    availability,
+    availabilityError,
+    availabilityStatus,
+    barbershops,
+    barbershopsError,
+    barbershopsStatus,
+    branches,
+    branchesError,
+    branchesStatus,
+    fetchAvailability,
+    fetchBarbershop,
+    fetchBarbershops,
+    fetchBranch,
+    fetchBranches,
+    reset,
+    selectedBarbershop,
+    selectedBarbershopError,
+    selectedBarbershopStatus,
+    selectedBranch,
+    selectedBranchError,
+    selectedBranchStatus
+  }
+})

@@ -3,6 +3,7 @@ import {
   getHeader,
   getMethod,
   getQuery,
+  getRequestURL,
   readBody,
   readFormData,
   setResponseStatus,
@@ -78,7 +79,7 @@ function getUpstreamErrorMessage(error: any, method: BackendMethod, path: string
     return data
   }
 
-  return error?.message || 'РћС€РёР±РєР° Р·Р°РїСЂРѕСЃР° Рє Р±СЌРєРµРЅРґСѓ.'
+  return error?.message || 'Ошибка запроса к бэкенду.'
 }
 
 export async function readIncomingBody(event: H3Event): Promise<BackendBody> {
@@ -170,4 +171,8 @@ export async function proxyBackend<T>(event: H3Event, path: string, auth: AuthMo
   setResponseStatus(event, response.status)
 
   return response.data
+}
+
+export async function proxyBackendCurrentPath<T>(event: H3Event, auth: AuthMode = 'optional'): Promise<T> {
+  return proxyBackend<T>(event, getRequestURL(event).pathname, auth)
 }

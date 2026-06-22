@@ -302,7 +302,7 @@
 
 #### 2. Role source of truth
 
-Сейчас роль фактически читается из Supabase `users.role` и частично прокидывается через login/me handlers.
+Сейчас роль фактически должна приходить из backend API (`users.role`) и прокидываться через login/me handlers.
 
 Нужно ввести:
 

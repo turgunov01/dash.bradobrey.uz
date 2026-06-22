@@ -43,6 +43,19 @@ Start the development server on `http://localhost:3000`:
 pnpm dev
 ```
 
+## Environment
+
+The dashboard talks to the backend API through Nuxt server routes. Configure:
+
+```bash
+NUXT_PUBLIC_API_BASE=https://api.bradobrey.uz
+NUXT_ADMIN_SESSION_SECRET=replace-with-a-long-random-secret
+NUXT_COOKIE_SECURE=true
+```
+
+Database access and file storage are handled by the backend API, not by the
+dashboard runtime.
+
 ## Production
 
 Build the application for production:

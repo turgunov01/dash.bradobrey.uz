@@ -4,6 +4,8 @@ import { serviceFormSchema, type ServiceCategory, type ServiceFormPayload } from
 import { formatMoney } from '~/utils/format'
 import { flattenServicesPayload } from '~/utils/services'
 
+const apiClient = useApiClient()
+
 const Draggable = defineAsyncComponent({
   loader: () => import('vuedraggable').then(module => module.default),
   suspensible: false
@@ -243,7 +245,7 @@ function persistAllOrders() {
       [bucket.name]: bucket.items.map(item => item.id)
     }
   }
-  useApiClient().notifySuccess('Порядок услуг сохранён')
+  apiClient.notifySuccess('Порядок услуг сохранён')
 }
 
 async function onDragChange(category: string, evt: any) {
@@ -275,7 +277,7 @@ async function onDragChange(category: string, evt: any) {
       })
     } catch (error) {
       console.error('Failed to update category', error)
-      useApiClient().notifyError(new Error('Не удалось сохранить новую категорию'))
+      apiClient.notifyError(new Error('Не удалось сохранить новую категорию'))
     }
   }
 }
@@ -301,7 +303,7 @@ function resetForm() {
 
 function openCreateModal() {
   if (!canCreateService.value) {
-    useApiClient().notifyError(new Error('categories are required'), 'Сначала создайте хотя бы одну категорию.')
+    apiClient.notifyError(new Error('categories are required'), 'Сначала создайте хотя бы одну категорию.')
     return
   }
 
@@ -373,7 +375,7 @@ async function submit() {
   const categoryName = normalizeText(form.category_name)
 
   if (!categoryName) {
-    useApiClient().notifyError(new Error('category is required'), 'Выберите категорию.')
+    apiClient.notifyError(new Error('category is required'), 'Выберите категорию.')
     return
   }
 
@@ -387,7 +389,7 @@ async function submit() {
   })
 
   if (!payload.success) {
-    useApiClient().notifyError(new Error(payload.error.issues[0]?.message || 'Проверьте данные'))
+    apiClient.notifyError(new Error(payload.error.issues[0]?.message || 'Проверьте данные'))
     return
   }
 

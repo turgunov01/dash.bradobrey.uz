@@ -3,6 +3,8 @@ import type { TableColumn } from '@nuxt/ui'
 
 import type { MerchantServiceCategory, MerchantServiceCategoryPayload } from '~/composables/useMerchantApi'
 
+const apiClient = useApiClient()
+
 definePageMeta({
   layout: 'merchant'
 })
@@ -106,7 +108,7 @@ function toIntegerOrNull(value: unknown) {
 async function submitCreate() {
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название категории.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название категории.')
     return
   }
 
@@ -133,7 +135,7 @@ async function submitEdit() {
 
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название категории.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название категории.')
     return
   }
 

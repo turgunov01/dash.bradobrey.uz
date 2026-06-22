@@ -1,34 +1,3 @@
-import { createError, readBody } from 'h3'
+import { proxyBackendCurrentPath } from '~~/server/utils/backend'
 
-import { branchFormSchema } from '~~/shared/schemas'
-import { ensureMerchantAccess } from '~~/server/utils/merchant-access'
-import { supabaseRequest } from '~~/server/utils/supabase'
-
-export default defineEventHandler(async (event) => {
-  const access = await ensureMerchantAccess(event)
-  const payload = branchFormSchema.parse(await readBody(event))
-
-  const rows = await supabaseRequest(event, 'branches', {
-    body: {
-      ...payload,
-      marketplace_barbershop_id: access.barbershopId
-    },
-    method: 'POST',
-    prefer: 'return=representation',
-    query: {
-      select: 'id,name,address,city,timezone,work_hours,is_active,marketplace_barbershop_id'
-    }
-  })
-
-  const item = Array.isArray(rows) ? rows[0] : null
-
-  if (!item) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Не удалось создать филиал.'
-    })
-  }
-
-  return { item }
-})
-
+export default defineEventHandler(event => proxyBackendCurrentPath<unknown>(event, 'required'))

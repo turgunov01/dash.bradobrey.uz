@@ -4,6 +4,8 @@ import type { TableColumn } from '@nuxt/ui'
 import type { Branch } from '~~/shared/schemas'
 import { branchFormSchema, branchSchema } from '~~/shared/schemas'
 
+const apiClient = useApiClient()
+
 type BranchRow = {
   id: string
   name: string
@@ -179,7 +181,7 @@ async function submit() {
   })
 
   if (!parsed.success) {
-    useApiClient().notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные'))
+    apiClient.notifyError(new Error(parsed.error.issues[0]?.message || 'Проверьте данные'))
     return
   }
 
@@ -253,7 +255,7 @@ async function removeBranch(row: BranchRow) {
         }
       }
       else {
-        useApiClient().notifyError(error)
+        apiClient.notifyError(error)
         throw error
       }
     }

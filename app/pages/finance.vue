@@ -732,8 +732,8 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
         v-if="remoteNeedsMigration"
         color="warning"
         icon="i-lucide-database-zap"
-        title="Нет таблицы finance_snapshots в Supabase"
-        description="Данные сохраняются локально в браузере. Чтобы включить синхронизацию, создайте таблицу finance_snapshots и повторите сохранение."
+        title="Нет таблицы finance_snapshots в backend PostgreSQL"
+        description="Данные сохраняются локально в браузере. Чтобы включить синхронизацию, примените backend-миграцию finance_snapshots и повторите сохранение."
         class="mb-4"
       />
 

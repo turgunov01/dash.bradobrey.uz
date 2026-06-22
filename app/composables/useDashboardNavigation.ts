@@ -1,15 +1,19 @@
-import { useCalculatorModal } from '#imports'
-import type { NavigationMenuItem } from '@nuxt/ui'
+import { useCalculatorModal } from "#imports";
+import type { NavigationMenuItem } from "@nuxt/ui";
 
-function flattenNavigationItems(items: NavigationMenuItem[]): NavigationMenuItem[] {
+function flattenNavigationItems(
+  items: NavigationMenuItem[],
+): NavigationMenuItem[] {
   return items.flatMap((item) => [
     item,
-    ...('children' in item && Array.isArray(item.children) ? flattenNavigationItems(item.children) : [])
-  ])
+    ...("children" in item && Array.isArray(item.children)
+      ? flattenNavigationItems(item.children)
+      : []),
+  ]);
 }
 
 function toSearchItem(item: NavigationMenuItem) {
-  const source = item as Record<string, any>
+  const source = item as Record<string, any>;
 
   return {
     description: source.description,
@@ -17,97 +21,129 @@ function toSearchItem(item: NavigationMenuItem) {
     label: source.label,
     onSelect: source.onSelect,
     target: source.target,
-    to: source.to
-  }
+    to: source.to,
+  };
 }
 
 export function useDashboardNavigation() {
-  const route = useRoute()
-  const { openCalculator } = useCalculatorModal()
+  const route = useRoute();
+  const { openCalculator } = useCalculatorModal();
 
-  const primaryLinks = [[
-    { icon: 'i-lucide-layout-dashboard', label: 'Обзор', to: '/' },
-    {
-      icon: 'i-lucide-briefcase-business',
-      label: 'Управление',
-      children: [
-        { icon: 'i-lucide-users', label: 'Сотрудники', to: '/barbers' },
-        { icon: 'i-lucide-store', label: 'Филиалы', to: '/branches' },
-        { icon: 'i-lucide-users-round', label: 'Клиенты', to: '/clients' },
-        { icon: 'i-lucide-wallet', label: 'Финансы', to: '/finance' }
-      ]
-    },
-    {
-      icon: 'i-lucide-folder-tree',
-      label: 'Каталог',
-      children: [
-        { icon: 'i-lucide-folder', label: 'Категории', to: '/service-categories' },
-        { icon: 'i-lucide-badge-dollar-sign', label: 'Услуги', to: '/services' }
-      ]
-    },
-    { icon: 'i-lucide-history', label: 'История', to: '/history' },
-    { icon: 'i-lucide-chart-column-big', label: 'Статистика', to: '/statistics' },
-    {
-      icon: 'i-lucide-shopping-bag',
-      label: 'Маркетплейс',
-      children: [
-        { icon: 'i-lucide-store', label: 'Обзор', to: '/dashboard/marketplace' },
-        { icon: 'i-lucide-ticket-percent', label: 'Промокоды', to: '/promo-codes' },
-        { icon: 'i-lucide-id-card', label: 'Сертификаты', to: '/certificates' }
-      ]
-    },
-    {
-      icon: 'i-lucide-settings',
-      label: 'Настройки',
-      children: [
-        { icon: 'i-lucide-award', label: 'Ранги клиентов', to: '/settings/loyalty-ranks' },
-        { icon: 'i-lucide-monitor-play', label: 'Реклама киоска', to: '/settings/kiosk-ads' }
-      ]
-    },
-    { icon: 'i-lucide-code-xml', label: 'Отладка API', to: '/api-debug' }
-  ]] satisfies NavigationMenuItem[][]
+  const primaryLinks = [
+    [
+      { icon: "i-lucide-layout-dashboard", label: "Обзор", to: "/" },
+      {
+        icon: "i-lucide-briefcase-business",
+        label: "Управление",
+        children: [
+          { icon: "i-lucide-users", label: "Сотрудники", to: "/barbers" },
+          { icon: "i-lucide-store", label: "Филиалы", to: "/branches" },
+          { icon: "i-lucide-users-round", label: "Клиенты", to: "/clients" },
+          { icon: "i-lucide-wallet", label: "Финансы", to: "/finance" },
+        ],
+      },
+      {
+        icon: "i-lucide-folder-tree",
+        label: "Каталог",
+        children: [
+          {
+            icon: "i-lucide-folder",
+            label: "Категории",
+            to: "/service-categories",
+          },
+          {
+            icon: "i-lucide-badge-dollar-sign",
+            label: "Услуги",
+            to: "/services",
+          },
+        ],
+      },
+      { icon: "i-lucide-history", label: "История", to: "/history" },
+      {
+        icon: "i-lucide-chart-column-big",
+        label: "Статистика",
+        to: "/statistics",
+      },
+      {
+        icon: "i-lucide-shopping-bag",
+        label: "Маркетплейс",
+        children: [
+          {
+            icon: "i-lucide-store",
+            label: "Обзор",
+            to: "/dashboard/marketplace",
+          },
+          {
+            icon: "i-lucide-ticket-percent",
+            label: "Промокоды",
+            to: "/promo-codes",
+          },
+          {
+            icon: "i-lucide-id-card",
+            label: "Сертификаты",
+            to: "/certificates",
+          },
+        ],
+      },
+      {
+        icon: "i-lucide-settings",
+        label: "Настройки",
+        children: [
+          {
+            icon: "i-lucide-award",
+            label: "Ранги клиентов",
+            to: "/settings/loyalty-ranks",
+          },
+          {
+            icon: "i-lucide-monitor-play",
+            label: "Реклама киоска",
+            to: "/settings/kiosk-ads",
+          },
+        ],
+      },
+    ],
+  ] satisfies NavigationMenuItem[][];
 
-  const supportLinks = [[
-    { icon: 'i-lucide-heart-pulse', label: 'Проверка API', to: '/api-debug?preset=health' },
-    { icon: 'i-lucide-book-open', label: 'Шаблон панели Nuxt UI', target: '_blank', to: 'https://dashboard-template.nuxt.dev/' }
-  ]] satisfies NavigationMenuItem[][]
+  const supportLinks = [[]] satisfies NavigationMenuItem[][];
 
   const searchGroups = computed(() => [
     {
-      id: 'dashboard',
+      id: "dashboard",
       items: flattenNavigationItems(primaryLinks.flat())
-        .filter(item => Boolean((item as any).to || (item as any).onSelect))
+        .filter((item) => Boolean((item as any).to || (item as any).onSelect))
         .map(toSearchItem),
-      label: 'Панель'
+      label: "Панель",
     },
     {
-      id: 'tools',
-      items: [{
-        description: 'Открыть модальный калькулятор для быстрых вычислений',
-        icon: 'i-lucide-calculator',
-        label: 'Калькулятор',
-        onSelect: () => openCalculator()
-      }],
-      label: 'Инструменты'
-    },
-    {
-      id: 'support',
+      id: "tools",
       items: [
         {
-          icon: 'i-lucide-file-code-2',
-          label: 'Открыть исходник текущей страницы',
-          target: '_blank',
-          to: `https://github.com/nuxt-ui-templates/dashboard/blob/main/app/pages${route.path === '/' ? '/index' : route.path}.vue`
+          description: "Открыть модальный калькулятор для быстрых вычислений",
+          icon: "i-lucide-calculator",
+          label: "Калькулятор",
+          onSelect: () => openCalculator(),
         },
-        ...supportLinks.flat()
       ],
-      label: 'Поддержка'
-    }
-  ])
+      label: "Инструменты",
+    },
+    {
+      id: "support",
+      items: [
+        {
+          icon: "i-lucide-file-code-2",
+          label: "Открыть исходник текущей страницы",
+          target: "_blank",
+          to: `https://github.com/nuxt-ui-templates/dashboard/blob/main/app/pages${route.path === "/" ? "/index" : route.path}.vue`,
+        },
+        ...supportLinks.flat(),
+      ],
+      label: "Поддержка",
+    },
+  ]);
 
   return {
     primaryLinks,
     searchGroups,
-    supportLinks
-  }
+    supportLinks,
+  };
 }

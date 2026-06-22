@@ -14,15 +14,16 @@ type RequestOptions<TBody = unknown> = {
   successMessage?: string;
 };
 
-function buildScopedQuery(query: Record<string, unknown> | undefined, method?: RequestOptions["method"]) {
+function buildScopedQuery(
+  query: Record<string, unknown> | undefined,
+  method: RequestOptions["method"] | undefined,
+  activeBranchId: string | null | undefined,
+) {
   const normalizedMethod = (method || "GET").toUpperCase();
 
   if (!["GET", "HEAD"].includes(normalizedMethod)) {
     return query;
   }
-
-  const branchStore = useBranchStore();
-  const activeBranchId = branchStore?.activeBranchId;
 
   const nextQuery: Record<string, unknown> = {
     ...(query || {})
@@ -92,13 +93,18 @@ function extractErrorMessage(error: any) {
   return "Не удалось выполнить запрос.";
 }
 
-function buildRequestHeaders(headers?: HeadersInit, options: { skipAuth?: boolean } = {}) {
-  const mergedHeaders = new Headers(
-    import.meta.server ? useRequestHeaders(["cookie", "authorization"]) : undefined,
-  );
+function buildRequestHeaders(
+  headers: HeadersInit | undefined,
+  options: { skipAuth?: boolean },
+  context: {
+    adminToken: ReturnType<typeof useAdminToken>;
+    requestHeaders?: Record<string, string>;
+  },
+) {
+  const mergedHeaders = new Headers(context.requestHeaders);
 
   if (import.meta.client && !options.skipAuth) {
-    const header = useAdminToken().authHeader.value;
+    const header = context.adminToken.authHeader.value;
 
     if (header && !mergedHeaders.has("authorization")) {
       mergedHeaders.set("authorization", header);
@@ -121,6 +127,11 @@ function buildRequestHeaders(headers?: HeadersInit, options: { skipAuth?: boolea
 export function useApiClient() {
   const toast = useToast();
   const uiStore = useUiStore();
+  const branchStore = useBranchStore();
+  const adminToken = useAdminToken();
+  const requestHeaders = import.meta.server
+    ? useRequestHeaders(["cookie", "authorization"])
+    : undefined;
 
   function notifySuccess(title: string, description?: string) {
     if (import.meta.client) {
@@ -148,13 +159,17 @@ export function useApiClient() {
     url: string,
     options: RequestOptions<TBody> = {},
   ) {
-    const scopedQuery = buildScopedQuery(options.query, options.method);
+    const scopedQuery = buildScopedQuery(options.query, options.method, branchStore?.activeBranchId);
 
     try {
       const data = await $fetch<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
-        headers: buildRequestHeaders(options.headers, { skipAuth: options.skipAuth }),
+        headers: buildRequestHeaders(
+          options.headers,
+          { skipAuth: options.skipAuth },
+          { adminToken, requestHeaders },
+        ),
         method: options.method || "GET",
         query: scopedQuery,
       });
@@ -200,13 +215,17 @@ export function useApiClient() {
     url: string,
     options: RequestOptions<TBody> = {},
   ) {
-    const scopedQuery = buildScopedQuery(options.query, options.method);
+    const scopedQuery = buildScopedQuery(options.query, options.method, branchStore?.activeBranchId);
 
     try {
       const response = await $fetch.raw<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
-        headers: buildRequestHeaders(options.headers, { skipAuth: options.skipAuth }),
+        headers: buildRequestHeaders(
+          options.headers,
+          { skipAuth: options.skipAuth },
+          { adminToken, requestHeaders },
+        ),
         method: options.method || "GET",
         query: scopedQuery,
       });

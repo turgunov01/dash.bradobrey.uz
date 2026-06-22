@@ -4,6 +4,8 @@ import { formatDateTime, formatMoney } from '~/utils/format'
 import { formatPaymentMethod } from '~/utils/display'
 import { flattenServicesPayload } from '~/utils/services'
 
+const apiClient = useApiClient()
+
 const route = useRoute()
 const barbersApi = useBarbersApi()
 const kioskApi = useKioskApi()
@@ -91,7 +93,7 @@ async function submitUpdate() {
   })
 
   if (!payload.success) {
-    useApiClient().notifyError(new Error(payload.error.issues[0]?.message || 'Некорректное обновление очереди'))
+    apiClient.notifyError(new Error(payload.error.issues[0]?.message || 'Некорректное обновление очереди'))
     return
   }
 
@@ -103,7 +105,7 @@ async function saveOverride() {
   const payload = queueEditBeforeCompleteSchema.safeParse(overrideForm)
 
   if (!payload.success) {
-    useApiClient().notifyError(new Error(payload.error.issues[0]?.message || 'Некорректная корректировка перед завершением'))
+    apiClient.notifyError(new Error(payload.error.issues[0]?.message || 'Некорректная корректировка перед завершением'))
     return
   }
 

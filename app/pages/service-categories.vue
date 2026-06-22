@@ -3,6 +3,8 @@ import type { TableColumn } from '@nuxt/ui'
 
 import type { ServiceCategory, ServiceCategoryFormPayload } from '~~/shared/schemas'
 
+const apiClient = useApiClient()
+
 type CategoryRow = {
   id: string
   name: string
@@ -63,7 +65,7 @@ function resetForm() {
 
 function openCreate() {
   if (!branchStore.activeBranchId) {
-    useApiClient().notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
+    apiClient.notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
     return
   }
 
@@ -116,13 +118,13 @@ const columns: TableColumn<CategoryRow>[] = [
 async function submitCreate() {
   const branchId = branchStore.activeBranchId
   if (!branchId) {
-    useApiClient().notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
+    apiClient.notifyError(new Error('branch is required'), 'Выберите филиал для категории.')
     return
   }
 
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название категории.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название категории.')
     return
   }
 
@@ -150,7 +152,7 @@ async function submitEdit() {
 
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название категории.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название категории.')
     return
   }
 

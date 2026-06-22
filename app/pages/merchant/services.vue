@@ -4,6 +4,8 @@ import type { TableColumn } from '@nuxt/ui'
 import { formatMoney } from '~/utils/format'
 import type { MerchantService, MerchantServiceCategory, MerchantServicePayload } from '~/composables/useMerchantApi'
 
+const apiClient = useApiClient()
+
 definePageMeta({
   layout: 'merchant'
 })
@@ -64,7 +66,7 @@ function resetForm() {
 
 function openCreate() {
   if (!canCreateService.value) {
-    useApiClient().notifyError(new Error('categories are required'), 'Сначала создайте хотя бы одну категорию.')
+    apiClient.notifyError(new Error('categories are required'), 'Сначала создайте хотя бы одну категорию.')
     return
   }
 
@@ -164,13 +166,13 @@ function toIntegerOrNull(value: unknown) {
 async function submitCreate() {
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название услуги.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название услуги.')
     return
   }
 
   const category_name = normalizeText(form.category_name)
   if (!category_name) {
-    useApiClient().notifyError(new Error('category is required'), 'Выберите категорию.')
+    apiClient.notifyError(new Error('category is required'), 'Выберите категорию.')
     return
   }
 
@@ -200,13 +202,13 @@ async function submitEdit() {
 
   const name = normalizeText(form.name)
   if (!name) {
-    useApiClient().notifyError(new Error('name is required'), 'Введите название услуги.')
+    apiClient.notifyError(new Error('name is required'), 'Введите название услуги.')
     return
   }
 
   const category_name = normalizeText(form.category_name)
   if (!category_name) {
-    useApiClient().notifyError(new Error('category is required'), 'Выберите категорию.')
+    apiClient.notifyError(new Error('category is required'), 'Выберите категорию.')
     return
   }
 

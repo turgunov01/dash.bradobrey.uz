@@ -1,10 +1,11 @@
-# Finance snapshots (Supabase)
+# Finance snapshots (PostgreSQL)
 
-Эта миграция нужна для страницы **«Финансы»** (`/finance`), чтобы сохранять данные в Supabase (а не только локально в браузере).
+Эта миграция нужна для страницы **«Финансы»** (`/finance`), чтобы backend API
+сохранял данные в обычный PostgreSQL, а не только локально в браузере.
 
 ## SQL
 
-Запустите в Supabase SQL Editor:
+Запустите в PostgreSQL миграциях backend:
 
 ```sql
 create table if not exists public.finance_snapshots (
@@ -21,6 +22,6 @@ create index if not exists finance_snapshots_updated_at_idx
 
 ## Примечания
 
-- Сохранение выполняется сервером с `service_role` ключом (см. `NUXT_SUPABASE_SERVICE_ROLE_KEY`), поэтому RLS не обязателен.
-- Если таблицы нет, страница покажет предупреждение и продолжит хранить данные локально.
-
+- Сохранение выполняется backend API по маршруту `/api/finance`.
+- Если backend вернет ошибку отсутствующей таблицы, страница покажет
+  предупреждение и продолжит хранить данные локально.

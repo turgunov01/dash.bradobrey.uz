@@ -1,11 +1,3 @@
-import { createBarberRecords } from '~~/server/utils/barber-admin'
-import { ensureDashboardAccess } from '~~/server/utils/dashboard-access'
-import { readEmployeeRegisterPayload } from '~~/server/utils/employee-form'
+import { proxyBackendCurrentPath } from '~~/server/utils/backend'
 
-export default defineEventHandler(async (event) => {
-  await ensureDashboardAccess(event)
-
-  const payload = await readEmployeeRegisterPayload(event)
-
-  return createBarberRecords(event, payload)
-})
+export default defineEventHandler(event => proxyBackendCurrentPath<unknown>(event, 'required'))

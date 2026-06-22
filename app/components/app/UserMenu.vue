@@ -27,13 +27,6 @@ const items = computed<DropdownMenuItem[][]>(() => [
   ],
   [
     {
-      label: 'Отладка API',
-      icon: 'i-lucide-code-xml',
-      to: '/api-debug'
-    }
-  ],
-  [
-    {
       label: 'Выйти',
       icon: 'i-lucide-log-out',
       onSelect: async () => {

@@ -738,7 +738,7 @@ async function exportHistoryToExcel() {
   }
 
   if (!rows.value.length) {
-    useApiClient().notifyError(new Error('Нет данных для экспорта'))
+    apiClient.notifyError(new Error('Нет данных для экспорта'))
     return
   }
 
@@ -781,7 +781,7 @@ async function exportHistoryToExcel() {
     const filename = `history_${branchSegment}_${formatExportTimestamp(new Date())}.csv`
 
     downloadTextFile(filename, `\uFEFF${csv}`, 'text/csv;charset=utf-8')
-    useApiClient().notifySuccess('Экспорт готов')
+    apiClient.notifySuccess('Экспорт готов')
   }
   finally {
     exporting.value = false

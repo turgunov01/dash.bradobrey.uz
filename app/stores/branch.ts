@@ -1,12 +1,13 @@
+import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import type { Branch } from '~~/shared/schemas'
 import { branchSchema } from '~~/shared/schemas'
 
-type BranchState = {
-  activeBranchId: string | null
-  branches: Branch[]
-  loaded: boolean
+type BranchFetchOptions = {
+  credentials: 'include'
+  headers?: HeadersInit
+  query?: Record<string, unknown>
 }
 
 function extractBranchItems(response: unknown): unknown[] {
@@ -58,61 +59,81 @@ function extractBranchItems(response: unknown): unknown[] {
   return []
 }
 
-export const useBranchStore = defineStore('branch', {
-  actions: {
-    async ensureLoaded(options: { force?: boolean } = {}): Promise<Branch[]> {
-      if (this.loaded && !options.force) {
-        return this.branches
-      }
+export const useBranchStore = defineStore('branch', () => {
+  const activeBranchId = ref<string | null>(null)
+  const branches = ref<Branch[]>([])
+  const loaded = ref(false)
+  const requestHeaders = import.meta.server
+    ? useRequestHeaders(['cookie', 'authorization'])
+    : undefined
 
-      let response: unknown
-
-      try {
-        response = await useBranchesApi().list()
-      }
-      catch {
-        response = await useKioskApi().config()
-      }
-
-      const branches = extractBranchItems(response)
-      const parsedBranches: Branch[] = []
-
-      for (const branch of branches) {
-        const parsedBranch = branchSchema.safeParse(branch)
-
-        if (parsedBranch.success) {
-          parsedBranches.push(parsedBranch.data)
-        }
-      }
-
-      this.branches = parsedBranches
-
-      if (this.activeBranchId && !this.branches.some(branch => branch.id === this.activeBranchId)) {
-        this.activeBranchId = this.branches[0]?.id || null
-      }
-
-      if (!options.force && !this.activeBranchId && this.branches[0]?.id) {
-        this.activeBranchId = this.branches[0].id
-      }
-
-      this.loaded = true
-
-      return this.branches
-    },
-    async reload(): Promise<Branch[]> {
-      this.loaded = false
-      return await this.ensureLoaded({ force: true })
-    },
-    setActiveBranch(id?: string | null) {
-      this.activeBranchId = id ? String(id) : null
-    }
-  },
-  getters: {
-    activeBranch: (state: BranchState): Branch | null => state.branches.find((branch: Branch) => branch.id === state.activeBranchId) || null
-  },
-  state: (): BranchState => ({
-    activeBranchId: null as string | null,
-    branches: [] as Branch[],
-    loaded: false
+  const activeBranch = computed<Branch | null>(() => {
+    return branches.value.find(branch => branch.id === activeBranchId.value) || null
   })
+
+  async function fetchBranchSource() {
+    const options: BranchFetchOptions = {
+      credentials: 'include',
+      headers: requestHeaders,
+      query: { __skipBranchScope: true }
+    }
+
+    try {
+      return await $fetch('/api/branches', options)
+    }
+    catch {
+      return { items: [] }
+    }
+  }
+
+  async function ensureLoaded(options: { force?: boolean } = {}): Promise<Branch[]> {
+    if (loaded.value && !options.force) {
+      return branches.value
+    }
+
+    const response = await fetchBranchSource()
+    const nextBranches = extractBranchItems(response)
+    const parsedBranches: Branch[] = []
+
+    for (const branch of nextBranches) {
+      const parsedBranch = branchSchema.safeParse(branch)
+
+      if (parsedBranch.success) {
+        parsedBranches.push(parsedBranch.data)
+      }
+    }
+
+    branches.value = parsedBranches
+
+    if (activeBranchId.value && !branches.value.some(branch => branch.id === activeBranchId.value)) {
+      activeBranchId.value = branches.value[0]?.id || null
+    }
+
+    if (!options.force && !activeBranchId.value && branches.value[0]?.id) {
+      activeBranchId.value = branches.value[0].id
+    }
+
+    loaded.value = true
+
+    return branches.value
+  }
+
+  async function reload(): Promise<Branch[]> {
+    loaded.value = false
+    return await ensureLoaded({ force: true })
+  }
+
+  function setActiveBranch(id?: string | null) {
+    activeBranchId.value = id ? String(id) : null
+  }
+
+  return {
+    activeBranch,
+    activeBranchId,
+    branches,
+    ensureLoaded,
+    loaded,
+    reload,
+    setActiveBranch
+  }
 })

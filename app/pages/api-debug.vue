@@ -10,8 +10,7 @@ const branchStore = useBranchStore()
 await branchStore.ensureLoaded()
 
 const presets = computed(() => [
-  { body: '', label: 'Проверка API', method: 'GET', path: '/api/health', value: 'health' },
-  { body: '', label: 'Конфиг киоска', method: 'GET', path: '/api/kiosk/config', value: 'kiosk-config' },
+  // { body: '', label: 'Проверка API', method: 'GET', path: '/api/health', value: 'health' },
   { body: '', label: 'Профиль барбера', method: 'GET', path: '/api/barbers/me', value: 'barber-me' },
   { body: '', label: 'Услуги', method: 'GET', path: '/api/services', value: 'services' },
   { body: '', label: 'Статистика', method: 'GET', path: '/api/statistics', value: 'statistics' },
