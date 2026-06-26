@@ -857,40 +857,59 @@ onBeforeUnmount(() => {
               <UButton color="primary" icon="i-lucide-user-plus" @click="openCreateModal">
                 Добавить сотрудника
               </UButton>
-              <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending || insightsPending"
-                variant="outline" @click="refreshDirectory()">
+              <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending || insightsPending" variant="outline" @click="refreshDirectory()">
                 Обновить список
               </UButton>
             </div>
           </div>
 
           <div class="grid gap-3 pb-4 md:grid-cols-3">
-            <UInput v-model="searchLogin" icon="i-lucide-search" placeholder="Поиск по логину" />
-            <USelectMenu v-model="roleFilter" :items="roleFilterOptions" value-key="value" placeholder="Все роли" />
+            <UInput
+              v-model="searchLogin"
+              icon="i-lucide-search"
+              placeholder="Поиск по логину"
+            />
+            <USelectMenu
+              v-model="roleFilter"
+              :items="roleFilterOptions"
+              value-key="value"
+              placeholder="Все роли"
+            />
           </div>
 
-          <div v-if="filteredRows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <div v-if="filteredRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
             <div class="max-h-[80vh] overflow-auto">
-              <UTable :columns="columns" :data="pagedRows" :loading="pending" sticky="header" :ui="{
-                root: 'w-full overflow-auto',
-                base: 'w-full min-w-[84rem]',
-                thead: 'bg-charcoal-50/90',
-                tbody: 'divide-y divide-charcoal-100',
-                th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
-                td: 'px-4 py-4 text-sm text-charcoal-700 align-middle'
-              }">
+              <UTable
+                :columns="columns"
+                :data="pagedRows"
+                :loading="pending"
+                sticky="header"
+                :ui="{
+                  root: 'w-full overflow-auto',
+                  base: 'w-full min-w-[84rem]',
+                  thead: 'bg-charcoal-50/90',
+                  tbody: 'divide-y divide-charcoal-100',
+                  th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
+                  td: 'px-4 py-4 text-sm text-charcoal-700 align-middle'
+                }"
+              >
                 <template #login-cell="{ row }">
                   <span class="font-semibold text-charcoal-950">{{ row.original.login }}</span>
                 </template>
 
                 <template #name-cell="{ row }">
-                  <button class="flex w-full items-center gap-3 text-left" type="button"
-                    @click="openEmployeeDetails(row.original)">
-                    <div
-                      class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
-                      <img v-if="row.original.photo_url" :alt="row.original.name"
-                        :src="`${config.public.apiBase}${row.original.photo_url}`" class="size-full object-cover">
+                  <button
+                    class="flex w-full items-center gap-3 text-left"
+                    type="button"
+                    @click="openEmployeeDetails(row.original)"
+                  >
+                    <div class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
+                      <img
+                        v-if="row.original.photo_url"
+                        :alt="row.original.name"
+                        :src="`${config.public.apiBase}${row.original.photo_url}`"
+                        class="size-full object-cover"
+                      >
                       <UIcon v-else class="text-lg text-charcoal-400" name="i-lucide-user-round" />
                     </div>
                     <div class="space-y-1">
@@ -922,10 +941,9 @@ onBeforeUnmount(() => {
                       {{ row.original.permissions.length }} прав
                     </span>
                     <span class="text-xs text-charcoal-500">
-                      {{row.original.permissions.length
-                        ? row.original.permissions.slice(0, 2).map(permission =>
-                          employeePermissionDefinitions[permission]?.label || permission).join(', ')
-                        : 'Права не настроены'}}
+                      {{ row.original.permissions.length
+                        ? row.original.permissions.slice(0, 2).map(permission => employeePermissionDefinitions[permission]?.label || permission).join(', ')
+                        : 'Права не настроены' }}
                     </span>
                   </div>
                 </template>
@@ -933,20 +951,37 @@ onBeforeUnmount(() => {
                 <template #actions-cell="{ row }">
                   <div class="flex justify-end gap-2">
                     <UTooltip text="Статистика">
-                      <UButton aria-label="Открыть статистику сотрудника" color="neutral"
-                        icon="i-lucide-chart-no-axes-combined" square variant="ghost"
-                        @click="openEmployeeDetails(row.original)" />
+                      <UButton
+                        aria-label="Открыть статистику сотрудника"
+                        color="neutral"
+                        icon="i-lucide-chart-no-axes-combined"
+                        square
+                        variant="ghost"
+                        @click="openEmployeeDetails(row.original)"
+                      />
                     </UTooltip>
 
                     <UTooltip text="Редактировать">
-                      <UButton aria-label="Редактировать сотрудника" color="neutral" icon="i-lucide-pencil" square
-                        variant="ghost" @click="startEdit(row.original)" />
+                      <UButton
+                        aria-label="Редактировать сотрудника"
+                        color="neutral"
+                        icon="i-lucide-pencil"
+                        square
+                        variant="ghost"
+                        @click="startEdit(row.original)"
+                      />
                     </UTooltip>
 
                     <UTooltip text="Удалить">
-                      <UButton aria-label="Удалить сотрудника" color="error" icon="i-lucide-trash-2"
-                        :loading="removingId === row.original.id" square variant="ghost"
-                        @click="removeEmployee(row.original)" />
+                      <UButton
+                        aria-label="Удалить сотрудника"
+                        color="error"
+                        icon="i-lucide-trash-2"
+                        :loading="removingId === row.original.id"
+                        square
+                        variant="ghost"
+                        @click="removeEmployee(row.original)"
+                      />
                     </UTooltip>
                   </div>
                 </template>
@@ -954,40 +989,50 @@ onBeforeUnmount(() => {
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-charcoal-100 px-4 py-3">
               <span class="text-xs text-charcoal-500">
-                Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize,
-                  filteredRows.length) }}
-                из {{ filteredRows.length }}
+                Показано {{ pagedRows.length ? (page - 1) * pageSize + 1 : 0 }}–{{ Math.min(page * pageSize, filteredRows.length) }} из {{ filteredRows.length }}
               </span>
-              <UPagination v-model="page" :page-count="pageCount" :total="filteredRows.length" :per-page="pageSize"
-                size="sm" />
+              <UPagination
+                v-model="page"
+                :page-count="pageCount"
+                :total="filteredRows.length"
+                :per-page="pageSize"
+                size="sm"
+              />
             </div>
           </div>
-          <SharedEmptyState v-else
+          <SharedEmptyState
+            v-else
             description="Список сотрудников пуст. Добавьте первого сотрудника через модальное окно."
-            icon="i-lucide-users" title="Нет сотрудников" />
+            icon="i-lucide-users"
+            title="Нет сотрудников"
+          />
         </UCard>
       </div>
     </template>
   </UDashboardPanel>
 
-  <UModal v-model:open="detailsModalOpen" class="sm:max-w-[760px]" :title="selectedEmployee?.name || 'Сотрудник'"
-    :description="selectedEmployee ? `${selectedEmployee.branch} · ${getEmployeeRoleLabel(selectedEmployee.role)}` : undefined">
+  <UModal
+    v-model:open="detailsModalOpen"
+    class="sm:max-w-[760px]"
+    :title="selectedEmployee?.name || 'Сотрудник'"
+    :description="selectedEmployee ? `${selectedEmployee.branch} · ${getEmployeeRoleLabel(selectedEmployee.role)}` : undefined"
+  >
     <template #body>
       <div v-if="selectedEmployee" class="space-y-5">
-        <div
-          class="flex flex-col gap-4 rounded-[1.5rem] border border-charcoal-200 bg-white/90 p-4 sm:flex-row sm:items-center">
-          <div
-            class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
-            <img v-if="selectedEmployee.photo_url" :alt="selectedEmployee.name" :src="selectedEmployee.photo_url"
-              class="size-full object-cover">
+        <div class="flex flex-col gap-4 rounded-[1.5rem] border border-charcoal-200 bg-white/90 p-4 sm:flex-row sm:items-center">
+          <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
+            <img
+              v-if="selectedEmployee.photo_url"
+              :alt="selectedEmployee.name"
+              :src="selectedEmployee.photo_url"
+              class="size-full object-cover"
+            >
             <UIcon v-else class="text-2xl text-charcoal-400" name="i-lucide-user-round" />
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-lg font-semibold text-charcoal-950">{{ selectedEmployee.name }}</p>
-            <p class="text-sm text-charcoal-600">{{ selectedEmployee.login }} · {{ selectedEmployee.phone || 'Телефон не
-              указан' }}</p>
-            <p v-if="selectedEmployee.specialization" class="text-sm text-charcoal-500">{{
-              selectedEmployee.specialization }}</p>
+            <p class="text-sm text-charcoal-600">{{ selectedEmployee.login }} · {{ selectedEmployee.phone || 'Телефон не указан' }}</p>
+            <p v-if="selectedEmployee.specialization" class="text-sm text-charcoal-500">{{ selectedEmployee.specialization }}</p>
           </div>
           <UBadge color="primary" variant="soft">
             {{ getEmployeeRoleLabel(selectedEmployee.role) }}
@@ -997,23 +1042,19 @@ onBeforeUnmount(() => {
         <div class="grid gap-3 sm:grid-cols-4">
           <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Визиты</p>
-            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatCount(selectedEmployeeInsight?.visits || 0)
-            }}</p>
+            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatCount(selectedEmployeeInsight?.visits || 0) }}</p>
           </div>
           <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Завершено</p>
-            <p class="mt-2 text-lg font-semibold text-emerald-600">{{ formatCount(selectedEmployeeInsight?.completed ||
-              0) }}</p>
+            <p class="mt-2 text-lg font-semibold text-emerald-600">{{ formatCount(selectedEmployeeInsight?.completed || 0) }}</p>
           </div>
           <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Отмены</p>
-            <p class="mt-2 text-lg font-semibold text-amber-600">{{ formatCount(selectedEmployeeInsight?.cancelled || 0)
-            }}</p>
+            <p class="mt-2 text-lg font-semibold text-amber-600">{{ formatCount(selectedEmployeeInsight?.cancelled || 0) }}</p>
           </div>
           <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Выручка</p>
-            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.revenue ||
-              0) }}</p>
+            <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.revenue || 0) }}</p>
           </div>
         </div>
 
@@ -1031,33 +1072,27 @@ onBeforeUnmount(() => {
           <div class="mt-4 grid gap-3 sm:grid-cols-3">
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Цель</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.salary ||
-                0) }}</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.salary || 0) }}</p>
             </div>
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Комиссия</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.commission
-                || 0) }}</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.commission || 0) }}</p>
             </div>
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">К выплате</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.payout ||
-                0) }}</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.payout || 0) }}</p>
             </div>
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Аванс</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.advances
-                || 0) }}</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.advances || 0) }}</p>
             </div>
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Штраф</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.penalty ||
-                0) }}</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ formatMoney(selectedEmployeeInsight?.finance.penalty || 0) }}</p>
             </div>
             <div class="rounded-xl bg-charcoal-50/70 px-3 py-2">
               <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Процент</p>
-              <p class="mt-1 font-semibold text-charcoal-950">{{ selectedEmployeeInsight?.finance.profit_percent || 0
-              }}%</p>
+              <p class="mt-1 font-semibold text-charcoal-950">{{ selectedEmployeeInsight?.finance.profit_percent || 0 }}%</p>
             </div>
           </div>
         </div>
@@ -1071,8 +1106,11 @@ onBeforeUnmount(() => {
           </div>
 
           <div v-if="selectedEmployeeInsight?.history.length" class="mt-4 max-h-[18rem] space-y-2 overflow-auto pr-1">
-            <div v-for="item in selectedEmployeeInsight.history.slice(0, 8)" :key="item.id"
-              class="rounded-xl border border-charcoal-200 bg-charcoal-50/50 px-3 py-2">
+            <div
+              v-for="item in selectedEmployeeInsight.history.slice(0, 8)"
+              :key="item.id"
+              class="rounded-xl border border-charcoal-200 bg-charcoal-50/50 px-3 py-2"
+            >
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p class="text-sm font-semibold text-charcoal-950">
@@ -1092,8 +1130,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <SharedEmptyState v-else description="По выбранному филиалу история этого сотрудника не найдена."
-            icon="i-lucide-history" title="История пуста" />
+          <SharedEmptyState
+            v-else
+            description="По выбранному филиалу история этого сотрудника не найдена."
+            icon="i-lucide-history"
+            title="История пуста"
+          />
         </div>
       </div>
     </template>
@@ -1116,10 +1158,13 @@ onBeforeUnmount(() => {
             <div class="flex flex-col gap-4">
               <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center">
-                  <div
-                    class="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-charcoal-100">
-                    <img v-if="avatarPreviewUrl" :alt="form.name || form.login || 'Аватар сотрудника'"
-                      :src="avatarPreviewUrl" class="size-full object-cover">
+                  <div class="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-charcoal-100">
+                    <img
+                      v-if="avatarPreviewUrl"
+                      :alt="form.name || form.login || 'Аватар сотрудника'"
+                      :src="avatarPreviewUrl"
+                      class="size-full object-cover"
+                    >
                     <UIcon v-else class="text-3xl text-charcoal-400" name="i-lucide-image-plus" />
                   </div>
 
@@ -1133,14 +1178,26 @@ onBeforeUnmount(() => {
                       </p>
                     </div>
 
-                    <UInput accept="image/*" class="w-full" type="file" @change="handleAvatarInput" />
+                    <UInput
+                      accept="image/*"
+                      class="w-full"
+                      type="file"
+                      @change="handleAvatarInput"
+                    />
 
                     <div class="flex flex-wrap items-center gap-3">
                       <span class="text-xs text-charcoal-500">
                         PNG, JPG, WEBP или GIF до 5 МБ
                       </span>
-                      <UButton v-if="form.photo_url || avatarFile" color="neutral" icon="i-lucide-trash-2" size="sm"
-                        type="button" variant="outline" @click="clearAvatar">
+                      <UButton
+                        v-if="form.photo_url || avatarFile"
+                        color="neutral"
+                        icon="i-lucide-trash-2"
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        @click="clearAvatar"
+                      >
                         Убрать аватар
                       </UButton>
                     </div>
@@ -1148,13 +1205,23 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <UFormField label="Филиал" name="branch_id" :error="fieldErrors.branch_id">
-                <USelectMenu v-model="form.branch_id" class="w-full" :items="branchOptions"
-                  placeholder="Выберите филиал" value-key="value" />
+                <USelectMenu
+                  v-model="form.branch_id"
+                  class="w-full"
+                  :items="branchOptions"
+                  placeholder="Выберите филиал"
+                  value-key="value"
+                />
               </UFormField>
 
               <UFormField label="Роль" name="role" :error="fieldErrors.role">
-                <USelectMenu v-model="form.role" class="w-full" :items="roleOptions" placeholder="Выберите роль"
-                  value-key="value" />
+                <USelectMenu
+                  v-model="form.role"
+                  class="w-full"
+                  :items="roleOptions"
+                  placeholder="Выберите роль"
+                  value-key="value"
+                />
               </UFormField>
 
               <UFormField label="Логин" name="login" :error="fieldErrors.login">
@@ -1173,10 +1240,8 @@ onBeforeUnmount(() => {
                 <UInput v-model="form.phone" class="w-full" placeholder="+998 90 000 00 00" />
               </UFormField>
 
-              <UFormField class="lg:col-span-2" label="Специализация" name="specialization"
-                :error="fieldErrors.specialization">
-                <UInput v-model="form.specialization"
-                  placeholder="Мужские стрижки / администратор филиала / старший мастер" />
+              <UFormField class="lg:col-span-2" label="Специализация" name="specialization" :error="fieldErrors.specialization">
+                <UInput v-model="form.specialization" placeholder="Мужские стрижки / администратор филиала / старший мастер" />
               </UFormField>
             </div>
           </div>
@@ -1191,8 +1256,7 @@ onBeforeUnmount(() => {
                   Роль задает стартовый preset, после чего админ может донастроить права свитчами.
                 </p>
               </div>
-              <UButton color="neutral" icon="i-lucide-wand-sparkles" size="sm" type="button" variant="outline"
-                @click="applyRolePreset(form.role)">
+              <UButton color="neutral" icon="i-lucide-wand-sparkles" size="sm" type="button" variant="outline" @click="applyRolePreset(form.role)">
                 Сбросить по роли
               </UButton>
             </div>
@@ -1213,8 +1277,11 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="mt-4 flex flex-col gap-4">
-              <div v-for="section in employeePermissionSections" :key="section.key"
-                class="rounded-[1.25rem] border border-charcoal-200 bg-charcoal-50/40 p-4">
+              <div
+                v-for="section in employeePermissionSections"
+                :key="section.key"
+                class="rounded-[1.25rem] border border-charcoal-200 bg-charcoal-50/40 p-4"
+              >
                 <div class="pb-3">
                   <h4 class="text-sm font-semibold uppercase tracking-[0.16em] text-charcoal-500">
                     {{ section.label }}
@@ -1222,10 +1289,14 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="flex flex-col gap-3">
-                  <USwitch v-for="permission in section.items" :key="permission"
+                  <USwitch
+                    v-for="permission in section.items"
+                    :key="permission"
                     :description="employeePermissionDefinitions[permission].description"
-                    :label="employeePermissionDefinitions[permission].label" :model-value="hasPermission(permission)"
-                    @update:model-value="(value) => setPermission(permission, Boolean(value))">
+                    :label="employeePermissionDefinitions[permission].label"
+                    :model-value="hasPermission(permission)"
+                    @update:model-value="(value) => setPermission(permission, Boolean(value))"
+                  >
                     <template #label="{ label }">
                       <span class="inline-flex items-center gap-2">
                         <UTooltip v-if="isReadOnlyPermission(permission)" text="Только чтение">
@@ -1276,7 +1347,12 @@ onBeforeUnmount(() => {
                   Набор прав
                 </p>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <UBadge v-for="permission in form.permissions" :key="permission" color="neutral" variant="soft">
+                  <UBadge
+                    v-for="permission in form.permissions"
+                    :key="permission"
+                    color="neutral"
+                    variant="soft"
+                  >
                     {{ employeePermissionDefinitions[permission].label }}
                   </UBadge>
                   <span v-if="!form.permissions.length" class="text-sm text-white/60">
@@ -1291,8 +1367,7 @@ onBeforeUnmount(() => {
             <UButton color="primary" :icon="submitIcon" type="submit" :loading="submitting">
               {{ submitLabel }}
             </UButton>
-            <UButton color="neutral" variant="ghost" type="button" :disabled="submitting"
-              @click="resetForm(!isEditing)">
+            <UButton color="neutral" variant="ghost" type="button" :disabled="submitting" @click="resetForm(!isEditing)">
               Очистить форму
             </UButton>
           </div>
