@@ -2,17 +2,23 @@
 import type { TableColumn } from '@nuxt/ui'
 
 import type { MerchantBarber, MerchantBarberPayload, MerchantService } from '~/composables/useMerchantApi'
+import { formatBranchAttachmentLabel, getBranchBarbershopId } from '~/utils/branchDisplay'
+import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 
 const apiClient = useApiClient()
+const config = useRuntimeConfig()
 
 definePageMeta({
   layout: 'merchant'
 })
 
 type BarberRow = {
+  branch_id: string | null
+  branch_name: string | null
   id: string
   name: string
   phone: string | null
+  photo_url: string | null
   specialization: string | null
   is_active: boolean | null
 }
@@ -23,15 +29,24 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
-function toRow(value: MerchantBarber): BarberRow | null {
+function getPhotoUrl(value: unknown) {
+  return resolveApiMediaUrl(value, config.public.apiBase)
+}
+
+function toRow(value: MerchantBarber, branchNames = new Map<string, string>()): BarberRow | null {
   const id = normalizeText(value?.id)
   if (!id) return null
 
+  const branchId = normalizeText(value.branch_id)
+
   return {
+    branch_id: branchId,
+    branch_name: branchId ? branchNames.get(branchId) || `Филиал ${branchId.slice(0, 8)}` : null,
     id,
     is_active: value.is_active ?? null,
     name: normalizeText(value.name) || 'Барбер',
     phone: normalizeText(value.phone),
+    photo_url: normalizeText(value.photo_url),
     specialization: normalizeText(value.specialization)
   }
 }
@@ -44,6 +59,7 @@ const submitting = ref(false)
 const editingId = ref<string | null>(null)
 
 const form = reactive({
+  branch_id: '',
   is_active: true,
   name: '',
   phone: '',
@@ -64,6 +80,7 @@ function parseServiceNames(value: unknown) {
 }
 
 function resetForm() {
+  form.branch_id = branchOptions.value[0]?.value || ''
   form.name = ''
   form.phone = ''
   form.service_names = []
@@ -73,7 +90,11 @@ function resetForm() {
 
 function openCreate() {
   if (!canCreateBarber.value) {
-    apiClient.notifyError(new Error('services are required'), 'Сначала создайте хотя бы одну услугу.')
+    const message = branchOptions.value.length
+      ? 'Сначала создайте хотя бы одну услугу.'
+      : 'Сначала создайте хотя бы один филиал.'
+
+    apiClient.notifyError(new Error('barber prerequisites are required'), message)
     return
   }
 
@@ -84,10 +105,11 @@ function openCreate() {
 
 function openEdit(row: BarberRow) {
   editingId.value = row.id
+  form.branch_id = row.branch_id || ''
   form.name = row.name || ''
   form.phone = row.phone || ''
   form.service_names = parseServiceNames(row.specialization)
-  form.photo_url = ''
+  form.photo_url = row.photo_url || ''
   form.is_active = row.is_active !== false
   editOpen.value = true
 }
@@ -100,14 +122,23 @@ const { data: servicesData, pending: servicesPending, refresh: refreshServices }
   return await merchantApi.services(true)
 })
 
-const rows = computed<BarberRow[]>(() =>
-  ((data.value as any)?.items || []).flatMap((item: MerchantBarber) => {
-    const row = toRow(item)
-    return row ? [row] : []
-  })
-)
+const { data: branchesData, pending: branchesPending, refresh: refreshBranches } = await useAsyncData('merchant-barbers-branches', async () => {
+  return await merchantApi.branches()
+})
+
+const { data: merchantBarbershopData, refresh: refreshMerchantBarbershop } = await useAsyncData('merchant-barbers-barbershop', async () => {
+  const dashboard = await merchantApi.dashboard()
+  const barbershop = await $fetch(`/api/marketplace/catalog/barbershops/${dashboard.barbershop_id}`).catch(() => null)
+  const entry = (barbershop as any)?.item ?? (barbershop as any)?.entry ?? barbershop
+
+  return {
+    id: normalizeText(dashboard.barbershop_id),
+    name: normalizeText((entry as any)?.name)
+  }
+})
 
 type ServiceOption = { label: string, value: string }
+type BranchOption = { label: string, value: string }
 
 const serviceOptions = computed<ServiceOption[]>(() =>
   ((servicesData.value as any)?.items || []).flatMap((item: MerchantService) => {
@@ -117,14 +148,53 @@ const serviceOptions = computed<ServiceOption[]>(() =>
   })
 )
 
-const canCreateBarber = computed(() => serviceOptions.value.length > 0)
+const merchantBarbershopName = computed(() => normalizeText((merchantBarbershopData.value as any)?.name))
+
+const branchContextNamesById = computed(() => {
+  const id = normalizeText((merchantBarbershopData.value as any)?.id)
+  const name = merchantBarbershopName.value
+
+  return id && name ? { [id]: name } : {}
+})
+
+const branchOptions = computed<BranchOption[]>(() =>
+  ((branchesData.value as any)?.items || []).flatMap((item: any) => {
+    const id = normalizeText(item?.id)
+    if (!id) return []
+    const branchContextId = getBranchBarbershopId(item)
+    const contextNames = branchContextId && merchantBarbershopName.value && !branchContextNamesById.value[branchContextId]
+      ? { ...branchContextNamesById.value, [branchContextId]: merchantBarbershopName.value }
+      : branchContextNamesById.value
+
+    return [{
+      label: formatBranchAttachmentLabel(item, contextNames, { fallbackContextName: merchantBarbershopName.value }),
+      value: id
+    }]
+  })
+)
+
+const branchNameById = computed(() =>
+  new Map(branchOptions.value.map(branch => [branch.value, branch.label]))
+)
+
+const rows = computed<BarberRow[]>(() =>
+  ((data.value as any)?.items || []).flatMap((item: MerchantBarber) => {
+    const row = toRow(item, branchNameById.value)
+    return row ? [row] : []
+  })
+)
+
+const canCreateBarber = computed(() => serviceOptions.value.length > 0 && branchOptions.value.length > 0)
+const photoPreviewUrl = computed(() => normalizeText(form.photo_url))
+const photoPreviewSrc = computed(() => getPhotoUrl(photoPreviewUrl.value))
 
 async function refreshAll() {
-  await Promise.all([refresh(), refreshServices()])
+  await Promise.all([refresh(), refreshServices(), refreshBranches(), refreshMerchantBarbershop()])
 }
 
 const columns: TableColumn<BarberRow>[] = [
   { accessorKey: 'name', header: 'Барбер' },
+  { id: 'branch', header: 'Филиал' },
   { accessorKey: 'phone', header: 'Телефон' },
   { accessorKey: 'specialization', header: 'Специализация' },
   { id: 'status', header: 'Статус' },
@@ -138,8 +208,18 @@ async function submitCreate() {
     return
   }
 
+  const branchId = normalizeText(form.branch_id)
+  if (!branchId) {
+    apiClient.notifyError(new Error('branch_id is required'), 'Выберите филиал для барбера.')
+    return
+  }
+
   if (!canCreateBarber.value) {
-    apiClient.notifyError(new Error('services are required'), 'Сначала создайте хотя бы одну услугу.')
+    const message = branchOptions.value.length
+      ? 'Сначала создайте хотя бы одну услугу.'
+      : 'Сначала создайте хотя бы один филиал.'
+
+    apiClient.notifyError(new Error('barber prerequisites are required'), message)
     return
   }
 
@@ -150,7 +230,7 @@ async function submitCreate() {
   submitting.value = true
   try {
     const payload: MerchantBarberPayload = {
-      branch_id: null,
+      branch_id: branchId,
       is_active: Boolean(form.is_active),
       name,
       phone: normalizeText(form.phone),
@@ -178,6 +258,12 @@ async function submitEdit() {
     return
   }
 
+  const branchId = normalizeText(form.branch_id)
+  if (!branchId) {
+    apiClient.notifyError(new Error('branch_id is required'), 'Выберите филиал для барбера.')
+    return
+  }
+
   const specialization = form.service_names.length
     ? form.service_names.map(normalizeText).filter(Boolean).join(', ')
     : null
@@ -185,6 +271,7 @@ async function submitEdit() {
   submitting.value = true
   try {
     await merchantApi.updateBarber(id, {
+      branch_id: branchId,
       is_active: Boolean(form.is_active),
       name,
       phone: normalizeText(form.phone),
@@ -228,7 +315,7 @@ async function removeRow(row: BarberRow) {
           <UButton
             color="neutral"
             icon="i-lucide-refresh-cw"
-            :loading="pending || servicesPending"
+            :loading="pending || servicesPending || branchesPending"
             variant="outline"
             @click="refreshAll()"
           >
@@ -253,10 +340,14 @@ async function removeRow(row: BarberRow) {
                 <p class="text-sm text-charcoal-500">
                   Здесь показываются только барберы вашего барбершопа (не “главные” барберы системы).
                 </p>
-                <p v-if="!servicesPending && !canCreateBarber" class="text-sm text-amber-700">
-                  Чтобы добавить барбера, сначала создайте хотя бы одну услугу в разделе
+                <p v-if="!servicesPending && !branchesPending && !canCreateBarber" class="text-sm text-amber-700">
+                  Чтобы добавить барбера, сначала создайте хотя бы одну услугу и один филиал. Услуги можно добавить в разделе
                   <NuxtLink to="/merchant/services" class="underline">
                     Услуги
+                  </NuxtLink>,
+                  филиалы — в разделе
+                  <NuxtLink to="/merchant/branches" class="underline">
+                    Филиалы
                   </NuxtLink>.
                 </p>
               </div>
@@ -275,6 +366,20 @@ async function removeRow(row: BarberRow) {
               <template #phone-cell="{ row }">
                 <span class="text-sm text-charcoal-700">
                   {{ row.original.phone || '—' }}
+                </span>
+              </template>
+
+              <template #branch-cell="{ row }">
+                <UBadge
+                  v-if="row.original.branch_id"
+                  color="neutral"
+                  size="xs"
+                  variant="soft"
+                >
+                  {{ row.original.branch_name }}
+                </UBadge>
+                <span v-else class="text-sm text-amber-700">
+                  Не привязан
                 </span>
               </template>
 
@@ -332,6 +437,17 @@ async function removeRow(row: BarberRow) {
               <UInput v-model="form.phone" placeholder="+998..." />
             </UFormField>
 
+            <UFormField label="Филиал" required>
+              <USelectMenu
+                v-model="form.branch_id"
+                class="w-full"
+                :disabled="!branchOptions.length"
+                :items="branchOptions"
+                placeholder="Выберите филиал"
+                value-key="value"
+              />
+            </UFormField>
+
             <UFormField label="Специализация">
               <USelectMenu
                 v-model="form.service_names"
@@ -342,6 +458,26 @@ async function removeRow(row: BarberRow) {
                 value-key="value"
               />
             </UFormField>
+
+            <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">
+              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+                <img
+                  v-if="photoPreviewSrc"
+                  :alt="form.name || 'Фото барбера'"
+                  :src="photoPreviewSrc"
+                  class="size-full object-cover"
+                >
+                <UIcon v-else class="text-2xl text-charcoal-400" name="i-lucide-user-round" />
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-charcoal-950">
+                  Фото барбера
+                </p>
+                <p class="break-all text-xs text-charcoal-500">
+                  {{ form.photo_url || 'Фото не указано' }}
+                </p>
+              </div>
+            </div>
 
             <UFormField label="Фото (URL)">
               <UInput v-model="form.photo_url" placeholder="https://..." />
@@ -381,6 +517,17 @@ async function removeRow(row: BarberRow) {
               <UInput v-model="form.phone" placeholder="+998..." />
             </UFormField>
 
+            <UFormField label="Филиал" required>
+              <USelectMenu
+                v-model="form.branch_id"
+                class="w-full"
+                :disabled="!branchOptions.length"
+                :items="branchOptions"
+                placeholder="Выберите филиал"
+                value-key="value"
+              />
+            </UFormField>
+
             <UFormField label="Специализация">
               <USelectMenu
                 v-model="form.service_names"
@@ -391,6 +538,26 @@ async function removeRow(row: BarberRow) {
                 value-key="value"
               />
             </UFormField>
+
+            <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">
+              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+                <img
+                  v-if="photoPreviewSrc"
+                  :alt="form.name || 'Фото барбера'"
+                  :src="photoPreviewSrc"
+                  class="size-full object-cover"
+                >
+                <UIcon v-else class="text-2xl text-charcoal-400" name="i-lucide-user-round" />
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-charcoal-950">
+                  Фото барбера
+                </p>
+                <p class="break-all text-xs text-charcoal-500">
+                  {{ form.photo_url || 'Фото не указано' }}
+                </p>
+              </div>
+            </div>
 
             <UFormField label="Фото (URL)">
               <UInput v-model="form.photo_url" placeholder="https://..." />
@@ -407,7 +574,7 @@ async function removeRow(row: BarberRow) {
             <UButton color="neutral" variant="ghost" :disabled="submitting" @click="editOpen = false">
               Отмена
             </UButton>
-            <UButton color="primary" :loading="submitting" @click="submitEdit">
+            <UButton color="primary" :loading="submitting" :disabled="!branchOptions.length" @click="submitEdit">
               Сохранить
             </UButton>
           </div>

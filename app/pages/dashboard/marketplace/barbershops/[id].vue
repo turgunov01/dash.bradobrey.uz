@@ -8,6 +8,8 @@ type BranchRow = {
   name: string
   address: string | null
   city: string | null
+  timezone: string | null
+  work_hours: any | null
   is_active: boolean | null
 }
 
@@ -15,6 +17,16 @@ function normalizeText(value: unknown) {
   if (value === undefined || value === null) return null
   const text = String(value).trim()
   return text || null
+}
+
+function getExternalAddressUrl(value: unknown) {
+  const address = normalizeText(value)
+
+  if (!address || !/^https?:\/\//i.test(address)) {
+    return null
+  }
+
+  return address
 }
 
 function toBranchRow(value: unknown): BranchRow | null {
@@ -28,7 +40,9 @@ function toBranchRow(value: unknown): BranchRow | null {
     city: normalizeText(anyValue.city),
     id,
     is_active: anyValue.is_active === undefined || anyValue.is_active === null ? null : Boolean(anyValue.is_active),
-    name: normalizeText(anyValue.name) || 'Филиал'
+    name: normalizeText(anyValue.name) || 'Филиал',
+    timezone: normalizeText(anyValue.timezone),
+    work_hours: anyValue.work_hours ?? null
   }
 }
 
@@ -41,6 +55,7 @@ const barbershopId = computed(() => String(route.params.id || ''))
 
 const createBranchModalOpen = ref(false)
 const branchSubmitting = ref(false)
+const editingBranchId = ref('')
 const detachingBranchId = ref('')
 const deletingBranchId = ref('')
 
@@ -74,8 +89,34 @@ const defaultWorkHours: Record<DayKey, { start_time: string, end_time: string }>
   sun: { end_time: '20:00', start_time: '10:00' }
 }
 
-const branchWorkHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>({
-  ...defaultWorkHours
+function cloneWorkHours(source: Record<DayKey, { start_time: string, end_time: string }>) {
+  return days.reduce((acc, day) => {
+    acc[day.key] = { ...source[day.key] }
+    return acc
+  }, {} as Record<DayKey, { start_time: string, end_time: string }>)
+}
+
+const branchWorkHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>(
+  cloneWorkHours(defaultWorkHours)
+)
+
+const barbershopWorkHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>(
+  cloneWorkHours(defaultWorkHours)
+)
+
+const editBarbershopModalOpen = ref(false)
+const barbershopSubmitting = ref(false)
+
+const barbershopForm = reactive({
+  address: '',
+  city: '',
+  cover_url: '',
+  description: '',
+  is_active: true,
+  logo_url: '',
+  name: '',
+  sort_order: 0,
+  timezone: 'Asia/Tashkent'
 })
 
 const merchantSubmitting = ref(false)
@@ -207,6 +248,34 @@ function resetBranchWorkHours() {
   }
 }
 
+function resetBarbershopWorkHours() {
+  for (const day of days) {
+    barbershopWorkHours[day.key].start_time = defaultWorkHours[day.key].start_time
+    barbershopWorkHours[day.key].end_time = defaultWorkHours[day.key].end_time
+  }
+}
+
+function applyWorkHours(target: Record<DayKey, { start_time: string, end_time: string }>, value: unknown) {
+  for (const day of days) {
+    target[day.key].start_time = defaultWorkHours[day.key].start_time
+    target[day.key].end_time = defaultWorkHours[day.key].end_time
+  }
+
+  if (!value || typeof value !== 'object') return
+  const anyValue = value as any
+
+  for (const day of days) {
+    const entry = anyValue[day.key]
+    if (!entry || typeof entry !== 'object') continue
+
+    const start = normalizeText((entry as any).start_time)
+    const end = normalizeText((entry as any).end_time)
+
+    if (start) target[day.key].start_time = start
+    if (end) target[day.key].end_time = end
+  }
+}
+
 function resetBranchForm() {
   branchForm.name = ''
   branchForm.city = String(barbershop.value?.city || '')
@@ -217,11 +286,46 @@ function resetBranchForm() {
 }
 
 function openCreateBranchModal() {
+  editingBranchId.value = ''
   resetBranchForm()
   createBranchModalOpen.value = true
 }
 
-async function submitCreateBranch() {
+function openEditBranchModal(row: BranchRow) {
+  editingBranchId.value = row.id
+  branchForm.name = row.name || ''
+  branchForm.city = row.city || ''
+  branchForm.address = row.address || ''
+  branchForm.timezone = row.timezone || String(barbershop.value?.timezone || 'Asia/Tashkent')
+  branchForm.is_active = row.is_active !== false
+  applyWorkHours(branchWorkHours, row.work_hours)
+  createBranchModalOpen.value = true
+}
+
+function openEditBarbershopModal() {
+  const source = barbershop.value || {}
+
+  barbershopForm.name = normalizeText(source.name) || ''
+  barbershopForm.city = normalizeText(source.city) || ''
+  barbershopForm.address = normalizeText(source.address) || ''
+  barbershopForm.timezone = normalizeText(source.timezone) || 'Asia/Tashkent'
+  barbershopForm.description = normalizeText(source.description) || ''
+  barbershopForm.logo_url = normalizeText(source.logo_url) || ''
+  barbershopForm.cover_url = normalizeText(source.cover_url) || ''
+  barbershopForm.sort_order = Number.isFinite(Number(source.sort_order)) ? Number(source.sort_order) : 0
+  barbershopForm.is_active = source.is_active !== false
+  applyWorkHours(barbershopWorkHours, source.work_hours)
+  editBarbershopModalOpen.value = true
+}
+
+const branchModalTitle = computed(() => editingBranchId.value ? 'Редактировать филиал' : 'Создать филиал')
+const branchModalDescription = computed(() => editingBranchId.value
+  ? 'Изменения будут применены к филиалу этого барбершопа.'
+  : 'Филиал будет создан и автоматически привязан к этому барбершопу.'
+)
+const branchSubmitLabel = computed(() => editingBranchId.value ? 'Сохранить' : 'Создать')
+
+async function submitBranchForm() {
   const name = normalizeText(branchForm.name)
 
   if (!name) {
@@ -231,20 +335,60 @@ async function submitCreateBranch() {
 
   branchSubmitting.value = true
   try {
-    await branchesApi.create({
+    const payload = {
       address: normalizeText(branchForm.address),
       city: normalizeText(branchForm.city),
       is_active: Boolean(branchForm.is_active),
-      marketplace_barbershop_id: barbershopId.value,
       name,
       timezone: normalizeText(branchForm.timezone),
       work_hours: JSON.parse(JSON.stringify(branchWorkHours))
-    })
+    }
+
+    if (editingBranchId.value) {
+      await branchesApi.update(editingBranchId.value, payload)
+    }
+    else {
+      await branchesApi.create({
+        ...payload,
+        marketplace_barbershop_id: barbershopId.value
+      })
+    }
 
     createBranchModalOpen.value = false
     await refresh()
   } finally {
     branchSubmitting.value = false
+  }
+}
+
+async function submitBarbershopEdit() {
+  const name = normalizeText(barbershopForm.name)
+
+  if (!name) {
+    apiClient.notifyError(new Error('name is required'), 'Укажите название барбершопа.')
+    return
+  }
+
+  barbershopSubmitting.value = true
+  try {
+    await marketplaceBarbershopsApi.update(barbershopId.value, {
+      address: normalizeText(barbershopForm.address),
+      city: normalizeText(barbershopForm.city),
+      cover_url: normalizeText(barbershopForm.cover_url),
+      description: normalizeText(barbershopForm.description),
+      is_active: Boolean(barbershopForm.is_active),
+      logo_url: normalizeText(barbershopForm.logo_url),
+      name,
+      sort_order: Number(barbershopForm.sort_order || 0),
+      timezone: normalizeText(barbershopForm.timezone),
+      work_hours: JSON.parse(JSON.stringify(barbershopWorkHours))
+    })
+
+    editBarbershopModalOpen.value = false
+    await refresh()
+  }
+  finally {
+    barbershopSubmitting.value = false
   }
 }
 
@@ -406,6 +550,14 @@ const columns: TableColumn<BranchRow>[] = [
               <UBadge color="neutral" size="lg" variant="soft">
                 {{ branchRows.length }} филиалов
               </UBadge>
+              <UButton
+                color="neutral"
+                icon="i-lucide-pencil"
+                variant="outline"
+                @click="openEditBarbershopModal"
+              >
+                Редактировать
+              </UButton>
             </div>
           </div>
 
@@ -423,7 +575,18 @@ const columns: TableColumn<BranchRow>[] = [
               <p class="text-xs text-charcoal-500">
                 Адрес
               </p>
-              <p class="text-sm font-medium text-charcoal-950">
+              <UButton
+                v-if="getExternalAddressUrl(barbershop?.address)"
+                color="neutral"
+                icon="i-lucide-map-pinned"
+                :to="getExternalAddressUrl(barbershop?.address) || undefined"
+                size="xs"
+                target="_blank"
+                variant="outline"
+              >
+                Перейти в Карты
+              </UButton>
+              <p v-else class="text-sm font-medium text-charcoal-950">
                 {{ barbershop?.address || '—' }}
               </p>
             </div>
@@ -473,7 +636,18 @@ const columns: TableColumn<BranchRow>[] = [
               </template>
 
               <template #address-cell="{ row }">
-                <span class="text-sm text-charcoal-700">
+                <UButton
+                  v-if="getExternalAddressUrl(row.original.address)"
+                  color="neutral"
+                  icon="i-lucide-map-pinned"
+                  :to="getExternalAddressUrl(row.original.address) || undefined"
+                  size="xs"
+                  target="_blank"
+                  variant="outline"
+                >
+                  Перейти в Карты
+                </UButton>
+                <span v-else class="text-sm text-charcoal-700">
                   {{ row.original.address || '—' }}
                 </span>
               </template>
@@ -496,6 +670,12 @@ const columns: TableColumn<BranchRow>[] = [
                     variant="ghost"
                     size="xs"
                     :to="`/dashboard/marketplace/branches/${row.original.id}`"
+                  />
+                  <UButton
+                    icon="i-lucide-pencil"
+                    variant="ghost"
+                    size="xs"
+                    @click="openEditBranchModal(row.original)"
                   />
                   <UButton
                     icon="i-lucide-unlink"
@@ -648,8 +828,8 @@ const columns: TableColumn<BranchRow>[] = [
         <UModal
           v-model:open="createBranchModalOpen"
           class="sm:max-w-2xl"
-          title="Создать филиал"
-          description="Филиал будет создан и автоматически привязан к этому барбершопу."
+          :title="branchModalTitle"
+          :description="branchModalDescription"
         >
           <template #body>
             <div class="space-y-4">
@@ -719,8 +899,109 @@ const columns: TableColumn<BranchRow>[] = [
               <UButton color="neutral" variant="ghost" :disabled="branchSubmitting" @click="close">
                 Закрыть
               </UButton>
-              <UButton color="primary" icon="i-lucide-save" :loading="branchSubmitting" @click="submitCreateBranch">
-                Создать
+              <UButton color="primary" icon="i-lucide-save" :loading="branchSubmitting" @click="submitBranchForm">
+                {{ branchSubmitLabel }}
+              </UButton>
+            </div>
+          </template>
+        </UModal>
+
+        <UModal
+          v-model:open="editBarbershopModalOpen"
+          class="sm:max-w-2xl"
+          title="Редактировать барбершоп"
+          description="Обновите карточку барбершопа, которую видит маркетплейс."
+        >
+          <template #body>
+            <div class="space-y-4">
+              <UFormField label="Название" required>
+                <UInput v-model="barbershopForm.name" />
+              </UFormField>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Город">
+                  <UInput v-model="barbershopForm.city" placeholder="Ташкент" />
+                </UFormField>
+
+                <UFormField label="Timezone">
+                  <UInput v-model="barbershopForm.timezone" placeholder="Asia/Tashkent" />
+                </UFormField>
+              </div>
+
+              <UFormField label="Адрес">
+                <UInput v-model="barbershopForm.address" />
+              </UFormField>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Лого URL">
+                  <UInput v-model="barbershopForm.logo_url" placeholder="https://..." />
+                </UFormField>
+
+                <UFormField label="Обложка URL">
+                  <UInput v-model="barbershopForm.cover_url" placeholder="https://..." />
+                </UFormField>
+              </div>
+
+              <UFormField label="Описание">
+                <UTextarea v-model="barbershopForm.description" :rows="3" />
+              </UFormField>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Сортировка">
+                  <UInput v-model.number="barbershopForm.sort_order" type="number" />
+                </UFormField>
+
+                <div class="flex items-end">
+                  <UCheckbox v-model="barbershopForm.is_active" label="Активен в маркетплейсе" />
+                </div>
+              </div>
+
+              <UCard class="rounded-2xl border border-charcoal-200 bg-white/70">
+                <template #header>
+                  <div class="space-y-1">
+                    <h4 class="font-semibold text-charcoal-950">
+                      Время работы
+                    </h4>
+                    <p class="text-sm text-charcoal-500">
+                      Сохраняется в <span class="font-mono">work_hours</span>.
+                    </p>
+                  </div>
+                </template>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div
+                    v-for="day in days"
+                    :key="day.key"
+                    class="rounded-2xl border border-charcoal-200 bg-white/80 p-4"
+                  >
+                    <p class="text-sm font-medium text-charcoal-950">
+                      {{ day.label }}
+                    </p>
+
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                      <UFormField label="Начало">
+                        <UInput v-model="barbershopWorkHours[day.key].start_time" type="time" />
+                      </UFormField>
+                      <UFormField label="Конец">
+                        <UInput v-model="barbershopWorkHours[day.key].end_time" type="time" />
+                      </UFormField>
+                    </div>
+                  </div>
+                </div>
+              </UCard>
+            </div>
+          </template>
+
+          <template #footer="{ close }">
+            <div class="flex w-full flex-wrap justify-end gap-3">
+              <UButton color="neutral" variant="outline" :disabled="barbershopSubmitting" @click="resetBarbershopWorkHours">
+                Сбросить график
+              </UButton>
+              <UButton color="neutral" variant="ghost" :disabled="barbershopSubmitting" @click="close">
+                Закрыть
+              </UButton>
+              <UButton color="primary" icon="i-lucide-save" :loading="barbershopSubmitting" @click="submitBarbershopEdit">
+                Сохранить
               </UButton>
             </div>
           </template>

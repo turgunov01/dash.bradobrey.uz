@@ -30,6 +30,16 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
+function getExternalAddressUrl(value: unknown) {
+  const address = normalizeText(value)
+
+  if (!address || !/^https?:\/\//i.test(address)) {
+    return null
+  }
+
+  return address
+}
+
 function asNumber(value: unknown): number | null {
   const num = Number(value)
   return Number.isFinite(num) ? num : null
@@ -240,7 +250,18 @@ function clearAvailability() {
               <p class="text-xs text-charcoal-500">
                 Адрес
               </p>
-              <p class="text-sm font-medium text-charcoal-950">
+              <UButton
+                v-if="getExternalAddressUrl(branch?.address)"
+                color="neutral"
+                icon="i-lucide-map-pinned"
+                :to="getExternalAddressUrl(branch?.address) || undefined"
+                size="xs"
+                target="_blank"
+                variant="outline"
+              >
+                Перейти в Карты
+              </UButton>
+              <p v-else class="text-sm font-medium text-charcoal-950">
                 {{ branch?.address || '—' }}
               </p>
             </div>

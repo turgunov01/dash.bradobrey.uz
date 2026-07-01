@@ -19,6 +19,16 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
+function getExternalAddressUrl(value: string | null) {
+  const address = normalizeText(value)
+
+  if (!address || !/^https?:\/\//i.test(address)) {
+    return null
+  }
+
+  return address
+}
+
 function toBranchRow(value: unknown): BranchRow | null {
   if (!value || typeof value !== 'object') return null
   const anyValue = value as any
@@ -215,7 +225,7 @@ async function submitEdit() {
 }
 
 async function removeRow(row: BranchRow) {
-  if (import.meta.client && !window.confirm(`Удалить филиал «${row.name}»?`)) {
+  if (import.meta.client && !window.confirm(`Безвозвратно удалить филиал «${row.name}»?`)) {
     return
   }
 
@@ -280,6 +290,23 @@ async function removeRow(row: BranchRow) {
             class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
+              <template #address-cell="{ row }">
+                <UButton
+                  v-if="getExternalAddressUrl(row.original.address)"
+                  color="neutral"
+                  icon="i-lucide-map-pinned"
+                  :to="getExternalAddressUrl(row.original.address) || undefined"
+                  size="xs"
+                  target="_blank"
+                  variant="outline"
+                >
+                  Перейти в Карты
+                </UButton>
+                <span v-else class="text-sm text-charcoal-700">
+                  {{ row.original.address || '—' }}
+                </span>
+              </template>
+
               <template #status-cell="{ row }">
                 <UBadge
                   :color="row.original.is_active === false ? 'neutral' : 'success'"

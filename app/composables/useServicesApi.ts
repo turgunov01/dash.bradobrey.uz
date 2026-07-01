@@ -23,8 +23,8 @@ export function useServicesApi() {
     list() {
       return client.request('/api/services')
     },
-    remove(id: string) {
-      return client.request(`/api/services/${id}`, { method: 'DELETE', successMessage: 'Услуга удалена' })
+    remove(id: string, query?: Record<string, unknown>) {
+      return client.request(`/api/services/${id}`, { method: 'DELETE', query, successMessage: 'Услуга удалена' })
     },
     update(id: string, payload: Partial<ServiceFormPayload> | FormData) {
       const body = payload instanceof FormData ? payload : mapPayload(payload as ServiceFormPayload)

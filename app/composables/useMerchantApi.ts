@@ -103,6 +103,17 @@ type MerchantDashboardResponse = {
   warnings?: string[]
 }
 
+type MerchantBarbershopUpdatePayload = {
+  address?: string | null
+  city?: string | null
+  cover_url?: string | null
+  description?: string | null
+  logo_url?: string | null
+  name?: string
+  timezone?: string | null
+  work_hours?: Record<string, unknown> | null
+}
+
 export function useMerchantApi() {
   const client = useApiClient()
 
@@ -146,6 +157,7 @@ export function useMerchantApi() {
     deleteBranch(id: string) {
       return client.request<{ deleted: boolean, id: string }>(`/api/merchant/branches/${id}`, {
         method: 'DELETE',
+        query: { force: true },
         successMessage: 'Филиал удалён'
       })
     },
@@ -153,6 +165,14 @@ export function useMerchantApi() {
     dashboard() {
       return client.request<MerchantDashboardResponse>('/api/merchant/dashboard', {
         query: { __skipBranchScope: true }
+      })
+    },
+
+    updateBarbershop(payload: MerchantBarbershopUpdatePayload) {
+      return client.request<{ entry?: unknown, item?: unknown }>('/api/merchant/barbershop', {
+        body: payload,
+        method: 'PATCH',
+        successMessage: 'Барбершоп обновлён'
       })
     },
 

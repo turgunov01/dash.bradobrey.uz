@@ -3,8 +3,10 @@ import type { TableColumn } from '@nuxt/ui'
 
 import { formatMoney } from '~/utils/format'
 import type { MerchantService, MerchantServiceCategory, MerchantServicePayload } from '~/composables/useMerchantApi'
+import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 
 const apiClient = useApiClient()
+const config = useRuntimeConfig()
 
 definePageMeta({
   layout: 'merchant'
@@ -16,6 +18,7 @@ type ServiceRow = {
   price: string | number | null
   duration_minutes: string | number | null
   category_name: string | null
+  image: string | null
   is_active: boolean | null
 }
 
@@ -23,6 +26,10 @@ function normalizeText(value: unknown) {
   if (value === undefined || value === null) return null
   const text = String(value).trim()
   return text || null
+}
+
+function resolveServiceImageUrl(value: unknown) {
+  return resolveApiMediaUrl(value, config.public.apiBase)
 }
 
 function toRow(value: MerchantService): ServiceRow | null {
@@ -33,6 +40,7 @@ function toRow(value: MerchantService): ServiceRow | null {
     category_name: normalizeText(value.category_name),
     duration_minutes: (value as any).duration_minutes ?? null,
     id,
+    image: normalizeText(value.image),
     is_active: value.is_active ?? null,
     name: normalizeText(value.name) || 'Услуга',
     price: (value as any).price ?? null
@@ -43,6 +51,9 @@ const merchantApi = useMerchantApi()
 
 const createOpen = ref(false)
 const editOpen = ref(false)
+const previewOpen = ref(false)
+const previewSrc = ref('')
+const previewTitle = ref('')
 const submitting = ref(false)
 const editingId = ref<string | null>(null)
 
@@ -81,7 +92,7 @@ function openEdit(row: ServiceRow) {
   form.price = row.price === null || row.price === undefined ? '' : String(row.price)
   form.duration_minutes = row.duration_minutes === null || row.duration_minutes === undefined ? '' : String(row.duration_minutes)
   form.category_name = row.category_name || ''
-  form.image = ''
+  form.image = row.image || ''
   form.is_active = row.is_active !== false
   editOpen.value = true
 }
@@ -115,6 +126,7 @@ const categoryOptions = computed<CategoryOption[]>(() =>
 )
 
 const canCreateService = computed(() => categoryOptions.value.length > 0)
+const formImagePreviewSrc = computed(() => resolveServiceImageUrl(form.image))
 
 const categoriesErrorMessage = computed(() => {
   const error: any = categoriesError.value
@@ -246,6 +258,15 @@ async function removeRow(row: ServiceRow) {
     submitting.value = false
   }
 }
+
+function openPreview(row: ServiceRow) {
+  const src = resolveServiceImageUrl(row.image)
+  if (!src) return
+
+  previewSrc.value = src
+  previewTitle.value = row.name
+  previewOpen.value = true
+}
 </script>
 
 <template>
@@ -347,6 +368,13 @@ async function removeRow(row: ServiceRow) {
 
               <template #actions-cell="{ row }">
                 <div class="flex items-center justify-end gap-2">
+                  <UButton
+                    v-if="row.original.image"
+                    icon="i-lucide-image"
+                    variant="ghost"
+                    size="xs"
+                    @click="openPreview(row.original)"
+                  />
                   <UButton icon="i-lucide-pencil" variant="ghost" size="xs" @click="openEdit(row.original)" />
                   <UButton
                     icon="i-lucide-trash-2"
@@ -403,6 +431,17 @@ async function removeRow(row: ServiceRow) {
               <UInput v-model="form.image" placeholder="https://..." />
             </UFormField>
 
+            <div v-if="formImagePreviewSrc" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
+                Предпросмотр
+              </p>
+              <img
+                :alt="form.name || 'Превью услуги'"
+                :src="formImagePreviewSrc"
+                class="max-h-64 w-full rounded-lg object-contain"
+              >
+            </div>
+
             <UFormField>
               <UCheckbox v-model="form.is_active" label="Активна" />
             </UFormField>
@@ -457,6 +496,17 @@ async function removeRow(row: ServiceRow) {
               <UInput v-model="form.image" placeholder="https://..." />
             </UFormField>
 
+            <div v-if="formImagePreviewSrc" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
+                Предпросмотр
+              </p>
+              <img
+                :alt="form.name || 'Превью услуги'"
+                :src="formImagePreviewSrc"
+                class="max-h-64 w-full rounded-lg object-contain"
+              >
+            </div>
+
             <UFormField>
               <UCheckbox v-model="form.is_active" label="Активна" />
             </UFormField>
@@ -471,6 +521,23 @@ async function removeRow(row: ServiceRow) {
             <UButton color="primary" :loading="submitting" @click="submitEdit">
               Сохранить
             </UButton>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="previewOpen"
+        class="sm:max-w-3xl"
+        :title="previewTitle || 'Предпросмотр изображения'"
+      >
+        <template #body>
+          <div class="flex justify-center">
+            <img
+              v-if="previewSrc"
+              :alt="previewTitle || 'Превью услуги'"
+              :src="previewSrc"
+              class="max-h-[70vh] max-w-full rounded-2xl border border-charcoal-200 object-contain"
+            >
           </div>
         </template>
       </UModal>

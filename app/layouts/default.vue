@@ -51,12 +51,12 @@ const utilityLinks = computed(() =>
 
       <template #default="{ collapsed }">
         <UDashboardSearchButton :collapsed="collapsed" class="bg-transparent ring-default" />
-        <AppCalculatorModal :collapsed="collapsed" :show-modal="false" />
+        <!-- <AppCalculatorModal :collapsed="collapsed" :show-modal="false" /> -->
 
         <UNavigationMenu
           :collapsed="collapsed"
           :items="mainLinks"
-          class="mt-4"
+          class="mt-0"
           orientation="vertical"
           tooltip
         />

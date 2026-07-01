@@ -8,6 +8,12 @@ type BarbershopRow = {
   name: string
   city: string | null
   address: string | null
+  cover_url: string | null
+  description: string | null
+  logo_url: string | null
+  sort_order: number | null
+  timezone: string | null
+  work_hours: any | null
   branches_count: number | null
   is_active: boolean | null
 }
@@ -31,9 +37,15 @@ function toBarbershopRow(value: unknown): BarbershopRow | null {
     address: normalizeText(anyValue.address),
     branches_count: branchesCount,
     city: normalizeText(anyValue.city),
+    cover_url: normalizeText(anyValue.cover_url),
+    description: normalizeText(anyValue.description),
     id,
     is_active: anyValue.is_active === undefined || anyValue.is_active === null ? null : Boolean(anyValue.is_active),
-    name: normalizeText(anyValue.name) || 'Барбершоп'
+    logo_url: normalizeText(anyValue.logo_url),
+    name: normalizeText(anyValue.name) || 'Барбершоп',
+    sort_order: Number.isFinite(Number(anyValue.sort_order)) ? Number(anyValue.sort_order) : null,
+    timezone: normalizeText(anyValue.timezone),
+    work_hours: anyValue.work_hours ?? null
   }
 }
 
@@ -50,6 +62,7 @@ const status = ref<'active' | 'inactive' | 'all'>(
 const createModalOpen = ref(false)
 const submitting = ref(false)
 const deletingBarbershopId = ref('')
+const editingBarbershopId = ref('')
 
 const createForm = reactive({
   address: '',
@@ -85,9 +98,16 @@ const defaultWorkHours: Record<DayKey, { start_time: string, end_time: string }>
   sun: { end_time: '20:00', start_time: '10:00' }
 }
 
-const workHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>({
-  ...defaultWorkHours
-})
+function cloneWorkHours(source: Record<DayKey, { start_time: string, end_time: string }>) {
+  return days.reduce((acc, day) => {
+    acc[day.key] = { ...source[day.key] }
+    return acc
+  }, {} as Record<DayKey, { start_time: string, end_time: string }>)
+}
+
+const workHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>(
+  cloneWorkHours(defaultWorkHours)
+)
 const { pending, refresh } = await useAsyncData('dashboard-marketplace-catalog', async () => {
   await store.fetchBarbershops({
     city: city.value || undefined,
@@ -131,7 +151,26 @@ function resetWorkHours() {
   }
 }
 
+function applyWorkHours(value: unknown) {
+  resetWorkHours()
+
+  if (!value || typeof value !== 'object') return
+  const anyValue = value as any
+
+  for (const day of days) {
+    const entry = anyValue[day.key]
+    if (!entry || typeof entry !== 'object') continue
+
+    const start = normalizeText((entry as any).start_time)
+    const end = normalizeText((entry as any).end_time)
+
+    if (start) workHours[day.key].start_time = start
+    if (end) workHours[day.key].end_time = end
+  }
+}
+
 function resetCreateForm() {
+  editingBarbershopId.value = ''
   createForm.name = ''
   createForm.city = city.value || ''
   createForm.address = ''
@@ -149,7 +188,29 @@ function openCreateModal() {
   createModalOpen.value = true
 }
 
-async function submitCreate() {
+function openEditModal(row: BarbershopRow) {
+  editingBarbershopId.value = row.id
+  createForm.name = row.name || ''
+  createForm.city = row.city || ''
+  createForm.address = row.address || ''
+  createForm.timezone = row.timezone || 'Asia/Tashkent'
+  createForm.description = row.description || ''
+  createForm.logo_url = row.logo_url || ''
+  createForm.cover_url = row.cover_url || ''
+  createForm.sort_order = row.sort_order || 0
+  createForm.is_active = row.is_active !== false
+  applyWorkHours(row.work_hours)
+  createModalOpen.value = true
+}
+
+const modalTitle = computed(() => editingBarbershopId.value ? 'Редактировать барбершоп' : 'Добавить барбершоп')
+const modalDescription = computed(() => editingBarbershopId.value
+  ? 'Обновляет карточку барбершопа в каталоге маркетплейса.'
+  : 'Создаёт новый барбершоп в каталоге маркетплейса. Без бронирований и оплат.'
+)
+const submitLabel = computed(() => editingBarbershopId.value ? 'Сохранить' : 'Создать')
+
+async function submitBarbershopForm() {
   const name = normalizeText(createForm.name)
 
   if (!name) {
@@ -159,7 +220,7 @@ async function submitCreate() {
 
   submitting.value = true
   try {
-    await marketplaceBarbershopsApi.create({
+    const payload = {
       address: normalizeText(createForm.address),
       city: normalizeText(createForm.city),
       cover_url: normalizeText(createForm.cover_url),
@@ -170,7 +231,14 @@ async function submitCreate() {
       sort_order: Number(createForm.sort_order || 0),
       timezone: normalizeText(createForm.timezone),
       work_hours: JSON.parse(JSON.stringify(workHours))
-    })
+    }
+
+    if (editingBarbershopId.value) {
+      await marketplaceBarbershopsApi.update(editingBarbershopId.value, payload)
+    }
+    else {
+      await marketplaceBarbershopsApi.create(payload)
+    }
 
     createModalOpen.value = false
     await refresh()
@@ -310,6 +378,12 @@ async function deleteBarbershop(row: BarbershopRow) {
                     :to="`/dashboard/marketplace/barbershops/${row.original.id}`"
                   />
                   <UButton
+                    icon="i-lucide-pencil"
+                    variant="ghost"
+                    size="xs"
+                    @click="openEditModal(row.original)"
+                  />
+                  <UButton
                     icon="i-lucide-trash-2"
                     color="error"
                     variant="ghost"
@@ -338,8 +412,8 @@ async function deleteBarbershop(row: BarbershopRow) {
       <UModal
         v-model:open="createModalOpen"
         class="sm:max-w-2xl"
-        title="Добавить барбершоп"
-        description="Создаёт новый барбершоп в каталоге маркетплейса. Без бронирований и оплат."
+        :title="modalTitle"
+        :description="modalDescription"
       >
         <template #body>
           <div class="space-y-4">
@@ -431,8 +505,8 @@ async function deleteBarbershop(row: BarbershopRow) {
             <UButton color="neutral" variant="ghost" :disabled="submitting" @click="close">
               Закрыть
             </UButton>
-            <UButton color="primary" icon="i-lucide-save" :loading="submitting" @click="submitCreate">
-              Создать
+            <UButton color="primary" icon="i-lucide-save" :loading="submitting" @click="submitBarbershopForm">
+              {{ submitLabel }}
             </UButton>
           </div>
         </template>

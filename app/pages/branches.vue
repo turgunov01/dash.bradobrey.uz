@@ -26,6 +26,16 @@ function normalizeText(value: unknown) {
   return text || null
 }
 
+function getExternalAddressUrl(value: unknown) {
+  const address = normalizeText(value)
+
+  if (!address || !/^https?:\/\//i.test(address)) {
+    return null
+  }
+
+  return address
+}
+
 function toBranchRow(value: unknown): BranchRow | null {
   const parsed = branchSchema.safeParse(value)
 
@@ -340,7 +350,18 @@ async function removeBranch(row: BranchRow) {
               </template>
 
               <template #address-cell="{ row }">
-                <span class="text-sm text-charcoal-700">
+                <UButton
+                  v-if="getExternalAddressUrl(row.original.address)"
+                  color="neutral"
+                  icon="i-lucide-map-pinned"
+                  :to="getExternalAddressUrl(row.original.address) || undefined"
+                  size="xs"
+                  target="_blank"
+                  variant="outline"
+                >
+                  Перейти в Карты
+                </UButton>
+                <span v-else class="text-sm text-charcoal-700">
                   {{ row.original.address || '—' }}
                 </span>
               </template>

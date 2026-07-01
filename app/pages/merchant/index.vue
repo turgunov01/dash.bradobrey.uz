@@ -8,6 +8,8 @@ definePageMeta({
   layout: 'merchant'
 })
 
+const apiClient = useApiClient()
+
 type ActiveOrderRow = {
   id: string
   branch: string
@@ -39,6 +41,18 @@ function toActiveOrderRow(value: MerchantQueueEntry): ActiveOrderRow {
 }
 
 const merchantApi = useMerchantApi()
+const editBarbershopOpen = ref(false)
+const submittingBarbershop = ref(false)
+
+const barbershopForm = reactive({
+  address: '',
+  city: '',
+  cover_url: '',
+  description: '',
+  logo_url: '',
+  name: '',
+  timezone: 'Asia/Tashkent'
+})
 
 const { data, pending, refresh } = await useAsyncData('merchant-dashboard', async () => {
   const dashboard = await merchantApi.dashboard()
@@ -51,7 +65,10 @@ const { data, pending, refresh } = await useAsyncData('merchant-dashboard', asyn
 })
 
 const dashboard = computed(() => (data.value as any)?.dashboard as Awaited<ReturnType<typeof merchantApi.dashboard>> | null)
-const barbershop = computed(() => (data.value as any)?.barbershop as any)
+const barbershop = computed(() => {
+  const value = (data.value as any)?.barbershop as any
+  return value?.item ?? value?.entry ?? value
+})
 
 const barbershopName = computed(() => normalizeText(barbershop.value?.name) || 'Барбершоп')
 const barbershopCity = computed(() => normalizeText(barbershop.value?.city))
@@ -68,6 +85,47 @@ const columns: TableColumn<ActiveOrderRow>[] = [
   { accessorKey: 'created_at', header: 'Создано' },
   { accessorKey: 'amount', header: 'Сумма' }
 ]
+
+function openEditBarbershop() {
+  const source = barbershop.value || {}
+
+  barbershopForm.name = normalizeText(source.name) || ''
+  barbershopForm.city = normalizeText(source.city) || ''
+  barbershopForm.address = normalizeText(source.address) || ''
+  barbershopForm.timezone = normalizeText(source.timezone) || 'Asia/Tashkent'
+  barbershopForm.description = normalizeText(source.description) || ''
+  barbershopForm.logo_url = normalizeText(source.logo_url) || ''
+  barbershopForm.cover_url = normalizeText(source.cover_url) || ''
+  editBarbershopOpen.value = true
+}
+
+async function submitBarbershopEdit() {
+  const name = normalizeText(barbershopForm.name)
+
+  if (!name) {
+    apiClient.notifyError(new Error('name is required'), 'Укажите название барбершопа.')
+    return
+  }
+
+  submittingBarbershop.value = true
+  try {
+    await merchantApi.updateBarbershop({
+      address: normalizeText(barbershopForm.address),
+      city: normalizeText(barbershopForm.city),
+      cover_url: normalizeText(barbershopForm.cover_url),
+      description: normalizeText(barbershopForm.description),
+      logo_url: normalizeText(barbershopForm.logo_url),
+      name,
+      timezone: normalizeText(barbershopForm.timezone)
+    })
+
+    editBarbershopOpen.value = false
+    await refresh()
+  }
+  finally {
+    submittingBarbershop.value = false
+  }
+}
 </script>
 
 <template>
@@ -96,13 +154,19 @@ const columns: TableColumn<ActiveOrderRow>[] = [
       <div class="space-y-6">
         <UCard class="warm-card">
           <template #header>
-            <div class="space-y-1">
-              <h2 class="barbershop-heading text-xl text-charcoal-950">
-                {{ barbershopName }}
-              </h2>
-              <p class="text-sm text-charcoal-500">
-                {{ barbershopCity ? `Город: ${barbershopCity}` : 'Город не указан' }}
-              </p>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="space-y-1">
+                <h2 class="barbershop-heading text-xl text-charcoal-950">
+                  {{ barbershopName }}
+                </h2>
+                <p class="text-sm text-charcoal-500">
+                  {{ barbershopCity ? `Город: ${barbershopCity}` : 'Город не указан' }}
+                </p>
+              </div>
+
+              <UButton color="neutral" icon="i-lucide-pencil" variant="outline" @click="openEditBarbershop">
+                Редактировать
+              </UButton>
             </div>
           </template>
 
@@ -160,6 +224,60 @@ const columns: TableColumn<ActiveOrderRow>[] = [
             </UButton>
           </div>
         </UCard>
+
+        <UModal
+          v-model:open="editBarbershopOpen"
+          class="sm:max-w-2xl"
+          title="Редактировать барбершоп"
+          description="Эти данные отображаются в карточке вашего барбершопа."
+        >
+          <template #body>
+            <div class="space-y-4">
+              <UFormField label="Название" required>
+                <UInput v-model="barbershopForm.name" />
+              </UFormField>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Город">
+                  <UInput v-model="barbershopForm.city" placeholder="Ташкент" />
+                </UFormField>
+
+                <UFormField label="Timezone">
+                  <UInput v-model="barbershopForm.timezone" placeholder="Asia/Tashkent" />
+                </UFormField>
+              </div>
+
+              <UFormField label="Адрес">
+                <UInput v-model="barbershopForm.address" />
+              </UFormField>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Лого URL">
+                  <UInput v-model="barbershopForm.logo_url" placeholder="https://..." />
+                </UFormField>
+
+                <UFormField label="Обложка URL">
+                  <UInput v-model="barbershopForm.cover_url" placeholder="https://..." />
+                </UFormField>
+              </div>
+
+              <UFormField label="Описание">
+                <UTextarea v-model="barbershopForm.description" :rows="3" />
+              </UFormField>
+            </div>
+          </template>
+
+          <template #footer="{ close }">
+            <div class="flex w-full flex-wrap justify-end gap-3">
+              <UButton color="neutral" variant="ghost" :disabled="submittingBarbershop" @click="close">
+                Закрыть
+              </UButton>
+              <UButton color="primary" icon="i-lucide-save" :loading="submittingBarbershop" @click="submitBarbershopEdit">
+                Сохранить
+              </UButton>
+            </div>
+          </template>
+        </UModal>
 
         <UCard class="warm-card">
           <template #header>

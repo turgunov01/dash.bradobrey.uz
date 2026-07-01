@@ -2,7 +2,14 @@
 import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
+import {
+  extractListItems,
+  formatBranchAttachmentLabel,
+  getBranchBarbershopId,
+  normalizeBranchText
+} from '~/utils/branchDisplay'
 import { formatCount, formatDateTime, formatMoney } from '~/utils/format'
+import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 import { flattenServicesPayload } from '~/utils/services'
 import {
   employeePermissionDefinitions,
@@ -66,6 +73,51 @@ const financeDraftsStorage = useStorage<FinanceDraftStorage>('finance-drafts', {
 
 await branchStore.ensureLoaded()
 
+const marketplaceBarbershopNames = ref<Record<string, string>>({})
+
+async function loadMarketplaceBarbershopNames() {
+  const ids = new Set(
+    branchStore.branches
+      .map(branch => getBranchBarbershopId(branch))
+      .filter(Boolean) as string[]
+  )
+
+  if (!ids.size) {
+    marketplaceBarbershopNames.value = {}
+    return
+  }
+
+  try {
+    const response = await apiClient.request('/api/marketplace/barbershops', {
+      query: { __skipBranchScope: true },
+      silent: true
+    })
+    const names: Record<string, string> = {}
+
+    for (const item of extractListItems(response)) {
+      if (!item || typeof item !== 'object') continue
+      const record = item as Record<string, unknown>
+      const id = normalizeBranchText(record.id)
+      const name = normalizeBranchText(record.name)
+
+      if (id && name && ids.has(id)) {
+        names[id] = name
+      }
+    }
+
+    marketplaceBarbershopNames.value = names
+  }
+  catch {
+    marketplaceBarbershopNames.value = {}
+  }
+}
+
+await loadMarketplaceBarbershopNames()
+
+function getEmployeePhotoUrl(value: unknown) {
+  return resolveApiMediaUrl(value, config.public.apiBase) || ''
+}
+
 const formModalOpen = ref(false)
 const detailsModalOpen = ref(false)
 const isSyncingRolePreset = ref(false)
@@ -107,7 +159,7 @@ const passwordPlaceholder = computed(() =>
 
 const branchOptions = computed(() =>
   branchStore.branches.map(branch => ({
-    label: branch.name,
+    label: formatBranchAttachmentLabel(branch, marketplaceBarbershopNames.value),
     value: branch.id
   }))
 )
@@ -125,7 +177,10 @@ const roleFilterOptions = computed(() => [
 ])
 
 const branchMap = computed(() =>
-  new Map(branchStore.branches.map(branch => [branch.id, branch.name]))
+  new Map(branchStore.branches.map(branch => [
+    branch.id,
+    formatBranchAttachmentLabel(branch, marketplaceBarbershopNames.value)
+  ]))
 )
 
 function currentPeriodKey() {
@@ -374,12 +429,27 @@ const searchLogin = ref('')
 const roleFilter = ref<'all' | EmployeeRole>('all')
 
 const { data, pending, refresh } = await useAsyncData('employees-directory', async () => {
+  const selectedBranchId = branchStore.activeBranchId ? String(branchStore.activeBranchId) : ''
   const response = await barbersApi.list({
-    ...(branchStore.activeBranchId ? { branch_id: branchStore.activeBranchId } : {}),
+    __skipBranchScope: true,
+    ...(selectedBranchId ? { branch_id: selectedBranchId } : {}),
     mode: 'employees'
   })
 
-  const items = Array.isArray(response?.items) ? response.items : []
+  const responseItems = Array.isArray(response?.items) ? response.items : []
+  let items = selectedBranchId
+    ? responseItems.filter(item => String(item.branch_id || '') === selectedBranchId)
+    : responseItems
+
+  if (selectedBranchId && !items.length && !responseItems.length) {
+    const fallbackResponse = await barbersApi.list({
+      __skipBranchScope: true,
+      mode: 'employees'
+    })
+    const fallbackItems = Array.isArray(fallbackResponse?.items) ? fallbackResponse.items : []
+    items = fallbackItems.filter(item => String(item.branch_id || '') === selectedBranchId)
+  }
+
   const rows: EmployeeRow[] = items.map((item) => {
     const branchId = String(item.branch_id || '')
     const login = item.login || 'Без логина'
@@ -526,7 +596,7 @@ const selectedPermissionCount = computed(() => form.permissions.length)
 const selectedPermissionLabels = computed(() =>
   form.permissions.map(permission => employeePermissionDefinitions[permission]?.label || permission)
 )
-const avatarPreviewUrl = computed(() => avatarObjectUrl.value || form.photo_url || '')
+const avatarPreviewUrl = computed(() => avatarObjectUrl.value || getEmployeePhotoUrl(form.photo_url))
 const selectedPermissionPreview = computed(() => {
   if (!selectedPermissionLabels.value.length) {
     return 'Права не выбраны'
@@ -907,7 +977,7 @@ onBeforeUnmount(() => {
                       <img
                         v-if="row.original.photo_url"
                         :alt="row.original.name"
-                        :src="`${config.public.apiBase}${row.original.photo_url}`"
+                        :src="getEmployeePhotoUrl(row.original.photo_url)"
                         class="size-full object-cover"
                       >
                       <UIcon v-else class="text-lg text-charcoal-400" name="i-lucide-user-round" />
@@ -1024,7 +1094,7 @@ onBeforeUnmount(() => {
             <img
               v-if="selectedEmployee.photo_url"
               :alt="selectedEmployee.name"
-              :src="selectedEmployee.photo_url"
+              :src="getEmployeePhotoUrl(selectedEmployee.photo_url)"
               class="size-full object-cover"
             >
             <UIcon v-else class="text-2xl text-charcoal-400" name="i-lucide-user-round" />

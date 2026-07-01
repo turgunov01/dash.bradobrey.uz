@@ -3,8 +3,10 @@ import { useStorage } from '@vueuse/core'
 import { serviceFormSchema, type ServiceCategory, type ServiceFormPayload } from '~~/shared/schemas'
 import { formatMoney } from '~/utils/format'
 import { flattenServicesPayload } from '~/utils/services'
+import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 
 const apiClient = useApiClient()
+const config = useRuntimeConfig()
 
 const Draggable = defineAsyncComponent({
   loader: () => import('vuedraggable').then(module => module.default),
@@ -72,7 +74,7 @@ const form = reactive({
 
 const imageFile = ref<File | null>(null)
 const objectUrl = ref('')
-const previewUrl = computed(() => objectUrl.value || form.image || '')
+const previewUrl = computed(() => objectUrl.value || resolveServiceImageUrl(form.image) || '')
 
 const { data, pending, refresh } = await useAsyncData('services-dashboard', async () => {
   return await servicesApi.list()
@@ -170,6 +172,10 @@ onMounted(() => {
 const totalServices = computed(() => serviceRows.value.length)
 const modalTitle = computed(() => form.id ? 'Обновить услугу' : 'Создать услугу')
 const modalDescription = computed(() => form.id ? 'Измените параметры и сохраните' : 'Заполните данные, чтобы добавить услугу')
+
+function resolveServiceImageUrl(value: unknown) {
+  return resolveApiMediaUrl(value, config.public.apiBase)
+}
 
 function applySortAndOrder(list: ServiceRow[], category: string, preferredOrder?: string[]) {
   const ordered = [...list].sort((a, b) =>
@@ -405,12 +411,18 @@ async function submit() {
 }
 
 async function removeService(id: string) {
-  await servicesApi.remove(id)
+  await servicesApi.remove(id, branchStore.activeBranchId
+    ? {
+        branch_id: branchStore.activeBranchId,
+        object_id: branchStore.activeBranchId
+      }
+    : undefined
+  )
   await refresh()
 }
 
 function openPreview(src: string, title: string) {
-  previewSrc.value = src
+  previewSrc.value = resolveServiceImageUrl(src) || src
   previewTitle.value = title
   previewOpen.value = true
 }
@@ -510,10 +522,10 @@ function openPreview(src: string, title: string) {
                         icon="i-lucide-image"
                         variant="ghost"
                         size="xs"
-                        @click="openPreview(element.image!, element.name)"
+                        @click.stop="openPreview(element.image!, element.name)"
                       />
-                      <UButton icon="i-lucide-pencil" variant="ghost" size="xs" @click="startEdit(element)" />
-                      <UButton icon="i-lucide-trash-2" color="error" variant="ghost" size="xs" @click="removeService(element.id)" />
+                      <UButton icon="i-lucide-pencil" variant="ghost" size="xs" @click.stop="startEdit(element)" />
+                      <UButton icon="i-lucide-trash-2" color="error" variant="ghost" size="xs" @click.stop="removeService(element.id)" />
                     </div>
                   </div>
                 </template>
