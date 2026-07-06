@@ -154,11 +154,12 @@ export function useMerchantApi() {
       })
     },
 
-    deleteBranch(id: string) {
-      return client.request<{ deleted: boolean, id: string }>(`/api/merchant/branches/${id}`, {
+    deleteBranch(id: string, options: { hard?: boolean } = {}) {
+      // hard: true -> full purge (visits + payments); default -> keep statistics, remove only the branch
+      return client.request<{ deleted: boolean, id: string, purged?: boolean }>(`/api/merchant/branches/${id}`, {
         method: 'DELETE',
-        query: { force: true },
-        successMessage: 'Филиал удалён'
+        ...(options.hard ? { query: { hard: true } } : {}),
+        successMessage: options.hard ? 'Филиал удалён безвозвратно' : 'Филиал удалён'
       })
     },
 
@@ -210,10 +211,12 @@ export function useMerchantApi() {
       })
     },
 
-    deleteBarber(id: string) {
-      return client.request<{ deleted: boolean, id: string }>(`/api/merchant/barbers/${id}`, {
+    deleteBarber(id: string, options: { hard?: boolean } = {}) {
+      // hard: true -> full purge (visits + payments); default -> keep statistics, remove only barber + login/access
+      return client.request<{ deleted: boolean, id: string, purged?: boolean }>(`/api/merchant/barbers/${id}`, {
         method: 'DELETE',
-        successMessage: 'Барбер удалён'
+        ...(options.hard ? { query: { hard: true } } : {}),
+        successMessage: options.hard ? 'Барбер удалён безвозвратно' : 'Барбер удалён'
       })
     },
 

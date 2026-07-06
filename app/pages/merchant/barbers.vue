@@ -287,14 +287,25 @@ async function submitEdit() {
   }
 }
 
-async function removeRow(row: BarberRow) {
-  if (import.meta.client && !window.confirm(`Удалить барбера «${row.name}»?`)) {
-    return
-  }
+const deleteOpen = ref(false)
+const deleteHard = ref(false)
+const deleteTarget = ref<BarberRow | null>(null)
+
+function removeRow(row: BarberRow) {
+  deleteTarget.value = row
+  deleteHard.value = false
+  deleteOpen.value = true
+}
+
+async function confirmDelete() {
+  const row = deleteTarget.value
+  if (!row) return
 
   submitting.value = true
   try {
-    await merchantApi.deleteBarber(row.id)
+    await merchantApi.deleteBarber(row.id, { hard: deleteHard.value })
+    deleteOpen.value = false
+    deleteTarget.value = null
     await refresh()
   }
   finally {
@@ -576,6 +587,42 @@ async function removeRow(row: BarberRow) {
             </UButton>
             <UButton color="primary" :loading="submitting" :disabled="!branchOptions.length" @click="submitEdit">
               Сохранить
+            </UButton>
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="deleteOpen"
+        class="sm:max-w-md"
+        title="Удалить барбера"
+        :description="deleteTarget ? `Барбер «${deleteTarget.name}» будет удалён, вход в систему для него перестанет работать.` : ''"
+      >
+        <template #body>
+          <div class="space-y-4">
+            <div class="flex items-start gap-3 rounded-xl border p-3" :class="deleteHard ? 'border-error-300 bg-error-50/60' : 'border-charcoal-200 bg-charcoal-50/70'">
+              <USwitch v-model="deleteHard" color="error" />
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-charcoal-950">
+                  Удалить всё безвозвратно
+                </p>
+                <p class="text-xs text-charcoal-500">
+                  {{ deleteHard
+                    ? 'Будут удалены визиты барбера в очереди и связанные платежи. Финансовая история изменится. Отменить нельзя.'
+                    : 'Статистика и платежи сохранятся (барбер будет отвязан от них). Удалится только сам барбер и его доступы.' }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template #footer>
+          <div class="flex flex-wrap justify-end gap-3">
+            <UButton color="neutral" variant="ghost" :disabled="submitting" @click="deleteOpen = false">
+              Отмена
+            </UButton>
+            <UButton :color="deleteHard ? 'error' : 'primary'" :loading="submitting" @click="confirmDelete">
+              {{ deleteHard ? 'Удалить безвозвратно' : 'Удалить' }}
             </UButton>
           </div>
         </template>
