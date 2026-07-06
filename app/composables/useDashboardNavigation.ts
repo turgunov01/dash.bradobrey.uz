@@ -39,6 +39,7 @@ export function useDashboardNavigation() {
           { icon: "i-lucide-users", label: "Сотрудники", to: "/barbers" },
           { icon: "i-lucide-store", label: "Филиалы", to: "/branches" },
           { icon: "i-lucide-users-round", label: "Клиенты", to: "/clients" },
+          { icon: "i-lucide-warehouse", label: "Склад", to: "/warehouse" },
           { icon: "i-lucide-wallet", label: "Финансы", to: "/finance" },
         ],
       },

@@ -7,6 +7,7 @@ const barbersApi = useBarbersApi()
 const kioskApi = useKioskApi()
 const breakMinutes = ref(10)
 const completing = ref(false)
+const shifting = ref(false)
 const paymentModalOpen = ref(false)
 const completingItem = ref<QueueItem | null>(null)
 
@@ -77,6 +78,30 @@ async function returnFromBreak() {
   await Promise.all([sessionStore.ensureLoaded(), refresh()])
 }
 
+async function startShift() {
+  shifting.value = true
+
+  try {
+    await barbersApi.startShift()
+    await Promise.all([sessionStore.ensureLoaded({ force: true }), refresh()])
+  }
+  finally {
+    shifting.value = false
+  }
+}
+
+async function endShift() {
+  shifting.value = true
+
+  try {
+    await barbersApi.endShift()
+    await Promise.all([sessionStore.ensureLoaded({ force: true }), refresh()])
+  }
+  finally {
+    shifting.value = false
+  }
+}
+
 async function callItem(item: any) {
   await barbersApi.callQueue(String(item.id))
   await refresh()
@@ -124,9 +149,31 @@ function openItem(item: any) {
         </template>
 
         <template #right>
-          <UBadge :color="sessionStore.barber?.is_on_break ? 'warning' : 'primary'" variant="soft">
-            {{ sessionStore.barber?.is_on_break ? 'На перерыве' : 'На смене' }}
+          <UBadge
+            :color="sessionStore.barber?.is_on_break ? 'warning' : (sessionStore.barber?.is_on_shift ? 'primary' : 'neutral')"
+            variant="soft"
+          >
+            {{ sessionStore.barber?.is_on_break ? 'На перерыве' : (sessionStore.barber?.is_on_shift ? 'На смене' : 'Не на смене') }}
           </UBadge>
+          <UButton
+            v-if="!sessionStore.barber?.is_on_shift"
+            color="primary"
+            icon="i-lucide-play"
+            :loading="shifting"
+            @click="startShift"
+          >
+            Начать смену
+          </UButton>
+          <UButton
+            v-else
+            color="neutral"
+            icon="i-lucide-square"
+            :loading="shifting"
+            variant="outline"
+            @click="endShift"
+          >
+            Завершить смену
+          </UButton>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
@@ -185,6 +232,31 @@ function openItem(item: any) {
                 <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
                   <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Специализация</p>
                   <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ sessionStore.barber?.specialization || 'Общие услуги' }}</p>
+                </div>
+              </div>
+
+              <div class="space-y-3 rounded-[1.5rem] border border-charcoal-200 bg-white/80 p-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Управление сменой</p>
+                <div class="flex flex-wrap gap-3">
+                  <UButton
+                    v-if="!sessionStore.barber?.is_on_shift"
+                    color="primary"
+                    icon="i-lucide-play"
+                    :loading="shifting"
+                    @click="startShift"
+                  >
+                    Начать смену
+                  </UButton>
+                  <UButton
+                    v-else
+                    color="neutral"
+                    icon="i-lucide-square"
+                    :loading="shifting"
+                    variant="outline"
+                    @click="endShift"
+                  >
+                    Завершить смену
+                  </UButton>
                 </div>
               </div>
 

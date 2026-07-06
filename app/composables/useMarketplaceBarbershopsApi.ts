@@ -90,9 +90,11 @@ export function useMarketplaceBarbershopsApi() {
     },
 
     deleteMerchant(barbershopId: string, merchantId: string) {
+      // Hard delete: the merchant row is permanently removed from the backend.
       return client.request<{ deleted: boolean, id: string, item?: unknown }>(`/api/marketplace/barbershops/${barbershopId}/merchant`, {
         body: { id: merchantId },
         method: 'DELETE',
+        query: { hard: true },
         successMessage: 'Аккаунт мерчанта удалён'
       })
     }

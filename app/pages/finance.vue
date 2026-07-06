@@ -25,6 +25,15 @@ type FinanceEmployeeRow = {
   role: string | null
 }
 
+type FinanceOverviewBranchRow = {
+  id: string
+  name: string
+  orders: number
+  payroll: number
+  purchases: number
+  turnover: number
+}
+
 type FinanceDraftStorage = Record<string, FinanceSnapshotPayload>
 type FinanceMoneyField = 'advances' | 'penalty' | 'salary'
 
@@ -376,6 +385,46 @@ function buildEmployeeTitle(item: Record<string, any>) {
   return name || login || `Сотрудник ${String(item?.id || '').slice(0, 6)}`
 }
 
+function asRecord(value: unknown) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, any>
+    : null
+}
+
+function unwrapOverviewResponse(value: unknown) {
+  const source = asRecord(value)
+
+  if (!source) {
+    return {}
+  }
+
+  return asRecord(source.overview) || asRecord(source.data) || source
+}
+
+function pickNumber(source: Record<string, any>, keys: string[]) {
+  for (const key of keys) {
+    const amount = toNumberOrNull(source?.[key])
+
+    if (amount !== null) {
+      return amount
+    }
+  }
+
+  return 0
+}
+
+function pickArray(source: Record<string, any>, keys: string[]) {
+  for (const key of keys) {
+    const value = source?.[key]
+
+    if (Array.isArray(value)) {
+      return value as Record<string, any>[]
+    }
+  }
+
+  return []
+}
+
 const period = ref(currentPeriodKey())
 const periodKey = computed(() => (/^\d{4}-\d{2}$/.test(period.value) ? period.value : currentPeriodKey()))
 const periodRange = computed(() => getPeriodRange(periodKey.value))
@@ -384,6 +433,13 @@ const remoteLoading = ref(false)
 const remoteError = ref<unknown>(null)
 const hasLocalDraft = ref(false)
 const dirty = ref(false)
+
+const { data: overviewData, pending: overviewPending, refresh: refreshOverview } = await useAsyncData('finance-overview', async () => {
+  return await financeApi.overview(periodKey.value, { silent: true })
+}, {
+  default: () => ({}),
+  watch: [periodKey]
+})
 
 const draftsStorage = useStorage<FinanceDraftStorage>('finance-drafts', {}, undefined, {
   deep: true,
@@ -528,6 +584,7 @@ async function saveToRemote() {
 async function refreshAll() {
   await Promise.allSettled([
     refreshEmployees(),
+    refreshOverview(),
     refreshFinanceHistory(),
     refreshFinanceServices(),
     loadRemoteSnapshot()
@@ -590,6 +647,69 @@ const employees = computed<FinanceEmployeeRow[]>(() =>
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 )
+
+const branchNameMap = computed(() =>
+  new Map(
+    branchStore.branches.map(branch => [
+      String(branch.id),
+      String(branch.name || branch.id)
+    ])
+  )
+)
+
+const overviewSource = computed(() => unwrapOverviewResponse(overviewData.value))
+
+const overviewBranchRows = computed<FinanceOverviewBranchRow[]>(() => {
+  const items = pickArray(overviewSource.value, [
+    'branches',
+    'branch_breakdown',
+    'branchBreakdown',
+    'by_branch',
+    'byBranch',
+    'revenue_by_branch',
+    'turnover_by_branch'
+  ])
+
+  return items.flatMap((item, index) => {
+    const id = normalizeText(
+      item.branch_id
+      || item.branchId
+      || item.id
+      || item.object_id
+      || item.objectId
+    ) || `branch-${index}`
+    const name = normalizeText(
+      item.branch_name
+      || item.branchName
+      || item.name
+      || item.title
+    ) || branchNameMap.value.get(id) || id
+
+    return [{
+      id,
+      name,
+      orders: pickNumber(item, ['orders', 'orders_count', 'ordersCount', 'completed', 'completed_count']),
+      payroll: pickNumber(item, ['payroll', 'payroll_total', 'salary_fund', 'salary_total', 'salaries_total']),
+      purchases: pickNumber(item, ['purchases', 'purchases_total', 'purchase_total', 'warehouse_purchases']),
+      turnover: pickNumber(item, ['turnover', 'turnover_total', 'revenue', 'revenue_total', 'total_revenue', 'amount', 'total'])
+    }]
+  })
+})
+
+const overviewTotals = computed(() => {
+  const source = overviewSource.value
+  const branches = overviewBranchRows.value
+  const fallbackTurnover = branches.reduce((sum, row) => sum + row.turnover, 0)
+  const fallbackPayroll = branches.reduce((sum, row) => sum + row.payroll, 0)
+  const fallbackPurchases = branches.reduce((sum, row) => sum + row.purchases, 0)
+
+  return {
+    branches: branches.length || pickNumber(source, ['branches_count', 'branchesCount', 'branch_count']),
+    payroll: pickNumber(source, ['payroll', 'payroll_total', 'salary_fund', 'salary_total', 'salaries_total']) || fallbackPayroll,
+    purchases: pickNumber(source, ['purchases', 'purchases_total', 'purchase_total', 'warehouse_purchases']) || fallbackPurchases,
+    turnover: pickNumber(source, ['turnover', 'turnover_total', 'revenue', 'revenue_total', 'total_revenue', 'gross_turnover']) || fallbackTurnover
+  }
+})
 
 const servicePriceMap = computed(() =>
   new Map<string, number>(
@@ -677,6 +797,14 @@ const totals = computed(() => {
   }
 })
 
+const overviewBranchColumns: TableColumn<FinanceOverviewBranchRow>[] = [
+  { accessorKey: 'name', header: 'Филиал' },
+  { accessorKey: 'turnover', header: 'Оборот' },
+  { accessorKey: 'payroll', header: 'Зарплатный фонд' },
+  { accessorKey: 'purchases', header: 'Закупки' },
+  { accessorKey: 'orders', header: 'Заказы' }
+]
+
 const columns: TableColumn<FinanceEmployeeRow>[] = [
   { accessorKey: 'name', header: 'Сотрудник' },
   { id: 'salary', header: 'План' },
@@ -720,7 +848,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             color="neutral"
             variant="outline"
             icon="i-lucide-refresh-cw"
-            :loading="employeesPending || financeHistoryPending || financeServicesPending || remoteLoading"
+            :loading="employeesPending || financeHistoryPending || financeServicesPending || remoteLoading || overviewPending"
             @click="refreshAll"
           >
             Обновить
@@ -736,6 +864,73 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
         description="Данные сохраняются локально в браузере. Чтобы включить синхронизацию, примените backend-миграцию finance_snapshots и повторите сохранение."
         class="mb-4"
       />
+
+      <div class="grid gap-4 pb-4 md:grid-cols-4">
+        <DashboardMetricCard
+          description="Оборот по всем филиалам за выбранный месяц из backend finance overview."
+          icon="i-lucide-wallet"
+          label="Оборот"
+          :value="formatMoney(overviewTotals.turnover)"
+        />
+        <DashboardMetricCard
+          description="Сумма зарплатного фонда из finance_snapshots."
+          icon="i-lucide-users"
+          label="Зарплатный фонд"
+          :value="formatMoney(overviewTotals.payroll)"
+        />
+        <DashboardMetricCard
+          description="Закупки склада за выбранный период."
+          icon="i-lucide-package"
+          label="Закупки"
+          :value="formatMoney(overviewTotals.purchases)"
+        />
+        <DashboardMetricCard
+          description="Филиалы, попавшие в финансовую сводку."
+          icon="i-lucide-store"
+          label="Филиалы"
+          :value="formatCount(overviewTotals.branches)"
+        />
+      </div>
+
+      <UCard
+        v-if="overviewBranchRows.length"
+        class="warm-card mb-4 rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+      >
+        <template #header>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="barbershop-heading text-xl text-charcoal-950">
+                Разбивка по филиалам
+              </h2>
+              <p class="text-sm text-charcoal-500">
+                Данные из /api/finance/overview за {{ periodKey }}.
+              </p>
+            </div>
+            <UBadge color="neutral" size="lg" variant="soft">
+              {{ overviewBranchRows.length }} филиалов
+            </UBadge>
+          </div>
+        </template>
+
+        <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <UTable :columns="overviewBranchColumns" :data="overviewBranchRows" :loading="overviewPending">
+            <template #turnover-cell="{ row }">
+              <span class="font-semibold text-charcoal-950">
+                {{ formatMoney(row.original.turnover) }}
+              </span>
+            </template>
+            <template #payroll-cell="{ row }">
+              {{ formatMoney(row.original.payroll) }}
+            </template>
+            <template #purchases-cell="{ row }">
+              {{ formatMoney(row.original.purchases) }}
+            </template>
+            <template #orders-cell="{ row }">
+              {{ formatCount(row.original.orders) }}
+            </template>
+          </UTable>
+        </div>
+      </UCard>
 
       <div class="grid gap-3 pb-4 md:grid-cols-5">
         <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200 bg-white/90 md:col-span-5">

@@ -206,25 +206,30 @@ async function submitCreateMerchant() {
   }
 }
 
-async function deleteMerchantAccount() {
+function resolveMerchantTarget() {
   const account = merchantAccount.value
   const merchantId = normalizeText(account?.id)
-  const login = normalizeText(account?.login)
 
   if (!merchantId) {
     apiClient.notifyError(new Error('merchant id is required'), 'Не удалось определить id мерчанта.')
-    return
+    return null
   }
 
-  const label = login ? `«${login}»` : merchantId
+  const login = normalizeText(account?.login)
+  return { label: login ? `«${login}»` : merchantId, merchantId }
+}
 
-  if (import.meta.client && !window.confirm(`Удалить аккаунт мерчанта ${label}? Вход в /merchant для этого логина перестанет работать.`)) {
+async function deleteMerchantAccount() {
+  const target = resolveMerchantTarget()
+  if (!target) return
+
+  if (import.meta.client && !window.confirm(`Удалить аккаунт мерчанта ${target.label} безвозвратно? Запись будет удалена из базы, восстановить её нельзя.`)) {
     return
   }
 
   merchantDeleting.value = true
   try {
-    await marketplaceBarbershopsApi.deleteMerchant(barbershopId.value, merchantId)
+    await marketplaceBarbershopsApi.deleteMerchant(barbershopId.value, target.merchantId)
     lastCreatedMerchant.value = null
     await refreshMerchants()
   }

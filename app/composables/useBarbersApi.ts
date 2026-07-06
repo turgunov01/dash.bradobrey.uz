@@ -119,6 +119,18 @@ export function useBarbersApi() {
         successMessage: "Услуга начата",
       });
     },
+    startShift() {
+      return client.request("/api/barbers/shift/start", {
+        method: "POST",
+        successMessage: "Смена начата",
+      });
+    },
+    endShift() {
+      return client.request("/api/barbers/shift/end", {
+        method: "POST",
+        successMessage: "Смена завершена",
+      });
+    },
     update(id: string, payload: BarberUpdatePayload | FormData) {
       return client.request(`/api/barbers/${id}`, {
         body: payload,
