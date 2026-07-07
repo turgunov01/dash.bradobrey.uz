@@ -63,7 +63,18 @@ export function useDashboardNavigation() {
       {
         icon: "i-lucide-chart-column-big",
         label: "Статистика",
-        to: "/statistics",
+        children: [
+          {
+            icon: "i-lucide-clock",
+            label: "История записей",
+            to: "/statistics/history",
+          },
+          {
+            icon: "i-lucide-users",
+            label: "Сотрудники",
+            to: "/statistics/employees",
+          },
+        ],
       },
       {
         icon: "i-lucide-shopping-bag",
