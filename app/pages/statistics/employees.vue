@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useStatisticsAnalytics } from '~/composables/useStatisticsAnalytics'
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 
 const {

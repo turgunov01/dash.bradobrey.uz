@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ChartDoughnut from '~/components/shared/ChartDoughnut.vue'
+import { useStatisticsAnalytics } from '~/composables/useStatisticsAnalytics'
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 
 const {
