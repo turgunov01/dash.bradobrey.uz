@@ -120,11 +120,15 @@ function getEmployeePhotoUrl(value: unknown) {
 
 const formModalOpen = ref(false)
 const detailsModalOpen = ref(false)
+const reportModalOpen = ref(false)
 const isSyncingRolePreset = ref(false)
 const submitting = ref(false)
 const removingId = ref('')
 const editingId = ref('')
 const selectedEmployeeId = ref('')
+const reportEmployeeId = ref('')
+const reportFrom = ref('')
+const reportTo = ref('')
 const avatarFile = ref<File | null>(null)
 const avatarObjectUrl = ref('')
 
@@ -413,6 +417,126 @@ function getHistoryAmount(item: Record<string, any>, priceByServiceId: Map<strin
   return getHistoryServiceIds(item).reduce((sum, serviceId) => sum + (priceByServiceId.get(serviceId) || 0), 0)
 }
 
+function getHistoryStartValue(item: Record<string, any>) {
+  return normalizeText(
+    item.called_at
+    || item.calledAt
+    || item.started_at
+    || item.startedAt
+    || item.created_at
+    || item.createdAt
+  )
+}
+
+function getHistoryEndValue(item: Record<string, any>) {
+  return normalizeText(
+    item.completed_at
+    || item.completedAt
+    || item.finished_at
+    || item.finishedAt
+    || item.updated_at
+    || item.updatedAt
+  )
+}
+
+function toValidDate(value: string | null) {
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(value)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatClock(value: string | null) {
+  const date = toValidDate(value)
+
+  if (!date) {
+    return '—'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    second: '2-digit'
+  }).format(date)
+}
+
+function formatDurationSeconds(totalSeconds: number | null) {
+  if (totalSeconds === null || !Number.isFinite(totalSeconds) || totalSeconds < 0) {
+    return '—'
+  }
+
+  const seconds = Math.round(totalSeconds)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const rest = seconds % 60
+
+  return `${hours} ч. ${minutes} мин. ${rest} сек.`
+}
+
+type PaymentSplit = {
+  card: number
+  cash: number
+  certificate: number
+  other: number
+}
+
+function getHistoryPaymentSplit(item: Record<string, any>, priceByServiceId: Map<string, number>): PaymentSplit {
+  const split: PaymentSplit = { card: 0, cash: 0, certificate: 0, other: 0 }
+  const payments = Array.isArray(item.payments) ? item.payments : []
+  let matched = false
+
+  for (const payment of payments) {
+    const amount = normalizeNumber(payment?.amount)
+
+    if (amount <= 0) {
+      continue
+    }
+
+    const method = String(payment?.method || '').trim().toLowerCase()
+    matched = true
+
+    if (method === 'cash') {
+      split.cash += amount
+    }
+    else if (method === 'card') {
+      split.card += amount
+    }
+    else if (method === 'certificate') {
+      split.certificate += amount
+    }
+    else {
+      split.other += amount
+    }
+  }
+
+  if (!matched) {
+    const total = getHistoryAmount(item, priceByServiceId)
+
+    if (total > 0) {
+      const method = String(item.payment_method || '').trim().toLowerCase()
+
+      if (method === 'cash') {
+        split.cash += total
+      }
+      else if (method === 'card') {
+        split.card += total
+      }
+      else if (method === 'certificate') {
+        split.certificate += total
+      }
+      else {
+        split.other += total
+      }
+    }
+  }
+
+  return split
+}
+
 const columns: TableColumn<EmployeeRow>[] = [
   { accessorKey: 'login', header: 'Логин' },
   { accessorKey: 'name', header: 'Сотрудник' },
@@ -503,6 +627,57 @@ const { data: insightsData, pending: insightsPending, refresh: refreshInsights }
   watch: [() => branchStore.activeBranchId]
 })
 
+const { data: reportData, pending: reportPending } = await useAsyncData('employee-detail-report', async () => {
+  const employeeId = reportEmployeeId.value
+
+  if (!employeeId) {
+    return { items: [] as Record<string, any>[] }
+  }
+
+  const branchId = branchStore.activeBranchId || undefined
+  const startDate = reportFrom.value
+  const endDate = reportTo.value
+  const range: Record<string, string> = {}
+
+  if (startDate) {
+    range.from = startDate
+    range.start_date = startDate
+  }
+
+  if (endDate) {
+    range.to = endDate
+    range.end_date = endDate
+  }
+
+  const response = branchId
+    ? await historyApi.branch(branchId, range)
+    : await historyApi.list(range)
+
+  const items = extractHistoryItems(response).filter((item) => {
+    if (getHistoryBarberId(item) !== employeeId) {
+      return false
+    }
+
+    const timestamp = getHistoryTimestamp(item)
+    const dateKey = timestamp ? timestamp.slice(0, 10) : null
+
+    if (dateKey && startDate && dateKey < startDate) {
+      return false
+    }
+
+    if (dateKey && endDate && dateKey > endDate) {
+      return false
+    }
+
+    return true
+  })
+
+  return { items }
+}, {
+  server: false,
+  watch: [reportEmployeeId, reportFrom, reportTo, () => branchStore.activeBranchId]
+})
+
 const employeeRows = computed<EmployeeRow[]>(() => data.value?.rows || [])
 const filteredRows = computed<EmployeeRow[]>(() => {
   const loginNeedle = searchLogin.value.trim().toLowerCase()
@@ -589,6 +764,70 @@ const selectedEmployee = computed(() =>
 )
 const selectedEmployeeInsight = computed(() =>
   selectedEmployeeId.value ? employeeInsightMap.value.get(selectedEmployeeId.value) || null : null
+)
+
+const reportEmployee = computed(() =>
+  employeeRows.value.find(row => row.id === reportEmployeeId.value) || null
+)
+
+const reportRows = computed(() => {
+  const items = [...(reportData.value?.items || [])].sort((left, right) => {
+    const leftStart = toValidDate(getHistoryStartValue(left))
+    const rightStart = toValidDate(getHistoryStartValue(right))
+
+    return (leftStart ? leftStart.getTime() : 0) - (rightStart ? rightStart.getTime() : 0)
+  })
+
+  let previousEnd: Date | null = null
+
+  return items.map((item, index) => {
+    const startValue = getHistoryStartValue(item)
+    const endValue = getHistoryEndValue(item)
+    const startDate = toValidDate(startValue)
+    const endDate = toValidDate(endValue)
+    const durationSeconds = startDate && endDate && endDate > startDate
+      ? (endDate.getTime() - startDate.getTime()) / 1000
+      : null
+    const idleSeconds = previousEnd && startDate && startDate > previousEnd
+      ? (startDate.getTime() - previousEnd.getTime()) / 1000
+      : null
+
+    if (endDate) {
+      previousEnd = endDate
+    }
+
+    const split = getHistoryPaymentSplit(item, servicePriceMap.value)
+    const splitTotal = split.cash + split.card + split.certificate + split.other
+    const total = splitTotal > 0 ? splitTotal : getHistoryAmount(item, servicePriceMap.value)
+
+    return {
+      card: split.card,
+      cash: split.cash,
+      certificate: split.certificate,
+      client: item.client?.name || item.customer_name || item.user_name || 'Клиент',
+      durationLabel: formatDurationSeconds(durationSeconds),
+      endLabel: formatClock(endValue),
+      id: String(item.id ?? `${index}`),
+      idleLabel: idleSeconds === null ? '—' : formatDurationSeconds(idleSeconds),
+      index: index + 1,
+      startLabel: formatClock(startValue),
+      status: item.status,
+      total
+    }
+  })
+})
+
+const reportSummary = computed(() =>
+  reportRows.value.reduce(
+    (acc, row) => ({
+      card: acc.card + row.card,
+      cash: acc.cash + row.cash,
+      certificate: acc.certificate + row.certificate,
+      count: acc.count + 1,
+      total: acc.total + row.total
+    }),
+    { card: 0, cash: 0, certificate: 0, count: 0, total: 0 }
+  )
 )
 
 const selectedRoleDescription = computed(() => roleDescriptions[form.role])
@@ -720,6 +959,22 @@ async function refreshDirectory() {
 function openEmployeeDetails(row: EmployeeRow) {
   selectedEmployeeId.value = row.id
   detailsModalOpen.value = true
+}
+
+function openEmployeeReport(row: EmployeeRow) {
+  const range = currentPeriodRange()
+
+  reportEmployeeId.value = row.id
+  reportFrom.value = range.start_date
+  reportTo.value = range.end_date
+  reportModalOpen.value = true
+}
+
+function resetReportFilters() {
+  const range = currentPeriodRange()
+
+  reportFrom.value = range.start_date
+  reportTo.value = range.end_date
 }
 
 function clearAvatar() {
@@ -1020,6 +1275,17 @@ onBeforeUnmount(() => {
 
                 <template #actions-cell="{ row }">
                   <div class="flex justify-end gap-2">
+                    <UTooltip text="Детали записей">
+                      <UButton
+                        aria-label="Открыть детали записей сотрудника"
+                        color="neutral"
+                        icon="i-lucide-table-2"
+                        square
+                        variant="ghost"
+                        @click="openEmployeeReport(row.original)"
+                      />
+                    </UTooltip>
+
                     <UTooltip text="Статистика">
                       <UButton
                         aria-label="Открыть статистику сотрудника"
@@ -1207,6 +1473,116 @@ onBeforeUnmount(() => {
             title="История пуста"
           />
         </div>
+      </div>
+    </template>
+  </UModal>
+
+  <UModal
+    v-model:open="reportModalOpen"
+    class="sm:max-w-[1080px]"
+    :title="reportEmployee?.name || 'Детали записей'"
+    :description="reportEmployee ? `${reportEmployee.branch} · ${getEmployeeRoleLabel(reportEmployee.role)}` : undefined"
+  >
+    <template #body>
+      <div class="space-y-4">
+        <div class="grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+          <UFormField label="От">
+            <UInput v-model="reportFrom" class="w-full" type="date" />
+          </UFormField>
+          <UFormField label="До">
+            <UInput v-model="reportTo" class="w-full" type="date" />
+          </UFormField>
+          <UButton
+            color="neutral"
+            icon="i-lucide-rotate-ccw"
+            variant="outline"
+            @click="resetReportFilters"
+          >
+            Текущий месяц
+          </UButton>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-5">
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Записей</p>
+            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatCount(reportSummary.count) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Наличные</p>
+            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.cash) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Безнал</p>
+            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.card) }}</p>
+          </div>
+          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Сертификат</p>
+            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.certificate) }}</p>
+          </div>
+          <div class="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3">
+            <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Всего</p>
+            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.total) }}</p>
+          </div>
+        </div>
+
+        <div v-if="reportPending" class="flex items-center justify-center rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-10 text-sm text-charcoal-500">
+          <UIcon class="mr-2 animate-spin text-lg" name="i-lucide-loader-circle" />
+          Загрузка записей…
+        </div>
+
+        <div v-else-if="reportRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <div class="max-h-[55vh] overflow-auto">
+            <table class="w-full min-w-[64rem] border-collapse text-sm">
+              <thead class="sticky top-0 z-10 bg-charcoal-50/95">
+                <tr class="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-500">
+                  <th class="px-3 py-3 text-left">№</th>
+                  <th class="px-3 py-3 text-left">Клиент</th>
+                  <th class="px-3 py-3 text-left">Начало</th>
+                  <th class="px-3 py-3 text-left">Окончание</th>
+                  <th class="px-3 py-3 text-left">Время</th>
+                  <th class="px-3 py-3 text-right">Наличные</th>
+                  <th class="px-3 py-3 text-right">Безнал</th>
+                  <th class="px-3 py-3 text-right">Сертификат</th>
+                  <th class="px-3 py-3 text-right">Всего</th>
+                  <th class="px-3 py-3 text-left">Простой</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-charcoal-100">
+                <tr v-for="row in reportRows" :key="row.id" class="text-charcoal-700">
+                  <td class="px-3 py-3 text-charcoal-500">{{ row.index }}</td>
+                  <td class="px-3 py-3">
+                    <span class="font-medium text-charcoal-950">{{ row.client }}</span>
+                  </td>
+                  <td class="px-3 py-3 tabular-nums">{{ row.startLabel }}</td>
+                  <td class="px-3 py-3 tabular-nums">{{ row.endLabel }}</td>
+                  <td class="px-3 py-3 text-charcoal-600">{{ row.durationLabel }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ row.cash ? formatMoney(row.cash) : '—' }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ row.card ? formatMoney(row.card) : '—' }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ row.certificate ? formatMoney(row.certificate) : '—' }}</td>
+                  <td class="px-3 py-3 text-right font-semibold tabular-nums text-charcoal-950">{{ formatMoney(row.total) }}</td>
+                  <td class="px-3 py-3 text-charcoal-600">{{ row.idleLabel }}</td>
+                </tr>
+              </tbody>
+              <tfoot class="sticky bottom-0 bg-charcoal-50/95">
+                <tr class="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-600">
+                  <td class="px-3 py-3" colspan="5">Итого · {{ formatCount(reportSummary.count) }} записей</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.cash) }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.card) }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.certificate) }}</td>
+                  <td class="px-3 py-3 text-right tabular-nums text-charcoal-950">{{ formatMoney(reportSummary.total) }}</td>
+                  <td class="px-3 py-3" />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <SharedEmptyState
+          v-else
+          description="За выбранный период у сотрудника нет записей."
+          icon="i-lucide-calendar-x"
+          title="Записей нет"
+        />
       </div>
     </template>
   </UModal>

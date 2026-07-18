@@ -138,6 +138,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // The dashboard theme is light-only (see app/assets/css/main.css — no dark
+  // variants). Force light mode so Nuxt UI does not follow the OS/browser dark
+  // preference and flip text tokens to white on the light surfaces.
+  colorMode: {
+    preference: 'light',
+    fallback: 'light'
+  },
+
   runtimeConfig: {
     adminBackendTokenCookieName: 'brado_admin_backend_token',
     adminSessionCookieName: 'brado_admin_session',
