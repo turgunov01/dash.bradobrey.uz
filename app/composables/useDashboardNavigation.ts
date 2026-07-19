@@ -39,7 +39,37 @@ export function useDashboardNavigation() {
           { icon: "i-lucide-users", label: "Сотрудники", to: "/barbers" },
           { icon: "i-lucide-store", label: "Филиалы", to: "/branches" },
           { icon: "i-lucide-users-round", label: "Клиенты", to: "/clients" },
-          { icon: "i-lucide-warehouse", label: "Склад", to: "/warehouse" },
+          {
+            icon: "i-lucide-warehouse",
+            label: "Склад",
+            children: [
+              {
+                icon: "i-lucide-box",
+                label: "Позиции",
+                to: "/warehouse/positions",
+              },
+              {
+                icon: "i-lucide-layers",
+                label: "Остатки",
+                to: "/warehouse/stocks",
+              },
+              {
+                icon: "i-lucide-shopping-cart",
+                label: "Закупки",
+                to: "/warehouse/purchases",
+              },
+              {
+                icon: "i-lucide-clipboard-list",
+                label: "Шаблоны",
+                to: "/warehouse/templates",
+              },
+              {
+                icon: "i-lucide-folder",
+                label: "Категории",
+                to: "/warehouse/categories",
+              },
+            ],
+          },
           { icon: "i-lucide-wallet", label: "Финансы", to: "/finance" },
         ],
       },

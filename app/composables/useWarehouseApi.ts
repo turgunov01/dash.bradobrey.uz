@@ -98,6 +98,32 @@ export function useWarehouseApi() {
       return remove('purchases', id, 'Закупка удалена')
     },
 
+    categories(query?: Record<string, unknown>) {
+      return client.request<WarehouseListResponse>('/api/warehouse/categories', {
+        query: withUnscopedQuery(query)
+      })
+    },
+    createCategory(body: WarehouseRecord) {
+      return client.request<WarehouseRecord>('/api/warehouse/categories', {
+        body,
+        method: 'POST',
+        successMessage: 'Категория создана'
+      })
+    },
+    updateCategory(id: string, body: WarehouseRecord) {
+      return client.request<WarehouseRecord>(`/api/warehouse/categories/${id}`, {
+        body,
+        method: 'PATCH',
+        successMessage: 'Категория обновлена'
+      })
+    },
+    deleteCategory(id: string) {
+      return client.request<WarehouseRecord>(`/api/warehouse/categories/${id}`, {
+        method: 'DELETE',
+        successMessage: 'Категория удалена'
+      })
+    },
+
     summary(query?: Record<string, unknown>) {
       return client.request<WarehouseRecord>('/api/warehouse/summary', {
         query: withUnscopedQuery(query)
