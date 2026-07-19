@@ -182,7 +182,6 @@ const {
             <div v-if="filteredHistory.length" class="grid gap-6 xl:grid-cols-[0.55fr_0.45fr] items-center">
               <SharedPieChart
                 :items="statusPieItems"
-                center-label="Записи"
                 empty-label="За выбранный диапазон нет записей."
                 :size="260"
               />
