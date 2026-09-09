@@ -74,6 +74,7 @@ export function useDashboardNavigation() {
           },
           { icon: "i-lucide-wallet", label: "Финансы", to: "/finance" },
           { icon: "i-lucide-receipt", label: "Расходы", to: "/warehouse/expenses" },
+          { icon: "i-lucide-badge-dollar-sign", label: "Штрафы", to: "/penalties" },
           { icon: "i-lucide-calendar-clock", label: "Verifix", to: "/verifix" },
         ],
       },
@@ -159,6 +160,14 @@ export function useDashboardNavigation() {
 
     return permissions.includes('expenses.read');
   });
+  const canViewPenalties = computed(() => {
+    const role = String(sessionStore.user?.role || '').trim().toLowerCase();
+    const explicit = sessionStore.user?.permissions;
+    const permissions = Array.isArray(explicit) && explicit.length
+      ? explicit as EmployeePermission[]
+      : employeeRolePermissionPresets[role as keyof typeof employeeRolePermissionPresets] || [];
+    return permissions.includes('penalties.read');
+  });
 
   function filterExpenseLinks(items: NavigationMenuItem[]): NavigationMenuItem[] {
     return items.flatMap((item) => {
@@ -167,6 +176,7 @@ export function useDashboardNavigation() {
       if (source.to === '/warehouse/expenses' && !canViewExpenses.value) {
         return [];
       }
+      if (source.to === '/penalties' && !canViewPenalties.value) return [];
 
       if (Array.isArray(source.children)) {
         return [{ ...source, children: filterExpenseLinks(source.children) }];

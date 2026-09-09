@@ -55,6 +55,8 @@ export const employeePermissions = [
   'expenses.create',
   'expenses.update',
   'expenses.delete',
+  'penalties.read',
+  'penalties.create',
   'promo.manage',
   'certificates.manage'
 ] as const
@@ -163,6 +165,14 @@ export const employeePermissionDefinitions: Record<EmployeePermission, Permissio
     description: 'Удаление расходов филиала.',
     label: 'Удаление расходов'
   },
+  'penalties.read': {
+    description: 'Просмотр штрафов сотрудников филиала.',
+    label: 'Просмотр штрафов'
+  },
+  'penalties.create': {
+    description: 'Создание штрафов сотрудникам филиала.',
+    label: 'Создание штрафов'
+  },
   'promo.manage': {
     description: 'Управление промокодами.',
     label: 'Промокоды'
@@ -214,6 +224,8 @@ export const employeePermissionSections: PermissionSection[] = [
       'expenses.create',
       'expenses.update',
       'expenses.delete',
+      'penalties.read',
+      'penalties.create',
       'promo.manage',
       'certificates.manage'
     ],
@@ -241,7 +253,9 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
     'services.read',
     'services.manage',
     'expenses.read',
-    'expenses.create'
+    'expenses.create',
+    'penalties.read',
+    'penalties.create'
   ],
   'super-barber': [
     'queue.read',
@@ -267,6 +281,8 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
     'expenses.create',
     'expenses.update',
     'expenses.delete',
+    'penalties.read',
+    'penalties.create',
     'promo.manage',
     'certificates.manage'
   ]
