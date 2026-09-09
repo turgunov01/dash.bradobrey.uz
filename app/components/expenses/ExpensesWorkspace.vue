@@ -14,6 +14,7 @@ type ExpenseRow = {
   created_by: string | null
   branch_id: string | null
   branch: string
+  can_edit: boolean
   name: string
 }
 
@@ -129,6 +130,7 @@ const rows = computed<ExpenseRow[]>(() => extractItems(data.value).map((item, in
     amount: number(item.amount || item.total_amount || item.totalAmount),
     branch: text(item.branch_name || item.branchName || item.branch?.name) || branch?.name || branchId || '—',
     branch_id: branchId,
+    can_edit: item.can_edit !== false,
     category: text(item.category || item.category_name || item.categoryName) || 'Прочее',
     comment: text(item.comment || item.description || item.note),
     created_at: dateOnly(item.spent_at || item.date || item.created_at || item.createdAt),
@@ -288,7 +290,7 @@ async function remove(row: ExpenseRow) {
               <template #comment-cell="{ row }">{{ row.original.comment || '—' }}</template>
               <template #actions-cell="{ row }">
                 <div class="flex justify-end gap-2">
-                  <UButton v-if="canUpdate" icon="i-lucide-pencil" size="xs" variant="ghost" @click="openEdit(row.original)" />
+                  <UButton v-if="canUpdate && row.original.can_edit" icon="i-lucide-pencil" size="xs" variant="ghost" @click="openEdit(row.original)" />
                   <UButton v-if="canDelete" icon="i-lucide-trash-2" color="error" size="xs" variant="ghost" :loading="submitting" @click="remove(row.original)" />
                 </div>
               </template>
