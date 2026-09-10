@@ -43,6 +43,7 @@ type FinanceMoneyField = 'advances' | 'salary'
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
 const financeApi = useFinanceApi()
+const penaltiesApi = usePenaltiesApi()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
 const verifixApi = useVerifixApi()
@@ -520,6 +521,80 @@ const { data: overviewData, pending: overviewPending, refresh: refreshOverview }
   watch: [periodKey]
 })
 
+const { data: manualPenaltiesData } = await useAsyncData('finance-manual-penalties', async () => {
+  const query: Record<string, unknown> = { period: periodKey.value }
+  if (branchStore.activeBranchId) query.branch_id = branchStore.activeBranchId
+  return await penaltiesApi.list(query)
+}, {
+  default: () => ({ items: [] }),
+  watch: [periodKey, () => branchStore.activeBranchId]
+})
+
+function extractPenaltyItems(value: unknown): Record<string, any>[] {
+  if (Array.isArray(value)) return value as Record<string, any>[]
+  if (!value || typeof value !== 'object') return []
+  const source = value as Record<string, any>
+  for (const key of ['items', 'data', 'rows', 'records', 'penalties']) {
+    if (Array.isArray(source[key])) return source[key]
+  }
+  return []
+}
+
+function penaltyItemAmount(item: Record<string, any>) {
+  const amount = normalizeNumber(item.amount ?? item.total_amount)
+  if (amount > 0 || item.source !== 'late_minutes') return Math.max(0, amount)
+  const minutes = normalizeNumber(item.late_minutes ?? item.late_by_minutes)
+  const rate = Number(penaltySettings.value?.penalty_per_minute ?? 0)
+  return calculateMinutePenalty(minutes, rate)
+}
+
+const manualPenaltiesByEmployee = computed(() => {
+  const result = new Map<string, number>()
+  for (const item of extractPenaltyItems(manualPenaltiesData.value)) {
+    if (item.canceled === true || item.source === 'late_minutes') continue
+    const employeeId = String(item.recipient?.id || item.recipient_id || '').trim()
+    if (!employeeId) continue
+    const amount = normalizeNumber(item.amount || item.total_amount)
+    result.set(employeeId, (result.get(employeeId) || 0) + Math.max(0, amount))
+  }
+  return result
+})
+
+const latePenaltiesByEmployee = computed(() => {
+  const result = new Map<string, number>()
+  for (const item of extractPenaltyItems(manualPenaltiesData.value)) {
+    if (item.canceled === true || item.source !== 'late_minutes') continue
+    const employeeId = String(item.recipient?.id || item.recipient_id || '').trim()
+    if (!employeeId) continue
+    result.set(employeeId, (result.get(employeeId) || 0) + penaltyItemAmount(item))
+  }
+  return result
+})
+
+const latePenaltyStatsByEmployee = computed(() => {
+  const result = new Map<string, { count: number, minutes: number }>()
+  for (const item of extractPenaltyItems(manualPenaltiesData.value)) {
+    if (item.canceled === true || item.source !== 'late_minutes') continue
+    const employeeId = String(item.recipient?.id || item.recipient_id || '').trim()
+    if (!employeeId) continue
+    const current = result.get(employeeId) || { count: 0, minutes: 0 }
+    current.count += 1
+    current.minutes += Math.max(0, normalizeNumber(item.late_minutes ?? item.late_by_minutes))
+    result.set(employeeId, current)
+  }
+  return result
+})
+
+const hasApiLatePenalties = computed(() => extractPenaltyItems(manualPenaltiesData.value).some(item => item.source === 'late_minutes'))
+
+const activePenaltyTotal = computed(() => {
+  const items = extractPenaltyItems(manualPenaltiesData.value)
+  return items.reduce((sum, item) => {
+    if (item.canceled === true) return sum
+    return sum + penaltyItemAmount(item)
+  }, 0)
+})
+
 const draftsStorage = useStorage<FinanceDraftStorage>('finance-drafts', {}, undefined, {
   deep: true,
   listenToStorageChanges: false
@@ -988,6 +1063,12 @@ const barberLateMap = computed(() => {
     }
 
     const source = event as VerifixEvent & Record<string, unknown>
+    const metadata = source.metadata && typeof source.metadata === 'object'
+      ? source.metadata as Record<string, unknown>
+      : {}
+    if (metadata.canceled === true) {
+      continue
+    }
     const barberId = normalizeText(source.barber_id ?? source.barberId)
     const occurredAt = getVerifixEventDate(event)
 
@@ -1032,7 +1113,8 @@ const lateTotals = computed(() => {
   let count = 0
   let minutes = 0
 
-  for (const value of barberLateMap.value.values()) {
+  const source = hasApiLatePenalties.value ? latePenaltyStatsByEmployee.value : barberLateMap.value
+  for (const value of source.values()) {
     count += value.count
     minutes += value.minutes
   }
@@ -1041,6 +1123,9 @@ const lateTotals = computed(() => {
 })
 
 function getEmployeeLate(id: string) {
+  if (hasApiLatePenalties.value) {
+    return latePenaltyStatsByEmployee.value.get(String(id || '').trim()) || { count: 0, minutes: 0 }
+  }
   return barberLateMap.value.get(String(id || '').trim()) || { count: 0, minutes: 0 }
 }
 
@@ -1050,8 +1135,14 @@ function calculatedPenaltyForEmployee(id: string) {
 
 function penaltyForEmployee(id: string) {
   const draft = payload.value.employees[String(id || '').trim()]
+  const employeeId = String(id || '').trim()
+  const manualPenalty = manualPenaltiesByEmployee.value.get(employeeId) || 0
+  const apiLatePenalty = latePenaltiesByEmployee.value.get(employeeId)
+  const latePenalty = apiLatePenalty === undefined ? calculatedPenaltyForEmployee(employeeId) : apiLatePenalty
 
-  return draft?.penalty_override ? Math.max(0, normalizeNumber(draft.penalty)) : calculatedPenaltyForEmployee(id)
+  return draft?.penalty_override
+    ? Math.max(0, normalizeNumber(draft.penalty)) + manualPenalty
+    : latePenalty + manualPenalty
 }
 
 function syncBarberPenalties() {
@@ -1132,7 +1223,7 @@ const totals = computed(() => {
     commission,
     netProfit: profit - payout,
     payout,
-    penalties,
+    penalties: extractPenaltyItems(manualPenaltiesData.value).length ? activePenaltyTotal.value : penalties,
     profit,
     plan
   }

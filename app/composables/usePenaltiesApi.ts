@@ -13,6 +13,12 @@ export function usePenaltiesApi() {
         method: 'POST',
         successMessage: 'Штраф создан'
       })
+    },
+    cancel(id: string) {
+      return client.request<{ penalty?: PenaltyRecord }>(`/api/penalties/${id}/cancel`, {
+        method: 'POST',
+        successMessage: 'Штраф отменён'
+      })
     }
   }
 }
