@@ -555,14 +555,16 @@ const branchStore = useBranchStore()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
 const apiClient = useApiClient()
+const route = useRoute()
 
 const page = ref(1)
 const itemsPerPage = 10
 const exporting = ref(false)
 const allBarbersValue = '__all_barbers__'
 const allStatusesValue = '__all_statuses__'
-const selectedBarberId = ref(allBarbersValue)
-const selectedStatus = ref(allStatusesValue)
+const allBranches = computed(() => route.query.scope === 'all')
+const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
+const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
 const dateFrom = ref('')
 const dateTo = ref('')
 
@@ -601,7 +603,7 @@ const historyQuery = computed(() => {
   const query: Record<string, string> = {}
   const range = historyDateRange.value
 
-  if (branchStore.activeBranchId) {
+  if (branchStore.activeBranchId && !allBranches.value) {
     query.branch_id = branchStore.activeBranchId
   }
 
@@ -634,7 +636,7 @@ const { data, pending, refresh } = await useAsyncData('history-current-filter', 
   return loadAllHistoryPages(historyQuery.value)
 }, {
   server: false,
-  watch: [() => branchStore.activeBranchId, selectedStatus, dateFrom, dateTo]
+  watch: [() => branchStore.activeBranchId, allBranches, selectedStatus, dateFrom, dateTo]
 })
 
 const { data: servicesData } = await useAsyncData('history-services', async () => {
@@ -906,7 +908,7 @@ async function exportHistoryToExcel() {
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" variant="soft">
-          {{ branchStore.activeBranch?.name || 'Общее по всем филиалам' }}
+  {{ allBranches ? 'Все филиалы' : (branchStore.activeBranch?.name || 'Общее по всем филиалам') }}
         </UBadge>
         <div class="flex items-center gap-2">
           <UBadge color="neutral" variant="outline">

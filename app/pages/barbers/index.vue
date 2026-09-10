@@ -810,10 +810,12 @@ const reportRows = computed(() => {
       certificate: split.certificate,
       client: item.client?.name || item.customer_name || item.user_name || 'Клиент',
       durationLabel: formatDurationSeconds(durationSeconds),
+      durationSeconds,
       endLabel: formatDateTime(endValue),
       id: String(item.id ?? `${index}`),
       idleLabel: idleSeconds === null ? '—' : formatDurationSeconds(idleSeconds),
       index: index + 1,
+      idleSeconds,
       startLabel: formatDateTime(startValue),
       status: item.status,
       total
@@ -828,9 +830,11 @@ const reportSummary = computed(() =>
       cash: acc.cash + row.cash,
       certificate: acc.certificate + row.certificate,
       count: acc.count + 1,
+      durationSeconds: acc.durationSeconds + (row.durationSeconds || 0),
+      idleSeconds: acc.idleSeconds + (row.idleSeconds || 0),
       total: acc.total + row.total
     }),
-    { card: 0, cash: 0, certificate: 0, count: 0, total: 0 }
+    { card: 0, cash: 0, certificate: 0, count: 0, durationSeconds: 0, idleSeconds: 0, total: 0 }
   )
 )
 
@@ -1455,32 +1459,46 @@ onBeforeUnmount(() => {
             <table class="w-full min-w-[64rem] border-collapse text-sm">
               <thead class="sticky top-0 z-10 bg-charcoal-50/95">
                 <tr class="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-500">
-                  <th class="px-3 py-3 text-left">№</th>
-                  <th class="px-3 py-3 text-left">Клиент</th>
-                  <th class="px-3 py-3 text-left">Начало</th>
-                  <th class="px-3 py-3 text-left">Окончание</th>
-                  <th class="px-3 py-3 text-left">Время</th>
-                  <th class="px-3 py-3 text-right">Наличные</th>
-                  <th class="px-3 py-3 text-right">Безнал</th>
-                  <th class="px-3 py-3 text-right">Сертификат</th>
-                  <th class="px-3 py-3 text-right">Всего</th>
-                  <th class="px-3 py-3 text-left">Простой</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left" colspan="4">Сотрудник</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left" rowspan="2">Время</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена наличные</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена безнал</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена сертификат</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена всего</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left" rowspan="2">Простой</th>
+                </tr>
+                <tr class="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-500">
+                  <th class="border border-charcoal-200 px-3 py-2 text-left">№</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left">Клиент</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left">Начало</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left">Окончание</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-charcoal-100">
+                <tr class="bg-charcoal-50/70 font-semibold text-charcoal-950">
+                  <td class="border border-charcoal-200 px-3 py-3" />
+                  <td class="border border-charcoal-200 px-3 py-3">{{ reportEmployee?.name || 'Сотрудник' }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3" colspan="2" />
+                  <td class="border border-charcoal-200 px-3 py-3">{{ formatDurationSeconds(reportSummary.durationSeconds) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.cash) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.card) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.certificate) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.total) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3">{{ formatDurationSeconds(reportSummary.idleSeconds) }}</td>
+                </tr>
                 <tr v-for="row in reportRows" :key="row.id" class="text-charcoal-700">
-                  <td class="px-3 py-3 text-charcoal-500">{{ row.index }}</td>
-                  <td class="px-3 py-3">
+                  <td class="border border-charcoal-200 px-3 py-3 text-charcoal-500">{{ row.index }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3">
                     <span class="font-medium text-charcoal-950">{{ row.client }}</span>
                   </td>
-                  <td class="px-3 py-3 tabular-nums">{{ row.startLabel }}</td>
-                  <td class="px-3 py-3 tabular-nums">{{ row.endLabel }}</td>
-                  <td class="px-3 py-3 text-charcoal-600">{{ row.durationLabel }}</td>
-                  <td class="px-3 py-3 text-right tabular-nums">{{ row.cash ? formatMoney(row.cash) : '—' }}</td>
-                  <td class="px-3 py-3 text-right tabular-nums">{{ row.card ? formatMoney(row.card) : '—' }}</td>
-                  <td class="px-3 py-3 text-right tabular-nums">{{ row.certificate ? formatMoney(row.certificate) : '—' }}</td>
-                  <td class="px-3 py-3 text-right font-semibold tabular-nums text-charcoal-950">{{ formatMoney(row.total) }}</td>
-                  <td class="px-3 py-3 text-charcoal-600">{{ row.idleLabel }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 tabular-nums">{{ row.startLabel }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 tabular-nums">{{ row.endLabel }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-charcoal-600">{{ row.durationLabel }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.cash ? formatMoney(row.cash) : '—' }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.card ? formatMoney(row.card) : '—' }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.certificate ? formatMoney(row.certificate) : '—' }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-right font-semibold tabular-nums text-charcoal-950">{{ formatMoney(row.total) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3 text-charcoal-600">{{ row.idleLabel }}</td>
                 </tr>
               </tbody>
               <tfoot class="sticky bottom-0 bg-charcoal-50/95">

@@ -94,18 +94,21 @@ const statisticsHighlights = computed(() => {
       description: 'Итог по всей системе за выбранный период',
       icon: 'i-lucide-wallet',
       label: 'Выручка',
+      to: '/history?scope=all&status=completed',
       value: formatMoney(payload.revenue)
     },
     {
       description: 'Объем очереди по данным аналитики',
       icon: 'i-lucide-users-round',
       label: 'Заказы',
+      to: '/history?scope=all',
       value: formatCount(payload.orders)
     },
     {
       description: 'Количество завершенных записей в аналитике',
       icon: 'i-lucide-check-check',
       label: 'Завершено',
+      to: '/history?scope=all&status=completed',
       value: formatCount(payload.completed)
     }
   ]
@@ -159,10 +162,14 @@ const shortcuts = computed(() =>
         <div class="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
           <!-- <DashboardMetricCard description="Текущие записи очереди, назначенные авторизованному барберу."
             icon="i-lucide-clock-3" label="Активная очередь" :value="formatCount(data?.queue?.count)" /> -->
-          <DashboardMetricCard description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
-            label="Филиалы" :value="formatCount(data?.branchCount)" />
-          <DashboardMetricCard description="Промокоды, полученные с панели управления." icon="i-lucide-ticket-percent"
-            label="Промокоды" :value="formatCount(promoItems.length)" />
+          <NuxtLink to="/branches" class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
+            <DashboardMetricCard description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
+              label="Филиалы" :value="formatCount(data?.branchCount)" />
+          </NuxtLink>
+          <NuxtLink to="/promo-codes" class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
+            <DashboardMetricCard description="Промокоды, полученные с панели управления." icon="i-lucide-ticket-percent"
+              label="Промокоды" :value="formatCount(promoItems.length)" />
+          </NuxtLink>
           <DashboardMetricCard description="Состояние основного health-эндпоинта." icon="i-lucide-heart-pulse"
             label="Состояние" :value="data?.health ? 'OK' : 'В ожидании'" />
         </div>
@@ -181,8 +188,10 @@ const shortcuts = computed(() =>
             </template>
 
             <div class="grid gap-4 md:grid-cols-3">
-              <DashboardMetricCard v-for="card in statisticsHighlights" :key="card.label"
-                :description="card.description" :icon="card.icon" :label="card.label" :value="card.value" />
+              <NuxtLink v-for="card in statisticsHighlights" :key="card.label" :to="card.to"
+                class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
+                <DashboardMetricCard :description="card.description" :icon="card.icon" :label="card.label" :value="card.value" />
+              </NuxtLink>
             </div>
 
             <!-- <div class="mt-6 grid gap-3">
