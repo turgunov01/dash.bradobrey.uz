@@ -562,6 +562,7 @@ const itemsPerPage = 10
 const exporting = ref(false)
 const allBarbersValue = '__all_barbers__'
 const allStatusesValue = '__all_statuses__'
+const suspiciousStatusValue = '__suspicious__'
 const allBranches = computed(() => route.query.scope === 'all')
 const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
 const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
@@ -607,7 +608,7 @@ const historyQuery = computed(() => {
     query.branch_id = branchStore.activeBranchId
   }
 
-  if (selectedStatus.value !== allStatusesValue) {
+  if (selectedStatus.value !== allStatusesValue && selectedStatus.value !== suspiciousStatusValue) {
     query.status = selectedStatus.value
   }
 
@@ -694,7 +695,8 @@ const statusFilterOptions = [
   { label: 'Завершён', value: 'completed' },
   { label: 'Отменён', value: 'cancelled' },
   { label: 'Неявка', value: 'no_show' },
-  { label: 'Не вовремя', value: 'not_in_time' }
+  { label: 'Не вовремя', value: 'not_in_time' },
+  { label: 'Подозрительный', value: suspiciousStatusValue }
 ]
 
 const barberFilterOptions = computed(() => {
@@ -757,7 +759,10 @@ function isVisitBySelectedBarber(visit: Record<string, any>) {
 
 function isVisitBySelectedStatus(visit: Record<string, any>) {
   return selectedStatus.value === allStatusesValue
-    || normalizeText(visit.status) === selectedStatus.value
+    ? true
+    : selectedStatus.value === suspiciousStatusValue
+      ? isSuspiciousOrder(visit)
+      : normalizeText(visit.status) === selectedStatus.value
 }
 
 const filteredHistory = computed(() =>
@@ -798,18 +803,38 @@ const rows = computed(() =>
   }))
 )
 
-const paginatedHistory = computed(() => {
-  const start = (page.value - 1) * itemsPerPage
-  return rows.value.slice(start, start + itemsPerPage)
+const allHistoryDays = computed(() => {
+  const groups = new Map<string, any[]>()
+
+  for (const row of rows.value) {
+    const key = getVisitDateKey(row as any) || 'Без даты'
+    const items = groups.get(key) || []
+    items.push(row)
+    groups.set(key, items)
+  }
+
+  return [...groups.entries()].map(([date, items]) => ({ date, items }))
 })
 
+const historyDays = computed(() => {
+  const start = (page.value - 1) * itemsPerPage
+  return allHistoryDays.value.slice(start, start + itemsPerPage)
+})
+
+const paginatedHistory = computed(() => historyDays.value.flatMap(day => day.items))
+const expandedHistoryDays = ref<Record<string, boolean>>({})
+
+function toggleHistoryDay(date: string) {
+  expandedHistoryDays.value[date] = !expandedHistoryDays.value[date]
+}
+
 const pageFrom = computed(() =>
-  rows.value.length ? (page.value - 1) * itemsPerPage + 1 : 0
+  allHistoryDays.value.length ? (page.value - 1) * itemsPerPage + 1 : 0
 )
 
 const pageTo = computed(() =>
-  rows.value.length
-    ? Math.min(page.value * itemsPerPage, rows.value.length)
+  allHistoryDays.value.length
+    ? Math.min(page.value * itemsPerPage, allHistoryDays.value.length)
     : 0
 )
 
@@ -822,8 +847,8 @@ watch(
 
 watch(
   () => rows.value.length,
-  (length) => {
-    const maxPage = Math.max(1, Math.ceil(length / itemsPerPage))
+  () => {
+    const maxPage = Math.max(1, Math.ceil(allHistoryDays.value.length / itemsPerPage))
 
     if (page.value > maxPage) {
       page.value = maxPage
@@ -970,7 +995,13 @@ async function exportHistoryToExcel() {
 
       <div v-if="rows.length" class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
         <div class="flex-1 overflow-auto">
-          <UTable :columns="columns" :data="paginatedHistory" :loading="pending" sticky="header" :ui="{
+          <div v-for="day in historyDays" :key="day.date" class="border-b border-charcoal-200 last:border-b-0">
+            <button type="button" class="flex w-full cursor-pointer items-center px-4 py-3 text-left text-sm font-semibold text-charcoal-950 hover:bg-charcoal-50" @click="toggleHistoryDay(day.date)">
+              <span class="mr-2 text-charcoal-500 transition-transform duration-200" :class="expandedHistoryDays[day.date] ? 'rotate-90' : ''">▸</span>{{ day.date }}<span class="ml-2 text-xs font-normal text-charcoal-500">({{ day.items.length }})</span>
+            </button>
+            <Transition name="history-day">
+              <div v-if="expandedHistoryDays[day.date]" class="overflow-hidden">
+                <UTable :columns="columns" :data="day.items" :loading="pending" sticky="header" :ui="{
             root: 'w-full overflow-auto',
             base: 'w-full min-w-[72rem]',
             thead: 'bg-charcoal-50/90',
@@ -1033,19 +1064,22 @@ async function exportHistoryToExcel() {
                 Подробнее
               </UButton>
             </template>
-          </UTable>
+                </UTable>
+              </div>
+            </Transition>
+          </div>
         </div>
 
         <div class="flex flex-col gap-3 border-t border-charcoal-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-charcoal-500">
-            Показано {{ pageFrom }}-{{ pageTo }} из {{ rows.length }}
+            Показано дней {{ pageFrom }}-{{ pageTo }} из {{ allHistoryDays.length }}
           </p>
 
           <UPagination v-model:page="page"
             :items-per-page="itemsPerPage"
             :show-controls="true"
             :sibling-count="1"
-            :total="rows.length"
+            :total="allHistoryDays.length"
             size="sm"
           />
         </div>
@@ -1147,3 +1181,17 @@ async function exportHistoryToExcel() {
     </template>
   </UDashboardPanel>
 </template>
+
+<style scoped>
+.history-day-enter-active,
+.history-day-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+  transform-origin: top;
+}
+
+.history-day-enter-from,
+.history-day-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+</style>
