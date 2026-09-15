@@ -77,6 +77,13 @@ export function useNotifications() {
     toast.add({ color: 'success', title: 'Уведомления включены', description: 'Подозрительные заказы будут приходить на это устройство.' })
     return true
   }
+  async function sendTestPush() {
+    await api.request('/api/notifications/test-push', {
+      method: 'POST',
+      silent: true
+    })
+    toast.add({ color: 'success', title: 'Тест отправлен', description: 'Проверьте телефон и ноутбук.' })
+  }
   if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
-  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, enablePush, pushPermission, pushSupported }
+  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, enablePush, sendTestPush, pushPermission, pushSupported }
 }
