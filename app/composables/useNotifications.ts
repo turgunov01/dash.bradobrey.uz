@@ -65,6 +65,8 @@ export function useNotifications() {
     }
 
     const registration = await navigator.serviceWorker.register('/sw.js')
+    const existing = await registration.pushManager.getSubscription()
+    if (existing) await existing.unsubscribe()
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: decodeVapidKey(publicKey)
@@ -72,7 +74,7 @@ export function useNotifications() {
     await api.request('/api/notifications/push-subscription', {
       method: 'POST',
       body: subscription.toJSON(),
-      silent: true
+      silent: false
     })
     toast.add({ color: 'success', title: 'Уведомления включены', description: 'Подозрительные заказы будут приходить на это устройство.' })
     return true
@@ -80,7 +82,7 @@ export function useNotifications() {
   async function sendTestPush() {
     await api.request('/api/notifications/test-push', {
       method: 'POST',
-      silent: true
+      silent: false
     })
     toast.add({ color: 'success', title: 'Тест отправлен', description: 'Проверьте телефон и ноутбук.' })
   }
