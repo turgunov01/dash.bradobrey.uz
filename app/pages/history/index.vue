@@ -871,6 +871,17 @@ function openDetails(row: any) {
   detailModalOpen.value = true
 }
 
+watch(
+  [historyItems, () => route.query.order_id],
+  () => {
+    const orderId = typeof route.query.order_id === 'string' ? route.query.order_id : ''
+    if (!orderId || detailModalOpen.value) return
+    const entry = historyItems.value.find(item => String((item as any).id) === orderId)
+    if (entry) openDetails(entry)
+  },
+  { immediate: true }
+)
+
 async function exportHistoryToExcel() {
   if (!import.meta.client) {
     return

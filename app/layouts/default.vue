@@ -4,6 +4,7 @@ import BranchSelector from '~/components/app/BranchSelector.vue'
 const open = ref(false)
 const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
+const notifications = useNotifications()
 
 const { primaryLinks, searchGroups, supportLinks } = useDashboardNavigation()
 
@@ -11,6 +12,11 @@ await Promise.all([
   branchStore.ensureLoaded(),
   sessionStore.ensureLoaded()
 ])
+
+if (import.meta.client) {
+  await notifications.refresh()
+  useIntervalFn(() => notifications.refresh({ notify: true }), 30000)
+}
 
 function closeSidebar() {
   open.value = false

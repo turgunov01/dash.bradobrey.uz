@@ -95,6 +95,7 @@ export function useDashboardNavigation() {
         ],
       },
       { icon: "i-lucide-history", label: "История", to: "/history" },
+      { icon: "i-lucide-bell", label: "Уведомления", to: "/notifications" },
       {
         icon: "i-lucide-chart-column-big",
         label: "Статистика",
