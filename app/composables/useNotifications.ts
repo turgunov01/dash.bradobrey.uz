@@ -1,4 +1,12 @@
 type NotificationItem = { id: string, title: string, body: string, order_id?: string | null, read_at?: string | null, created_at: string, data?: Record<string, any> }
+
+function decodeVapidKey(value: string) {
+  const padding = '='.repeat((4 - value.length % 4) % 4)
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from(raw, character => character.charCodeAt(0))
+}
+
 export function useNotifications() {
   const items = useState<NotificationItem[]>('notifications-items', () => [])
   const unreadCount = useState<number>('notifications-unread-count', () => 0)
@@ -6,6 +14,9 @@ export function useNotifications() {
   const api = useApiClient()
   const router = useRouter()
   const toast = useToast()
+  const config = useRuntimeConfig()
+  const pushPermission = ref<NotificationPermission | 'unsupported'>('default')
+  const pushSupported = computed(() => import.meta.client && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)
   async function refresh(options: { notify?: boolean } = {}) {
     try {
       const response = await api.request<{ items?: NotificationItem[], unread_count?: number }>('/api/notifications', { query: { limit: 50 }, silent: true })
@@ -38,5 +49,34 @@ export function useNotifications() {
       router.push({ path: '/history', query: { scope: 'all', order_id: item.order_id } })
     }
   }
-  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open }
+  async function enablePush() {
+    if (!pushSupported.value) {
+      pushPermission.value = 'unsupported'
+      return false
+    }
+
+    pushPermission.value = await Notification.requestPermission()
+    if (pushPermission.value !== 'granted') return false
+
+    const publicKey = String(config.public.vapidPublicKey || '').trim()
+    if (!publicKey) {
+      toast.add({ color: 'warning', title: 'Push не настроен', description: 'На сервере не задан публичный VAPID-ключ.' })
+      return false
+    }
+
+    const registration = await navigator.serviceWorker.register('/sw.js')
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: decodeVapidKey(publicKey)
+    })
+    await api.request('/api/notifications/push-subscription', {
+      method: 'POST',
+      body: subscription.toJSON(),
+      silent: true
+    })
+    toast.add({ color: 'success', title: 'Уведомления включены', description: 'Подозрительные заказы будут приходить на это устройство.' })
+    return true
+  }
+  if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
+  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, enablePush, pushPermission, pushSupported }
 }

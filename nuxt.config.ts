@@ -153,7 +153,8 @@ export default defineNuxtConfig({
     barberTokenCookieName: 'brado_barber_token',
     cookieSecure: env.NUXT_COOKIE_SECURE || env.COOKIE_SECURE || '',
     public: {
-      apiBase
+      apiBase,
+      vapidPublicKey: env.NUXT_PUBLIC_VAPID_PUBLIC_KEY || ''
     }
   },
 

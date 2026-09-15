@@ -1,8 +1,18 @@
 <script setup lang="ts">
-const { items, unreadCount, refresh, markAllRead, checkToday, open } = useNotifications()
+const { items, unreadCount, refresh, markAllRead, checkToday, open, enablePush, pushPermission, pushSupported } = useNotifications()
 const checking = ref(false)
 const checkMessage = ref('')
+const enablingPush = ref(false)
 await refresh()
+
+async function enablePhoneNotifications() {
+  enablingPush.value = true
+  try {
+    await enablePush()
+  } finally {
+    enablingPush.value = false
+  }
+}
 
 async function runTodayCheck() {
   checking.value = true
@@ -22,7 +32,7 @@ async function runTodayCheck() {
     <template #body>
       <div class="mb-5 flex items-center justify-between gap-3">
         <div><h1 class="text-2xl font-semibold text-charcoal-950">Уведомления</h1><p class="text-sm text-charcoal-500">Подозрительные заказы и важные события</p></div>
-        <div class="flex flex-wrap justify-end gap-2"><UBadge color="error" variant="soft">{{ unreadCount }} новых</UBadge><UButton color="primary" icon="i-lucide-search-check" :loading="checking" @click="runTodayCheck">Проверить заказы сегодня</UButton><UButton color="neutral" variant="outline" icon="i-lucide-check-check" :disabled="!unreadCount" @click="markAllRead">Прочитать все</UButton><UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" @click="refresh()">Обновить</UButton></div>
+        <div class="flex flex-wrap justify-end gap-2"><UBadge color="error" variant="soft">{{ unreadCount }} новых</UBadge><UButton v-if="pushSupported && pushPermission !== 'granted'" color="primary" variant="outline" icon="i-lucide-smartphone" :loading="enablingPush" @click="enablePhoneNotifications">Включить уведомления на телефон</UButton><UButton color="primary" icon="i-lucide-search-check" :loading="checking" @click="runTodayCheck">Проверить заказы сегодня</UButton><UButton color="neutral" variant="outline" icon="i-lucide-check-check" :disabled="!unreadCount" @click="markAllRead">Прочитать все</UButton><UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" @click="refresh()">Обновить</UButton></div>
       </div>
       <p v-if="checkMessage" class="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-charcoal-700">{{ checkMessage }}</p>
       <div v-if="items.length" class="divide-y divide-charcoal-100 overflow-hidden rounded-2xl border border-charcoal-200 bg-white/90">
