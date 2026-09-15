@@ -80,11 +80,11 @@ export function useNotifications() {
     return true
   }
   async function sendTestPush() {
-    await api.request('/api/notifications/test-push', {
+    const result = await api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
       method: 'POST',
       silent: false
     })
-    toast.add({ color: 'success', title: 'Тест отправлен', description: 'Проверьте телефон и ноутбук.' })
+    toast.add({ color: 'success', title: 'Тест отправлен', description: `Устройств найдено: ${result?.found || 0}. Доставлено: ${result?.sent || 0}.` })
   }
   if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
   return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, enablePush, sendTestPush, pushPermission, pushSupported }
