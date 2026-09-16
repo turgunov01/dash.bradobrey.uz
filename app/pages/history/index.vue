@@ -563,7 +563,10 @@ const exporting = ref(false)
 const allBarbersValue = '__all_barbers__'
 const allStatusesValue = '__all_statuses__'
 const suspiciousStatusValue = '__suspicious__'
-const allBranches = computed(() => route.query.scope === 'all')
+// History is global by default. A branch-scoped view is opt-in via
+// `?scope=branch`; this also prevents the global branch selector from
+// silently narrowing the history list on initial load.
+const allBranches = computed(() => route.query.scope !== 'branch')
 const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
 const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
 const dateFrom = ref('')
@@ -601,7 +604,11 @@ const historyDateRange = computed(() => {
 })
 
 const historyQuery = computed(() => {
-  const query: Record<string, string> = {}
+  const query: Record<string, string> = {
+    // useApiClient otherwise injects the currently selected branch into every
+    // GET request, which would make the default history branch-scoped again.
+    __skipBranchScope: 'true'
+  }
   const range = historyDateRange.value
 
   if (branchStore.activeBranchId && !allBranches.value) {
@@ -641,15 +648,15 @@ const { data, pending, refresh } = await useAsyncData('history-current-filter', 
 })
 
 const { data: servicesData } = await useAsyncData('history-services', async () => {
-  const branchId = branchStore.activeBranchId || undefined
+  const branchId = allBranches.value ? undefined : (branchStore.activeBranchId || undefined)
   const response = await kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) })
   return flattenServicesPayload(response)
 }, {
-  watch: [() => branchStore.activeBranchId]
+  watch: [() => branchStore.activeBranchId, allBranches]
 })
 
 const { data: barbersData } = await useAsyncData('history-barbers-directory', async () => {
-  const branchId = branchStore.activeBranchId || undefined
+  const branchId = allBranches.value ? undefined : (branchStore.activeBranchId || undefined)
 
   try {
     return await apiClient.request<{ items?: BarberDirectoryItem[] }>('/api/barbers', {
@@ -666,7 +673,7 @@ const { data: barbersData } = await useAsyncData('history-barbers-directory', as
   }
 }, {
   server: false,
-  watch: [() => branchStore.activeBranchId]
+  watch: [() => branchStore.activeBranchId, allBranches]
 })
 
 const branchNameMap = computed(() =>
@@ -768,7 +775,7 @@ function isVisitBySelectedStatus(visit: Record<string, any>) {
 const filteredHistory = computed(() =>
   historyItems.value.filter((item) => {
     const visit = item as Record<string, any>
-    const branchMatches = branchStore.activeBranchId
+    const branchMatches = !allBranches.value && branchStore.activeBranchId
       ? String(visit.branch_id || visit.branch?.id || '') === String(branchStore.activeBranchId)
       : true
 
