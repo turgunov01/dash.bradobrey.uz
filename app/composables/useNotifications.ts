@@ -84,10 +84,23 @@ export function useNotifications() {
     return true
   }
   async function sendTestPush() {
-    const result = await api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
+    const requestTest = () => api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
       method: 'POST',
       silent: false
     })
+    let result
+    try {
+      result = await requestTest()
+    } catch (error: any) {
+      const status = Number(error?.statusCode || error?.status || error?.response?.status || 0)
+      if (status !== 410) throw error
+
+      // The API removed an expired endpoint (for example after VAPID rotation).
+      // Re-register this browser once, then retry the test delivery.
+      const reRegistered = await enablePush()
+      if (!reRegistered) throw error
+      result = await requestTest()
+    }
     toast.add({ color: 'success', title: 'Тест отправлен', description: `Устройств найдено: ${result?.found || 0}. Доставлено: ${result?.sent || 0}.` })
   }
   if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
