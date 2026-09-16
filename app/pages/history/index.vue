@@ -815,6 +815,8 @@ const allHistoryDays = computed(() => {
 
   return [...groups.entries()].map(([date, items]) => ({ date, items }))
 })
+const isHydrated = ref(false)
+onMounted(() => { isHydrated.value = true })
 
 const historyDays = computed(() => {
   const start = (page.value - 1) * itemsPerPage
@@ -960,7 +962,7 @@ async function exportHistoryToExcel() {
           >
             Экспорт в Excel
           </UButton>
-          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
+          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="isHydrated && pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
         </div>
@@ -1012,7 +1014,7 @@ async function exportHistoryToExcel() {
             </button>
             <Transition name="history-day">
               <div v-if="expandedHistoryDays[day.date]" class="overflow-hidden">
-                <UTable :columns="columns" :data="day.items" :loading="pending" sticky="header" :ui="{
+                <UTable :columns="columns" :data="day.items" :loading="isHydrated && pending" sticky="header" :ui="{
             root: 'w-full overflow-auto',
             base: 'w-full min-w-[72rem]',
             thead: 'bg-charcoal-50/90',
