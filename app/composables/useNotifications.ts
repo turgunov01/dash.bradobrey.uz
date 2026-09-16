@@ -86,20 +86,34 @@ export function useNotifications() {
   async function sendTestPush() {
     const requestTest = () => api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
       method: 'POST',
-      silent: false
+      // A 410 is an expected recovery signal: the API removes the expired
+      // subscription, then we register the current browser and retry below.
+      // Do not show a transient error toast for that first attempt.
+      silent: true
     })
     let result
     try {
       result = await requestTest()
     } catch (error: any) {
       const status = Number(error?.statusCode || error?.status || error?.response?.status || 0)
-      if (status !== 410) throw error
+      if (status !== 410) {
+        api.notifyError(error)
+        return
+      }
 
       // The API removed an expired endpoint (for example after VAPID rotation).
       // Re-register this browser once, then retry the test delivery.
       const reRegistered = await enablePush()
-      if (!reRegistered) throw error
-      result = await requestTest()
+      if (!reRegistered) {
+        toast.add({ color: 'warning', title: 'Нужно включить уведомления', description: 'Нажмите «Включить уведомления на телефон», затем повторите тест.' })
+        return
+      }
+      try {
+        result = await requestTest()
+      } catch (retryError) {
+        api.notifyError(retryError)
+        return
+      }
     }
     toast.add({ color: 'success', title: 'Тест отправлен', description: `Устройств найдено: ${result?.found || 0}. Доставлено: ${result?.sent || 0}.` })
   }

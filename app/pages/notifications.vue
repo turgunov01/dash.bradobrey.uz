@@ -6,6 +6,14 @@ const enablingPush = ref(false)
 const sendingTestPush = ref(false)
 await refresh()
 
+function formatNotificationDate(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Tashkent'
+  }).format(new Date(value))
+}
+
 async function enablePhoneNotifications() {
   enablingPush.value = true
   try {
@@ -48,7 +56,7 @@ async function runTodayCheck() {
       <div v-if="items.length" class="divide-y divide-charcoal-100 overflow-hidden rounded-2xl border border-charcoal-200 bg-white/90">
         <button v-for="item in items" :key="item.id" type="button" class="flex w-full items-start gap-3 p-4 text-left transition hover:bg-charcoal-50" :class="item.read_at ? 'opacity-70' : ''" @click="open(item)">
           <span class="mt-1 rounded-full p-2" :class="item.read_at ? 'bg-charcoal-100 text-charcoal-500' : 'bg-red-100 text-red-700'"><UIcon name="i-lucide-triangle-alert" class="size-5" /></span>
-          <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-3"><strong class="text-sm text-charcoal-950">{{ item.title }}</strong><time class="text-xs text-charcoal-500">{{ new Date(item.created_at).toLocaleString('ru-RU') }}</time></span><span class="mt-1 block text-sm text-charcoal-600">{{ item.body }}</span><span class="mt-2 block text-xs font-medium text-primary">Нажмите, чтобы открыть заказ в истории →</span></span>
+          <span class="min-w-0 flex-1"><span class="flex items-center justify-between gap-3"><strong class="text-sm text-charcoal-950">{{ item.title }}</strong><time class="text-xs text-charcoal-500" :datetime="item.created_at">{{ formatNotificationDate(item.created_at) }}</time></span><span class="mt-1 block text-sm text-charcoal-600">{{ item.body }}</span><span class="mt-2 block text-xs font-medium text-primary">Нажмите, чтобы открыть заказ в истории →</span></span>
         </button>
       </div>
       <SharedEmptyState v-else icon="i-lucide-bell-off" title="Уведомлений пока нет" description="Здесь появятся уведомления о подозрительных заказах." />

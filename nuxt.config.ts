@@ -154,7 +154,10 @@ export default defineNuxtConfig({
     cookieSecure: env.NUXT_COOKIE_SECURE || env.COOKIE_SECURE || '',
     public: {
       apiBase,
-      vapidPublicKey: env.NUXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+      // The public VAPID key is safe to expose to the browser. Keep the
+      // explicit NUXT_* name for production runtime overrides, while also
+      // accepting VAPID_PUBLIC_KEY in deployments that share the API env.
+      vapidPublicKey: env.NUXT_PUBLIC_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY || ''
     }
   },
 
