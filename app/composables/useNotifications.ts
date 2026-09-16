@@ -64,7 +64,11 @@ export function useNotifications() {
       return false
     }
 
-    const registration = await navigator.serviceWorker.register('/sw.js')
+    // `register()` may resolve while the worker is still installing. Push
+    // subscriptions can only be created by an active worker, so wait for the
+    // browser's ready registration before accessing PushManager.
+    await navigator.serviceWorker.register('/sw.js')
+    const registration = await navigator.serviceWorker.ready
     const existing = await registration.pushManager.getSubscription()
     if (existing) await existing.unsubscribe()
     const subscription = await registration.pushManager.subscribe({
