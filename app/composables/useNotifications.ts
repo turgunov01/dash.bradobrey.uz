@@ -1,5 +1,10 @@
 type NotificationItem = { id: string, title: string, body: string, order_id?: string | null, read_at?: string | null, created_at: string, data?: Record<string, any> }
 
+function getNotificationBody(item: NotificationItem) {
+  // Keep old notifications readable after removing the ID from new messages.
+  return item.body.replace(/\s*•\s*заказ\s*#\S+/i, '')
+}
+
 function decodeVapidKey(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4)
   const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -39,7 +44,7 @@ export function useNotifications() {
       const next = response?.items || []
       if (options.notify && started.value) {
         const previous = new Set(items.value.map(item => item.id))
-        next.filter(item => !previous.has(item.id) && !item.read_at).reverse().forEach(item => toast.add({ color: 'error', title: item.title, description: item.body, actions: item.order_id ? [{ label: 'Открыть заказ', onClick: () => open(item) }] : undefined }))
+        next.filter(item => !previous.has(item.id) && !item.read_at).reverse().forEach(item => toast.add({ color: 'error', title: item.title, description: getNotificationBody(item), actions: item.order_id ? [{ label: 'Открыть заказ', onClick: () => openDetails(item) }] : undefined }))
       }
       items.value = next
       unreadCount.value = Number(response?.unread_count || 0)
