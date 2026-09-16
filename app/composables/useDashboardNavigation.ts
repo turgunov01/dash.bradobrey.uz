@@ -147,6 +147,11 @@ export function useDashboardNavigation() {
             label: "Реклама киоска",
             to: "/settings/kiosk-ads",
           },
+          {
+            icon: "i-lucide-bell-ring",
+            label: "Уведомления",
+            to: "/settings/notifications",
+          },
         ],
       },
     ],

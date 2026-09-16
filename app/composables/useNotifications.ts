@@ -16,7 +16,23 @@ export function useNotifications() {
   const toast = useToast()
   const config = useRuntimeConfig()
   const pushPermission = ref<NotificationPermission | 'unsupported'>('default')
+  const pushEnabled = ref(false)
   const pushSupported = computed(() => import.meta.client && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)
+  async function refreshPushState() {
+    if (!pushSupported.value) {
+      pushEnabled.value = false
+      return false
+    }
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/')
+      const subscription = await registration?.pushManager.getSubscription()
+      pushEnabled.value = Boolean(subscription)
+    }
+    catch {
+      pushEnabled.value = false
+    }
+    return pushEnabled.value
+  }
   async function refresh(options: { notify?: boolean } = {}) {
     try {
       const response = await api.request<{ items?: NotificationItem[], unread_count?: number }>('/api/notifications', { query: { limit: 50 }, silent: true })
@@ -42,6 +58,9 @@ export function useNotifications() {
     return result
   }
   function open(item: NotificationItem) {
+    markRead(item)
+  }
+  function openDetails(item: NotificationItem) {
     markRead(item)
     if (item.order_id) {
       // The order may belong to another branch than the currently selected one.
@@ -80,8 +99,30 @@ export function useNotifications() {
       body: subscription.toJSON(),
       silent: false
     })
+    pushEnabled.value = true
     toast.add({ color: 'success', title: 'Уведомления включены', description: 'Подозрительные заказы будут приходить на это устройство.' })
     return true
+  }
+  async function disablePush() {
+    if (!pushSupported.value) return false
+    try {
+      const registration = await navigator.serviceWorker.getRegistration('/')
+      const subscription = await registration?.pushManager.getSubscription()
+      if (subscription) {
+        await api.request('/api/notifications/push-subscription', {
+          method: 'DELETE',
+          body: { endpoint: subscription.endpoint },
+          silent: false
+        })
+        await subscription.unsubscribe()
+      }
+      pushEnabled.value = false
+      toast.add({ color: 'success', title: 'Уведомления выключены', description: 'Этот телефон больше не будет получать push-уведомления.' })
+      return true
+    }
+    catch {
+      return false
+    }
   }
   async function sendTestPush() {
     const requestTest = () => api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
@@ -118,5 +159,6 @@ export function useNotifications() {
     toast.add({ color: 'success', title: 'Тест отправлен', description: `Устройств найдено: ${result?.found || 0}. Доставлено: ${result?.sent || 0}.` })
   }
   if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
-  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, enablePush, sendTestPush, pushPermission, pushSupported }
+  if (import.meta.client && pushSupported.value) refreshPushState()
+  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, openDetails, enablePush, disablePush, refreshPushState, sendTestPush, pushPermission, pushEnabled, pushSupported }
 }
