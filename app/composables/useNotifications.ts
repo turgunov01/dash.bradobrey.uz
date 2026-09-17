@@ -29,7 +29,7 @@ export function useNotifications() {
       return false
     }
     try {
-      const registration = await navigator.serviceWorker.getRegistration('/')
+      const registration = await navigator.serviceWorker.getRegistration()
       const subscription = await registration?.pushManager.getSubscription()
       pushEnabled.value = Boolean(subscription)
     }
@@ -111,7 +111,7 @@ export function useNotifications() {
   async function disablePush() {
     if (!pushSupported.value) return false
     try {
-      const registration = await navigator.serviceWorker.getRegistration('/')
+      const registration = await navigator.serviceWorker.getRegistration()
       const subscription = await registration?.pushManager.getSubscription()
       if (subscription) {
         await api.request('/api/notifications/push-subscription', {
@@ -125,7 +125,8 @@ export function useNotifications() {
       toast.add({ color: 'success', title: 'Уведомления выключены', description: 'Этот телефон больше не будет получать push-уведомления.' })
       return true
     }
-    catch {
+    catch (error) {
+      api.notifyError(error)
       return false
     }
   }
