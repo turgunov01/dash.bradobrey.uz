@@ -463,37 +463,8 @@ function getElapsedMinutes(startValue: unknown, finishValue: unknown) {
 
 function getActualServiceMinutes(item: Record<string, any>) {
   const startedAt = item.started_at || item.startedAt || item.called_at || item.calledAt
-  const createdAt = item.created_at || item.createdAt
   const finishedAt = item.finished_at || item.finishedAt || item.completed_at || item.completedAt
-  const recordedMinutes = getElapsedMinutes(startedAt || createdAt, finishedAt)
-  const expectedMinutes = getExpectedServiceMinutes(item)
-
-  // In affected records started_at can be written at the same time as
-  // finished_at. Use the order creation time when it yields a plausible
-  // duration for the service, instead of reporting a false zero-minute visit.
-  if (expectedMinutes > 0 && (recordedMinutes === null || recordedMinutes < expectedMinutes * suspiciousDurationRatio)) {
-    const createdAtMinutes = getElapsedMinutes(createdAt, finishedAt)
-
-    if (createdAtMinutes !== null && createdAtMinutes >= expectedMinutes * suspiciousDurationRatio) {
-      return createdAtMinutes
-    }
-  }
-
-  return recordedMinutes
-}
-
-function isUsingCreatedAtDurationFallback(item: Record<string, any>) {
-  const startedAt = item.started_at || item.startedAt || item.called_at || item.calledAt
-  const createdAt = item.created_at || item.createdAt
-  const finishedAt = item.finished_at || item.finishedAt || item.completed_at || item.completedAt
-  const expectedMinutes = getExpectedServiceMinutes(item)
-  const recordedMinutes = getElapsedMinutes(startedAt, finishedAt)
-  const createdAtMinutes = getElapsedMinutes(createdAt, finishedAt)
-
-  return expectedMinutes > 0
-    && (recordedMinutes === null || recordedMinutes < expectedMinutes * suspiciousDurationRatio)
-    && createdAtMinutes !== null
-    && createdAtMinutes >= expectedMinutes * suspiciousDurationRatio
+  return getElapsedMinutes(startedAt, finishedAt)
 }
 
 function isSuspiciousOrder(item: Record<string, any>) {
@@ -650,6 +621,7 @@ const suspiciousStatusValue = '__suspicious__'
 const allBranches = computed(() => route.query.scope !== 'branch')
 const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
 const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
+const search = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 
@@ -665,7 +637,6 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'service_duration', header: 'ВРЕМЯ ЗАКАЗА' },
   { accessorKey: 'started_at', header: 'НАЧАЛО УСЛУГИ' },
   { accessorKey: 'finished_at', header: 'ОКОНЧАНИЕ УСЛУГИ' },
-  { accessorKey: 'created_at', header: 'СОЗДАНО' },
   { id: 'actions', header: '' }
 ]
 
@@ -716,7 +687,7 @@ const historyQuery = computed(() => {
 })
 
 const hasActiveFilters = computed(() =>
-  Boolean(selectedBarberId.value !== allBarbersValue || selectedStatus.value !== allStatusesValue || dateFrom.value || dateTo.value)
+  Boolean(search.value.trim() || selectedBarberId.value !== allBarbersValue || selectedStatus.value !== allStatusesValue || dateFrom.value || dateTo.value)
 )
 
 async function loadAllHistoryPages(query: Record<string, string>) {
@@ -855,6 +826,28 @@ function isVisitBySelectedStatus(visit: Record<string, any>) {
       : normalizeText(visit.status) === selectedStatus.value
 }
 
+function isVisitMatchingSearch(visit: Record<string, any>) {
+  const query = search.value.trim().toLocaleLowerCase()
+  if (!query) return true
+
+  const searchableText = [
+    visit.id,
+    getClientName(visit),
+    getClientPhone(visit),
+    getVisitSelectedBarberName(visit),
+    getVisitExecutingBarberName(visit),
+    visit.status,
+    visit.payment_method,
+    getServiceNames(visit).join(' ')
+  ].map(value => String(value || '').toLocaleLowerCase()).join(' ')
+
+  if (searchableText.includes(query)) return true
+
+  const digits = query.replace(/\D/g, '')
+  const phoneDigits = getClientPhone(visit)?.replace(/\D/g, '') || ''
+  return digits.length > 0 && phoneDigits.includes(digits)
+}
+
 const filteredHistory = computed(() =>
   historyItems.value.filter((item) => {
     const visit = item as Record<string, any>
@@ -865,6 +858,7 @@ const filteredHistory = computed(() =>
     return branchMatches
       && isVisitBySelectedBarber(visit)
       && isVisitBySelectedStatus(visit)
+      && isVisitMatchingSearch(visit)
       && isVisitInSelectedDateRange(visit)
   })
 )
@@ -928,7 +922,7 @@ const pageTo = computed(() =>
 )
 
 watch(
-  [() => branchStore.activeBranchId, selectedBarberId, selectedStatus, dateFrom, dateTo],
+  [() => branchStore.activeBranchId, selectedBarberId, selectedStatus, search, dateFrom, dateTo],
   () => {
     page.value = 1
   }
@@ -949,6 +943,7 @@ const detailModalOpen = ref(false)
 const selectedEntry = ref<any | null>(null)
 
 function resetHistoryFilters() {
+  search.value = ''
   selectedBarberId.value = allBarbersValue
   selectedStatus.value = allStatusesValue
   dateFrom.value = ''
@@ -988,7 +983,7 @@ async function exportHistoryToExcel() {
     const branchNameMap = new Map(branchStore.branches.map(branch => [String(branch.id), branch.name]))
 
     const exportRows: string[][] = [
-      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Барбер', 'Статус', 'Оплата', 'Сумма', 'Оригинальная сумма', 'Причина изменения', 'Создано', 'Услуги']
+      ['ID', 'Филиал', 'Клиент', 'Телефон', 'Барбер', 'Статус', 'Оплата', 'Сумма', 'Оригинальная сумма', 'Причина изменения', 'Услуги']
     ]
 
     for (const entry of rows.value) {
@@ -1006,7 +1001,6 @@ async function exportHistoryToExcel() {
         (entry as any).amount == null ? '' : String((entry as any).amount),
         getOriginalAmount(entry) == null ? '' : String(getOriginalAmount(entry)),
         getAdjustmentReason(entry) || '',
-        formatDateTime((entry as any).created_at),
         getServiceNames(entry).join(', ')
       ])
     }
@@ -1055,7 +1049,11 @@ async function exportHistoryToExcel() {
         </div>
       </div>
 
-      <div class="mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
+      <div class="mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
+        <UFormField label="Поиск">
+          <UInput v-model="search" class="w-full" icon="i-lucide-search" placeholder="Клиент, телефон, барбер, услуга или ID" />
+        </UFormField>
+
         <UFormField label="Барбер">
           <USelect
             v-model="selectedBarberId"
@@ -1141,10 +1139,6 @@ async function exportHistoryToExcel() {
                   Изменено<span v-if="getOriginalAmount(row.original) !== null"> с {{ formatMoney(getOriginalAmount(row.original)) }}</span>
                 </p>
               </div>
-            </template>
-
-            <template #created_at-cell="{ row }">
-              <span :class="row.original.suspicious ? 'text-red-700' : 'text-charcoal-700'">{{ formatDateTime(row.original.created_at) }}</span>
             </template>
 
             <template #started_at-cell="{ row }">
@@ -1236,10 +1230,6 @@ async function exportHistoryToExcel() {
                     Причина: {{ getAdjustmentReason(selectedEntry) }}
                   </p>
                 </div>
-              </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
-                <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Создано</p>
-                <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.created_at) }}</p>
               </div>
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Начало услуги</p>
