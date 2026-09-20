@@ -14,7 +14,7 @@ await Promise.all([
 ])
 
 if (import.meta.client) {
-  await notifications.refresh()
+  void notifications.refresh()
   useIntervalFn(() => notifications.refresh({ notify: true }), 30000)
 }
 

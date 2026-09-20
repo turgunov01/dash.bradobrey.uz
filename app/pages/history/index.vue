@@ -624,6 +624,18 @@ const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.
 const search = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
+const columnMenuOpen = ref(false)
+const columnVisibility = reactive<Record<string, boolean>>({
+  client: true,
+  phone: true,
+  barber: true,
+  status: true,
+  payment_method: true,
+  amount: true,
+  service_duration: true,
+  started_at: true,
+  finished_at: true
+})
 
 await branchStore.ensureLoaded()
 
@@ -639,6 +651,29 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'finished_at', header: 'ОКОНЧАНИЕ УСЛУГИ' },
   { id: 'actions', header: '' }
 ]
+const columnOptions = [
+  { key: 'client', label: 'Клиент' },
+  { key: 'phone', label: 'Телефон' },
+  { key: 'barber', label: 'Барбер' },
+  { key: 'status', label: 'Статус' },
+  { key: 'payment_method', label: 'Оплата' },
+  { key: 'amount', label: 'Сумма' },
+  { key: 'service_duration', label: 'Время заказа' },
+  { key: 'started_at', label: 'Начало услуги' },
+  { key: 'finished_at', label: 'Окончание услуги' }
+]
+const visibleColumns = computed(() =>
+  columns.filter((column: any) => {
+    const key = column.id || column.accessorKey
+    return key === 'actions' || columnVisibility[key] !== false
+  })
+)
+
+function showAllColumns() {
+  for (const option of columnOptions) {
+    columnVisibility[option.key] = true
+  }
+}
 
 const historyDateRange = computed(() => {
   const from = dateFrom.value || ''
@@ -1043,6 +1078,27 @@ async function exportHistoryToExcel() {
           >
             Экспорт в Excel
           </UButton>
+          <div class="relative">
+            <UButton
+              color="neutral"
+              icon="i-lucide-columns-3"
+              variant="outline"
+              @click="columnMenuOpen = !columnMenuOpen"
+            >
+              Столбцы
+            </UButton>
+            <div v-if="columnMenuOpen" class="absolute right-0 z-30 mt-2 w-64 space-y-2 rounded-xl border border-charcoal-200 bg-white p-4 shadow-xl">
+              <UCheckbox
+                v-for="option in columnOptions"
+                :key="option.key"
+                v-model="columnVisibility[option.key]"
+                :label="option.label"
+              />
+              <UButton color="neutral" size="xs" variant="ghost" @click="showAllColumns">
+                Показать все
+              </UButton>
+            </div>
+          </div>
           <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="isHydrated && pending" variant="outline" @click="refresh()">
             Обновить
           </UButton>
@@ -1099,9 +1155,9 @@ async function exportHistoryToExcel() {
             </button>
             <Transition name="history-day">
               <div v-if="expandedHistoryDays[day.date]" class="overflow-hidden">
-                <UTable :columns="columns" :data="day.items" :loading="isHydrated && pending" sticky="header" :ui="{
+                <UTable :columns="visibleColumns" :data="day.items" :loading="isHydrated && pending" sticky="header" :ui="{
             root: 'w-full overflow-auto',
-            base: 'w-full min-w-[72rem]',
+            base: visibleColumns.length <= 5 ? 'w-full min-w-[48rem]' : 'w-full min-w-[72rem]',
             thead: 'bg-charcoal-50/90',
             tbody: 'divide-y divide-charcoal-100',
             th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-charcoal-500',
