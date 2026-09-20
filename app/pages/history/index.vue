@@ -412,6 +412,15 @@ const serviceDurationMap = computed(() =>
   )
 )
 
+const servicePriceMap = computed(() =>
+  new Map(
+    (servicesData.value || []).map((svc: any) => [
+      String(svc.id),
+      Number(svc.base_price ?? svc.price ?? 0)
+    ])
+  )
+)
+
 const suspiciousDurationRatio = 0.5
 
 function getServiceIds(item: Record<string, any>) {
@@ -441,11 +450,9 @@ function getExpectedServiceMinutes(item: Record<string, any>) {
   }, 0)
 }
 
-function getActualServiceMinutes(item: Record<string, any>) {
-  const startedAt = item.started_at || item.startedAt || item.called_at || item.calledAt || item.created_at || item.createdAt
-  const finishedAt = item.finished_at || item.finishedAt || item.completed_at || item.completedAt
-  const start = startedAt ? new Date(startedAt).getTime() : NaN
-  const finish = finishedAt ? new Date(finishedAt).getTime() : NaN
+function getElapsedMinutes(startValue: unknown, finishValue: unknown) {
+  const start = startValue ? new Date(String(startValue)).getTime() : NaN
+  const finish = finishValue ? new Date(String(finishValue)).getTime() : NaN
 
   if (!Number.isFinite(start) || !Number.isFinite(finish) || finish < start) {
     return null
@@ -454,8 +461,49 @@ function getActualServiceMinutes(item: Record<string, any>) {
   return (finish - start) / 60_000
 }
 
+function getActualServiceMinutes(item: Record<string, any>) {
+  const startedAt = item.started_at || item.startedAt || item.called_at || item.calledAt
+  const createdAt = item.created_at || item.createdAt
+  const finishedAt = item.finished_at || item.finishedAt || item.completed_at || item.completedAt
+  const recordedMinutes = getElapsedMinutes(startedAt || createdAt, finishedAt)
+  const expectedMinutes = getExpectedServiceMinutes(item)
+
+  // In affected records started_at can be written at the same time as
+  // finished_at. Use the order creation time when it yields a plausible
+  // duration for the service, instead of reporting a false zero-minute visit.
+  if (expectedMinutes > 0 && (recordedMinutes === null || recordedMinutes < expectedMinutes * suspiciousDurationRatio)) {
+    const createdAtMinutes = getElapsedMinutes(createdAt, finishedAt)
+
+    if (createdAtMinutes !== null && createdAtMinutes >= expectedMinutes * suspiciousDurationRatio) {
+      return createdAtMinutes
+    }
+  }
+
+  return recordedMinutes
+}
+
+function isUsingCreatedAtDurationFallback(item: Record<string, any>) {
+  const startedAt = item.started_at || item.startedAt || item.called_at || item.calledAt
+  const createdAt = item.created_at || item.createdAt
+  const finishedAt = item.finished_at || item.finishedAt || item.completed_at || item.completedAt
+  const expectedMinutes = getExpectedServiceMinutes(item)
+  const recordedMinutes = getElapsedMinutes(startedAt, finishedAt)
+  const createdAtMinutes = getElapsedMinutes(createdAt, finishedAt)
+
+  return expectedMinutes > 0
+    && (recordedMinutes === null || recordedMinutes < expectedMinutes * suspiciousDurationRatio)
+    && createdAtMinutes !== null
+    && createdAtMinutes >= expectedMinutes * suspiciousDurationRatio
+}
+
 function isSuspiciousOrder(item: Record<string, any>) {
-  if (normalizeText(item.status)?.toLowerCase() !== 'completed') {
+  const status = normalizeText(item.status)?.toLowerCase() || ''
+
+  if (status.includes('подозр') || status.includes('suspicious')) {
+    return true
+  }
+
+  if (status !== 'completed') {
     return false
   }
 
@@ -465,6 +513,37 @@ function isSuspiciousOrder(item: Record<string, any>) {
   return expectedMinutes > 0
     && actualMinutes !== null
     && actualMinutes < expectedMinutes * suspiciousDurationRatio
+}
+
+function getHistoryOrderAmount(item: Record<string, any>) {
+  const directAmount = toNumberOrNull(
+    item.amount
+    ?? item.order_total
+    ?? item.orderTotal
+    ?? item.price_override
+    ?? item.priceOverride
+    ?? item.price
+  )
+
+  if (directAmount !== null && directAmount > 0) {
+    return directAmount
+  }
+
+  // Some backend records zero out suspicious orders. Keep the service value
+  // visible in History so a duration flag does not erase its revenue.
+  if (!isSuspiciousOrder(item)) {
+    return directAmount
+  }
+
+  const paymentAmount = Array.isArray(item.payments)
+    ? item.payments.reduce((total: number, payment: any) => total + Math.max(0, toNumberOrNull(payment?.amount) || 0), 0)
+    : 0
+
+  if (paymentAmount > 0) {
+    return paymentAmount
+  }
+
+  return getServiceIds(item).reduce((total, serviceId) => total + Math.max(0, servicePriceMap.value.get(serviceId) || 0), 0)
 }
 
 function suspiciousOrderTitle(item: Record<string, any>) {
@@ -486,8 +565,10 @@ function formatOrderDuration(item: Record<string, any>) {
     return '—'
   }
 
-  const actualLabel = `${Math.round(actual)} мин.`
-
+  const totalSeconds = Math.round(actual * 60)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  const actualLabel = `${minutes} мин. ${seconds} сек.`
   return expected > 0 ? `${actualLabel} / норма ${expected} мин.` : actualLabel
 }
 
@@ -582,6 +663,8 @@ const columns: TableColumn<any>[] = [
   { accessorKey: 'payment_method', header: 'ОПЛАТА' },
   { accessorKey: 'amount', header: 'СУММА' },
   { accessorKey: 'service_duration', header: 'ВРЕМЯ ЗАКАЗА' },
+  { accessorKey: 'started_at', header: 'НАЧАЛО УСЛУГИ' },
+  { accessorKey: 'finished_at', header: 'ОКОНЧАНИЕ УСЛУГИ' },
   { accessorKey: 'created_at', header: 'СОЗДАНО' },
   { id: 'actions', header: '' }
 ]
@@ -793,12 +876,9 @@ const rows = computed(() =>
     phone: getClientPhone(item) || 'Не указан',
     barber: getVisitExecutingBarberName(item),
     created_at: item.created_at || (item as any).createdAt || '',
-    amount: item.amount
-      ?? (item as any).order_total
-      ?? (item as any).orderTotal
-      ?? (item as any).price_override
-      ?? (item as any).price
-      ?? null,
+    started_at: item.started_at || (item as any).startedAt || null,
+    finished_at: item.finished_at || (item as any).finishedAt || item.completed_at || (item as any).completedAt || null,
+    amount: getHistoryOrderAmount(item),
     amount_source: (item as any).amount_source || (item as any).amountSource || null,
     original_amount: (item as any).original_amount ?? (item as any).originalAmount ?? null,
     price_override: (item as any).price_override ?? (item as any).priceOverride ?? null,
@@ -1067,6 +1147,14 @@ async function exportHistoryToExcel() {
               <span :class="row.original.suspicious ? 'text-red-700' : 'text-charcoal-700'">{{ formatDateTime(row.original.created_at) }}</span>
             </template>
 
+            <template #started_at-cell="{ row }">
+              <span class="whitespace-nowrap text-charcoal-700">{{ formatDateTime(row.original.started_at) }}</span>
+            </template>
+
+            <template #finished_at-cell="{ row }">
+              <span class="whitespace-nowrap text-charcoal-700">{{ formatDateTime(row.original.finished_at) }}</span>
+            </template>
+
             <template #service_duration-cell="{ row }">
               <span :class="row.original.suspicious ? 'font-semibold text-red-700' : 'text-charcoal-700'">
                 {{ row.original.service_duration }}
@@ -1152,6 +1240,14 @@ async function exportHistoryToExcel() {
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Создано</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.created_at) }}</p>
+              </div>
+              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Начало услуги</p>
+                <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.started_at || selectedEntry.startedAt) }}</p>
+              </div>
+              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+                <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Окончание услуги</p>
+                <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.finished_at || selectedEntry.finishedAt || selectedEntry.completed_at || selectedEntry.completedAt) }}</p>
               </div>
             </div>
 

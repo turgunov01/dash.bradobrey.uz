@@ -711,6 +711,22 @@ const servicePriceMap = computed(() =>
     ])
   )
 )
+
+const serviceDurationMap = computed(() =>
+  new Map(
+    (insightsData.value?.services || []).map((service: any) => [
+      String(service.id),
+      normalizeNumber(service.duration_minutes ?? service.duration)
+    ])
+  )
+)
+
+function getExpectedHistoryDurationMinutes(item: Record<string, any>) {
+  return getHistoryServiceIds(item).reduce(
+    (total, serviceId) => total + (serviceDurationMap.value.get(serviceId) || 0),
+    0
+  )
+}
 const employeeInsightMap = computed(() => {
   const map = new Map<string, {
     cancelled: number
@@ -792,6 +808,10 @@ const reportRows = computed(() => {
     const durationSeconds = startDate && endDate && endDate > startDate
       ? (endDate.getTime() - startDate.getTime()) / 1000
       : null
+    const expectedDurationMinutes = getExpectedHistoryDurationMinutes(item)
+    const durationNeedsReview = durationSeconds !== null
+      && expectedDurationMinutes > 0
+      && (durationSeconds < expectedDurationMinutes * 30 || durationSeconds > expectedDurationMinutes * 120)
     const idleSeconds = previousEnd && startDate && startDate > previousEnd
       ? (startDate.getTime() - previousEnd.getTime()) / 1000
       : null
@@ -811,6 +831,8 @@ const reportRows = computed(() => {
       client: item.client?.name || item.customer_name || item.user_name || 'Клиент',
       durationLabel: formatDurationSeconds(durationSeconds),
       durationSeconds,
+      durationNeedsReview,
+      expectedDurationMinutes,
       endLabel: formatDateTime(endValue),
       id: String(item.id ?? `${index}`),
       idleLabel: idleSeconds === null ? '—' : formatDurationSeconds(idleSeconds),
@@ -831,10 +853,11 @@ const reportSummary = computed(() =>
       certificate: acc.certificate + row.certificate,
       count: acc.count + 1,
       durationSeconds: acc.durationSeconds + (row.durationSeconds || 0),
+      expectedDurationSeconds: acc.expectedDurationSeconds + row.expectedDurationMinutes * 60,
       idleSeconds: acc.idleSeconds + (row.idleSeconds || 0),
       total: acc.total + row.total
     }),
-    { card: 0, cash: 0, certificate: 0, count: 0, durationSeconds: 0, idleSeconds: 0, total: 0 }
+    { card: 0, cash: 0, certificate: 0, count: 0, durationSeconds: 0, expectedDurationSeconds: 0, idleSeconds: 0, total: 0 }
   )
 )
 
@@ -1460,7 +1483,7 @@ onBeforeUnmount(() => {
               <thead class="sticky top-0 z-10 bg-charcoal-50/95">
                 <tr class="text-[11px] font-semibold uppercase tracking-[0.14em] text-charcoal-500">
                   <th class="border border-charcoal-200 px-3 py-2 text-left" colspan="4">Сотрудник</th>
-                  <th class="border border-charcoal-200 px-3 py-2 text-left" rowspan="2">Время</th>
+                  <th class="border border-charcoal-200 px-3 py-2 text-left" rowspan="2">Факт / норма</th>
                   <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена наличные</th>
                   <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена безнал</th>
                   <th class="border border-charcoal-200 px-3 py-2 text-right" rowspan="2">Цена сертификат</th>
@@ -1479,7 +1502,7 @@ onBeforeUnmount(() => {
                   <td class="border border-charcoal-200 px-3 py-3" />
                   <td class="border border-charcoal-200 px-3 py-3">{{ reportEmployee?.name || 'Сотрудник' }}</td>
                   <td class="border border-charcoal-200 px-3 py-3" colspan="2" />
-                  <td class="border border-charcoal-200 px-3 py-3">{{ formatDurationSeconds(reportSummary.durationSeconds) }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3">{{ formatDurationSeconds(reportSummary.durationSeconds) }} / {{ formatDurationSeconds(reportSummary.expectedDurationSeconds) }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.cash) }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.card) }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ formatMoney(reportSummary.certificate) }}</td>
@@ -1493,7 +1516,10 @@ onBeforeUnmount(() => {
                   </td>
                   <td class="border border-charcoal-200 px-3 py-3 tabular-nums">{{ row.startLabel }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 tabular-nums">{{ row.endLabel }}</td>
-                  <td class="border border-charcoal-200 px-3 py-3 text-charcoal-600">{{ row.durationLabel }}</td>
+                  <td class="border border-charcoal-200 px-3 py-3" :class="row.durationNeedsReview ? 'text-red-700' : 'text-charcoal-600'">
+                    <div>{{ row.durationLabel }}<span v-if="row.expectedDurationMinutes > 0"> / {{ formatDurationSeconds(row.expectedDurationMinutes * 60) }}</span></div>
+                    <div v-if="row.durationNeedsReview" class="mt-1 text-xs font-medium">Проверьте отметку начала</div>
+                  </td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.cash ? formatMoney(row.cash) : '—' }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.card ? formatMoney(row.card) : '—' }}</td>
                   <td class="border border-charcoal-200 px-3 py-3 text-right tabular-nums">{{ row.certificate ? formatMoney(row.certificate) : '—' }}</td>
