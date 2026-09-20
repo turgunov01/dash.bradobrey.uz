@@ -729,8 +729,24 @@ async function loadAllHistoryPages(query: Record<string, string>) {
   return historyApi.listAll<HistoryItem>(query)
 }
 
+const initialHistoryPageSize = 100
 const { data, pending, refresh } = await useAsyncData('history-current-filter', async () => {
-  return loadAllHistoryPages(historyQuery.value)
+  const response = await historyApi.list({
+    ...historyQuery.value,
+    limit: initialHistoryPageSize,
+    offset: 0
+  })
+  const items = extractHistoryItems(response)
+  const payload = response && typeof response === 'object' ? response as Record<string, any> : {}
+  const count = Number(payload.count ?? payload.total ?? payload.data?.count ?? payload.data?.total)
+  const total = Number.isFinite(count) && count >= 0 ? count : items.length
+
+  return {
+    count: total,
+    hasMore: items.length > 0 && items.length < total,
+    items,
+    nextOffset: items.length
+  }
 }, {
   server: false,
   watch: [() => branchStore.activeBranchId, allBranches, selectedStatus, dateFrom, dateTo]
@@ -784,7 +800,7 @@ const barberNameMap = computed(() => {
   return map
 })
 
-const historyItems = computed<HistoryItem[]>(() => data.value || [])
+const historyItems = computed<HistoryItem[]>(() => data.value?.items || [])
 
 const statusFilterOptions = [
   { label: 'Все статусы', value: allStatusesValue },
@@ -929,7 +945,9 @@ const allHistoryDays = computed(() => {
     groups.set(key, items)
   }
 
-  return [...groups.entries()].map(([date, items]) => ({ date, items }))
+  return [...groups.entries()]
+    .map(([date, items]) => ({ date, items }))
+    .sort((left, right) => right.date.localeCompare(left.date))
 })
 const isHydrated = ref(false)
 onMounted(() => { isHydrated.value = true })
@@ -941,9 +959,79 @@ const historyDays = computed(() => {
 
 const paginatedHistory = computed(() => historyDays.value.flatMap(day => day.items))
 const expandedHistoryDays = ref<Record<string, boolean>>({})
+const loadingHistoryDays = ref<Record<string, boolean>>({})
+const loadedHistoryDays = ref<Record<string, boolean>>({})
+const historyDayErrors = ref<Record<string, boolean>>({})
+const loadingMoreHistory = ref(false)
+const loadMoreHistoryError = ref(false)
+
+async function loadHistoryDay(date: string) {
+  if (loadedHistoryDays.value[date] || loadingHistoryDays.value[date]) return
+
+  loadingHistoryDays.value[date] = true
+  historyDayErrors.value[date] = false
+
+  try {
+    const query: Record<string, string> = {
+      ...historyQuery.value,
+      from: date,
+      start_date: date,
+      to: date,
+      end_date: date
+    }
+    const dayItems = await loadAllHistoryPages(query)
+    const otherDays = historyItems.value.filter(item => getVisitDateKey(item as Record<string, any>) !== date)
+    if (data.value) data.value = { ...data.value, items: [...otherDays, ...dayItems] }
+    loadedHistoryDays.value[date] = true
+  }
+  catch {
+    historyDayErrors.value[date] = true
+  }
+  finally {
+    loadingHistoryDays.value[date] = false
+  }
+}
+
+async function loadMoreHistory() {
+  if (!data.value?.hasMore || loadingMoreHistory.value) return
+
+  loadingMoreHistory.value = true
+  loadMoreHistoryError.value = false
+  try {
+    const offset = data.value.nextOffset
+    const response = await historyApi.list({
+      ...historyQuery.value,
+      limit: initialHistoryPageSize,
+      offset
+    })
+    const nextItems = extractHistoryItems(response)
+    const ids = new Set(historyItems.value.map(item => String((item as any).id)))
+    const additions = nextItems.filter(item => !ids.has(String((item as any).id)))
+    const payload = response && typeof response === 'object' ? response as Record<string, any> : {}
+    const count = Number(payload.count ?? payload.total ?? payload.data?.count ?? payload.data?.total)
+    const total = Number.isFinite(count) && count >= 0 ? count : data.value.count
+    const nextOffset = offset + nextItems.length
+
+    data.value = {
+      ...data.value,
+      count: total,
+      hasMore: nextItems.length > 0 && nextOffset < total,
+      items: [...historyItems.value, ...additions],
+      nextOffset
+    }
+  }
+  catch {
+    loadMoreHistoryError.value = true
+  }
+  finally {
+    loadingMoreHistory.value = false
+  }
+}
 
 function toggleHistoryDay(date: string) {
-  expandedHistoryDays.value[date] = !expandedHistoryDays.value[date]
+  const opening = !expandedHistoryDays.value[date]
+  expandedHistoryDays.value[date] = opening
+  if (opening) void loadHistoryDay(date)
 }
 
 const pageFrom = computed(() =>
@@ -960,6 +1048,9 @@ watch(
   [() => branchStore.activeBranchId, selectedBarberId, selectedStatus, search, dateFrom, dateTo],
   () => {
     page.value = 1
+    loadedHistoryDays.value = {}
+    expandedHistoryDays.value = {}
+    historyDayErrors.value = {}
   }
 )
 
@@ -1155,7 +1246,11 @@ async function exportHistoryToExcel() {
             </button>
             <Transition name="history-day">
               <div v-if="expandedHistoryDays[day.date]" class="overflow-hidden">
-                <UTable :columns="visibleColumns" :data="day.items" :loading="isHydrated && pending" sticky="header" :ui="{
+                <p v-if="historyDayErrors[day.date]" class="flex items-center justify-between gap-3 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  Не удалось загрузить визиты за этот день.
+                  <UButton size="xs" color="error" variant="outline" @click="loadHistoryDay(day.date)">Повторить</UButton>
+                </p>
+                <UTable :columns="visibleColumns" :data="day.items" :loading="(isHydrated && pending) || loadingHistoryDays[day.date]" sticky="header" :ui="{
             root: 'w-full overflow-auto',
             base: visibleColumns.length <= 5 ? 'w-full min-w-[48rem]' : 'w-full min-w-[72rem]',
             thead: 'bg-charcoal-50/90',
@@ -1230,21 +1325,29 @@ async function exportHistoryToExcel() {
 
         <div class="flex flex-col gap-3 border-t border-charcoal-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-sm text-charcoal-500">
-            Показано дней {{ pageFrom }}-{{ pageTo }} из {{ allHistoryDays.length }}
+            Дни {{ pageFrom }}-{{ pageTo }} из {{ allHistoryDays.length }} загруженных
           </p>
 
-          <UPagination v-model:page="page"
-            :items-per-page="itemsPerPage"
-            :show-controls="true"
-            :sibling-count="1"
-            :total="allHistoryDays.length"
-            size="sm"
-          />
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <UButton v-if="data?.hasMore" color="neutral" variant="outline" size="sm" :loading="loadingMoreHistory" @click="loadMoreHistory">
+              {{ loadMoreHistoryError ? 'Повторить загрузку' : 'Загрузить более ранние дни' }}
+            </UButton>
+            <UPagination v-model:page="page"
+              :items-per-page="itemsPerPage"
+              :show-controls="true"
+              :sibling-count="1"
+              :total="allHistoryDays.length"
+              size="sm"
+            />
+          </div>
         </div>
       </div>
 
       <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
         По выбранным фильтрам записи отсутствуют.
+        <UButton v-if="data?.hasMore" class="ml-3" color="neutral" variant="outline" size="sm" :loading="loadingMoreHistory" @click="loadMoreHistory">
+          {{ loadMoreHistoryError ? 'Повторить загрузку' : 'Загрузить более ранние записи' }}
+        </UButton>
       </div>
 
       <UModal v-model:open="detailModalOpen" title="Детали визита">
