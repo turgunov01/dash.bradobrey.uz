@@ -10,10 +10,33 @@ definePageMeta({
 })
 
 const branchStore = useBranchStore()
-const uiStore = useUiStore()
 const historyApi = useHistoryApi()
+const statisticsApi = useStatisticsApi()
 const kioskApi = useKioskApi()
 const promoApi = usePromoApi()
+
+function getCurrentTashkentMonthRange() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(new Date())
+  const year = parts.find(part => part.type === 'year')?.value || '2000'
+  const month = parts.find(part => part.type === 'month')?.value || '01'
+  const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+
+  return {
+    start: `${year}-${month}-01`,
+    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`
+  }
+}
+
+const currentMonthRange = getCurrentTashkentMonthRange()
+const currentMonthLabel = new Intl.DateTimeFormat('ru-RU', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Asia/Tashkent'
+}).format(new Date())
 
 useRealtimeQueue()
 
@@ -22,15 +45,14 @@ await Promise.all([
   // sessionStore.ensureLoaded()
 ])
 
-const { data, pending, refresh } = await useAsyncData('overview-dashboard', async () => {
-  const emptyQueue = { count: 0, items: [] }
+const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${currentMonthRange.start}`, async () => {
   const rangeQuery = {
-    end_date: uiStore.statisticsRange.end,
-    from: uiStore.statisticsRange.start,
-    start_date: uiStore.statisticsRange.start,
-    to: uiStore.statisticsRange.end
+    end_date: currentMonthRange.end,
+    from: currentMonthRange.start,
+    start_date: currentMonthRange.start,
+    to: currentMonthRange.end
   }
-  const [health, branches, promoDashboard, history, servicesPayload] = await Promise.all([
+  const [health, branches, promoDashboard, history, servicesPayload, queueStats] = await Promise.all([
     $fetch('/api/health').catch(() => null),
     branchStore.ensureLoaded({ force: true }).catch(() => branchStore.branches),
     promoApi.dashboard({ __skipBranchScope: true }).catch(() => ({ items: [] })),
@@ -42,14 +64,19 @@ const { data, pending, refresh } = await useAsyncData('overview-dashboard', asyn
       __skipBranchScope: true,
       active: true,
       grouped: true
-    }).catch(() => ({ services: [] }))
+    }).catch(() => ({ services: [] })),
+    statisticsApi.global({
+      __skipBranchScope: true,
+      start_date: currentMonthRange.start,
+      end_date: `${currentMonthRange.end}T23:59:59.999Z`
+    }).catch(() => null)
   ])
   const statistics = summarizeHistoryMetrics(
     extractHistoryItems(history),
     createServicePriceMap(flattenServicesPayload(servicesPayload)),
     {
-      endDate: uiStore.statisticsRange.end,
-      startDate: uiStore.statisticsRange.start
+      endDate: currentMonthRange.end,
+      startDate: currentMonthRange.start
     }
   )
 
@@ -57,11 +84,12 @@ const { data, pending, refresh } = await useAsyncData('overview-dashboard', asyn
     branchCount: branches.length,
     health,
     promoDashboard,
-    queue: emptyQueue,
+    queue: {
+      count: Number((queueStats as any)?.totals?.in_progress || 0),
+      items: []
+    },
     statistics
   }
-}, {
-  watch: [() => uiStore.statisticsRange.end, () => uiStore.statisticsRange.start, () => branchStore.activeBranchId]
 })
 
 const promoItems = computed(() => {
@@ -91,21 +119,21 @@ const statisticsHighlights = computed(() => {
 
   return [
     {
-      description: 'Итог по всей системе за выбранный период',
+      description: 'Итог по всем филиалам за текущий месяц',
       icon: 'i-lucide-wallet',
       label: 'Выручка',
       to: '/history?scope=all&status=completed',
       value: formatMoney(payload.revenue)
     },
     {
-      description: 'Объем очереди по данным аналитики',
+      description: 'Количество заказов за текущий месяц по всем филиалам',
       icon: 'i-lucide-users-round',
       label: 'Заказы',
       to: '/history?scope=all',
       value: formatCount(payload.orders)
     },
     {
-      description: 'Количество завершенных записей в аналитике',
+      description: 'Завершенные записи за текущий месяц по всем филиалам',
       icon: 'i-lucide-check-check',
       label: 'Завершено',
       to: '/history?scope=all&status=completed',
@@ -159,9 +187,9 @@ const shortcuts = computed(() =>
 
     <template #body>
       <div class="space-y-6">
-        <div class="grid gap-4 xl:grid-cols-3 md:grid-cols-2">
-          <!-- <DashboardMetricCard description="Текущие записи очереди, назначенные авторизованному барберу."
-            icon="i-lucide-clock-3" label="Активная очередь" :value="formatCount(data?.queue?.count)" /> -->
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <DashboardMetricCard description="Заказы со статусом «В работе» за текущий месяц по всем филиалам."
+            icon="i-lucide-clock-3" label="Заказы в процессе" :value="formatCount(data?.queue?.count)" />
           <NuxtLink to="/branches" class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
             <DashboardMetricCard description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
               label="Филиалы" :value="formatCount(data?.branchCount)" />
@@ -184,6 +212,7 @@ const shortcuts = computed(() =>
                 <h2 class="barbershop-heading text-3xl text-charcoal-950">
                   Быстрая операционная сводка
                 </h2>
+                <p class="text-sm capitalize text-charcoal-500">{{ currentMonthLabel }} · все филиалы</p>
               </div>
             </template>
 

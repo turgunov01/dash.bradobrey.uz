@@ -18,6 +18,16 @@ type LateRow = {
   scheduleStart: string
 }
 
+type LateEmployeeGroup = {
+  barberId: string
+  barberName: string
+  branches: string[]
+  events: LateRow[]
+  lateDays: number
+  totalLateMinutes: number
+  totalPenalty: number
+}
+
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
 const verifixApi = useVerifixApi()
@@ -225,29 +235,59 @@ const totalLateMinutes = computed(() => lateRows.value.reduce((sum, row) => sum 
 const penaltyTotal = computed(() => penaltySettings.value
   ? lateRows.value.reduce((sum, row) => row ? sum + penaltyForRow(row) : sum, 0)
   : null)
-const lateEmployees = computed(() => new Set(lateRows.value.map(row => row.barberId)).size)
-const page = ref(1)
-const pageSize = 20
-const pageCount = computed(() => Math.max(1, Math.ceil(lateRows.value.length / pageSize)))
-const pagedLateRows = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return lateRows.value.slice(start, start + pageSize)
+
+const lateEmployeeGroups = computed<LateEmployeeGroup[]>(() => {
+  const groups = new Map<string, LateRow[]>()
+
+  for (const row of lateRows.value) {
+    const events = groups.get(row.barberId) || []
+    events.push(row)
+    groups.set(row.barberId, events)
+  }
+
+  return [...groups.entries()]
+    .map(([barberId, events]) => ({
+      barberId,
+      barberName: events[0]?.barberName || `Сотрудник ${barberId.slice(0, 6)}`,
+      branches: [...new Set(events.map(event => event.branchName))],
+      events: events.sort((left, right) => right.loginAt.getTime() - left.loginAt.getTime()),
+      lateDays: new Set(events.map(event => dateInputValue(event.date))).size,
+      totalLateMinutes: events.reduce((sum, event) => sum + event.lateMinutes, 0),
+      totalPenalty: penaltySettings.value
+        ? events.reduce((sum, event) => sum + penaltyForRow(event), 0)
+        : 0
+    }))
+    .sort((left, right) => right.totalLateMinutes - left.totalLateMinutes || left.barberName.localeCompare(right.barberName, 'ru'))
 })
 
-watch([lateRows, page], () => {
+const lateEmployees = computed(() => lateEmployeeGroups.value.length)
+const page = ref(1)
+const pageSize = 20
+const pageCount = computed(() => Math.max(1, Math.ceil(lateEmployeeGroups.value.length / pageSize)))
+const pagedLateEmployees = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return lateEmployeeGroups.value.slice(start, start + pageSize)
+})
+const expandedBarbers = ref<Record<string, boolean>>({})
+
+function toggleBarber(barberId: string) {
+  expandedBarbers.value[barberId] = !expandedBarbers.value[barberId]
+}
+
+watch([lateEmployeeGroups, page], () => {
   if (page.value > pageCount.value) {
     page.value = pageCount.value
   }
 })
 
-watch([selectedBranchId, fromDate, toDate], () => {
+watch([selectedBranchId, fromDate, toDate, lateRows], () => {
   page.value = 1
+  expandedBarbers.value = {}
 })
 
-const columns: TableColumn<LateRow>[] = [
-  { accessorKey: 'barberName', header: 'Сотрудник' },
+const detailColumns: TableColumn<LateRow>[] = [
+  { id: 'date', header: 'Дата опоздания' },
   { accessorKey: 'branchName', header: 'Филиал' },
-  { id: 'date', header: 'Дата' },
   { id: 'scheduleStart', header: 'Начало смены' },
   { id: 'loginAt', header: 'Первый вход' },
   { id: 'lateMinutes', header: 'Опоздание' },
@@ -294,41 +334,80 @@ const columns: TableColumn<LateRow>[] = [
         </div>
 
         <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-          <UTable :columns="columns" :data="pagedLateRows" :loading="pending" :ui="{ root: 'w-full overflow-auto', base: 'w-full min-w-[56rem]', thead: 'bg-charcoal-50/90', tbody: 'divide-y divide-charcoal-100', th: 'px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-charcoal-500 whitespace-nowrap', td: 'px-5 py-4 text-sm text-charcoal-700 align-middle whitespace-nowrap' }">
-            <template #barberName-cell="{ row }"><span class="font-semibold text-charcoal-950">{{ row.original.barberName }}</span></template>
-            <template #branchName-cell="{ row }">{{ row.original.branchName }}</template>
-            <template #date-cell="{ row }">{{ formatDate(row.original.date) }}</template>
-            <template #scheduleStart-cell="{ row }">{{ row.original.scheduleStart }}</template>
-            <template #loginAt-cell="{ row }">{{ formatTime(row.original.loginAt) }}</template>
-            <template #penalty-cell="{ row }">
-              <div class="space-y-1">
-                <UInput
-                  :model-value="penaltyForRow(row.original)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  size="sm"
-                  class="w-32"
-                  @update:model-value="value => updatePenaltyOverride(row.original, value)"
-                />
-                <UButton
-                  v-if="penaltyOverrides[row.original.id] !== undefined"
-                  size="xs"
-                  color="neutral"
-                  variant="link"
-                  class="px-0"
-                  @click="resetPenaltyOverride(row.original)"
-                >Авто</UButton>
+          <div v-if="pagedLateEmployees.length" class="divide-y divide-charcoal-100">
+            <article v-for="employee in pagedLateEmployees" :key="employee.barberId">
+              <button
+                type="button"
+                class="flex w-full flex-col gap-4 px-4 py-4 text-left transition hover:bg-charcoal-50/80 sm:flex-row sm:items-center sm:px-5"
+                :aria-expanded="Boolean(expandedBarbers[employee.barberId])"
+                @click="toggleBarber(employee.barberId)"
+              >
+                <span class="flex min-w-0 flex-1 items-center gap-3">
+                  <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><UIcon name="i-lucide-user-round" class="size-5" /></span>
+                  <span class="min-w-0">
+                    <strong class="block truncate text-sm font-semibold text-charcoal-950">{{ employee.barberName }}</strong>
+                    <span class="mt-1 flex flex-wrap gap-1">
+                      <UBadge v-for="branch in employee.branches" :key="branch" color="neutral" variant="soft" size="xs">{{ branch }}</UBadge>
+                    </span>
+                  </span>
+                </span>
+                <span class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[22rem]">
+                  <span class="rounded-xl bg-charcoal-50 px-3 py-2 text-center">
+                    <strong class="block text-sm text-charcoal-950">{{ employee.lateDays }}</strong>
+                    <span class="text-[11px] text-charcoal-500">дней</span>
+                  </span>
+                  <span class="rounded-xl bg-red-50 px-3 py-2 text-center">
+                    <strong class="block text-sm text-red-700">{{ employee.totalLateMinutes }} мин</strong>
+                    <span class="text-[11px] text-red-600">опоздания</span>
+                  </span>
+                  <span class="rounded-xl bg-charcoal-50 px-3 py-2 text-center">
+                    <strong class="block text-sm text-charcoal-950">{{ employee.events.length }}</strong>
+                    <span class="text-[11px] text-charcoal-500">случаев</span>
+                  </span>
+                </span>
+                <UIcon name="i-lucide-chevron-down" class="hidden size-5 shrink-0 text-charcoal-400 transition sm:block" :class="expandedBarbers[employee.barberId] ? 'rotate-180' : ''" />
+              </button>
+
+              <div v-if="expandedBarbers[employee.barberId]" class="border-t border-charcoal-100 bg-charcoal-50/40 px-3 py-4 sm:px-5">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-charcoal-500">Дни и детали опозданий</p>
+                <div class="overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+                  <UTable :columns="detailColumns" :data="employee.events" :ui="{ root: 'w-full overflow-auto', base: 'w-full min-w-[52rem]', thead: 'bg-charcoal-50/90', tbody: 'divide-y divide-charcoal-100', th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-charcoal-500 whitespace-nowrap', td: 'px-4 py-3 text-sm text-charcoal-700 align-middle whitespace-nowrap' }">
+                    <template #date-cell="{ row }">{{ formatDate(row.original.date) }}</template>
+                    <template #scheduleStart-cell="{ row }">{{ row.original.scheduleStart }}</template>
+                    <template #loginAt-cell="{ row }">{{ formatTime(row.original.loginAt) }}</template>
+                    <template #penalty-cell="{ row }">
+                      <div class="space-y-1">
+                        <UInput
+                          :model-value="penaltyForRow(row.original)"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          size="sm"
+                          class="w-32"
+                          @update:model-value="value => updatePenaltyOverride(row.original, value)"
+                        />
+                        <UButton
+                          v-if="penaltyOverrides[row.original.id] !== undefined"
+                          size="xs"
+                          color="neutral"
+                          variant="link"
+                          class="px-0"
+                          @click="resetPenaltyOverride(row.original)"
+                        >Авто</UButton>
+                      </div>
+                    </template>
+                    <template #lateMinutes-cell="{ row }"><UBadge color="error" variant="soft">{{ row.original.lateMinutes }} мин</UBadge></template>
+                  </UTable>
+                </div>
               </div>
-            </template>
-            <template #lateMinutes-cell="{ row }"><UBadge color="error" variant="soft">{{ row.original.lateMinutes }} мин</UBadge></template>
-          </UTable>
-          <div v-if="!pending && !lateRows.length" class="px-6 py-12 text-center text-sm text-charcoal-500">За выбранный период опозданий не найдено.</div>
-          <div v-else-if="lateRows.length" class="flex flex-col gap-3 border-t border-charcoal-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            </article>
+          </div>
+          <div v-else-if="!pending" class="px-6 py-12 text-center text-sm text-charcoal-500">За выбранный период опозданий не найдено.</div>
+          <div v-if="lateEmployeeGroups.length" class="flex flex-col gap-3 border-t border-charcoal-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <span class="text-xs text-charcoal-500">
-              Показано {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, lateRows.length) }} из {{ lateRows.length }}
+              Показано мастеров {{ (page - 1) * pageSize + 1 }}–{{ Math.min(page * pageSize, lateEmployeeGroups.length) }} из {{ lateEmployeeGroups.length }}
             </span>
-            <UPagination v-model:page="page" :total="lateRows.length" :items-per-page="pageSize" size="sm" />
+            <UPagination v-model:page="page" :total="lateEmployeeGroups.length" :items-per-page="pageSize" size="sm" />
           </div>
         </div>
       </div>

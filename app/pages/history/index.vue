@@ -622,8 +622,32 @@ const allBranches = computed(() => route.query.scope !== 'branch')
 const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
 const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
 const search = ref('')
-const dateFrom = ref('')
-const dateTo = ref('')
+
+function getCurrentTashkentMonthRange() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(new Date())
+  const year = parts.find(part => part.type === 'year')?.value || '2000'
+  const month = parts.find(part => part.type === 'month')?.value || '01'
+  const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+
+  return {
+    start: `${year}-${month}-01`,
+    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`
+  }
+}
+
+const defaultDateRange = getCurrentTashkentMonthRange()
+const dateFrom = ref(
+  (typeof route.query.from === 'string' ? route.query.from : typeof route.query.start_date === 'string' ? route.query.start_date : '')
+  || defaultDateRange.start
+)
+const dateTo = ref(
+  (typeof route.query.to === 'string' ? route.query.to : typeof route.query.end_date === 'string' ? route.query.end_date : '')
+  || defaultDateRange.end
+)
 const columnMenuOpen = ref(false)
 const columnVisibility = reactive<Record<string, boolean>>({
   client: true,
@@ -722,7 +746,13 @@ const historyQuery = computed(() => {
 })
 
 const hasActiveFilters = computed(() =>
-  Boolean(search.value.trim() || selectedBarberId.value !== allBarbersValue || selectedStatus.value !== allStatusesValue || dateFrom.value || dateTo.value)
+  Boolean(
+    search.value.trim()
+    || selectedBarberId.value !== allBarbersValue
+    || selectedStatus.value !== allStatusesValue
+    || dateFrom.value !== defaultDateRange.start
+    || dateTo.value !== defaultDateRange.end
+  )
 )
 
 async function loadAllHistoryPages(query: Record<string, string>) {
@@ -1072,8 +1102,8 @@ function resetHistoryFilters() {
   search.value = ''
   selectedBarberId.value = allBarbersValue
   selectedStatus.value = allStatusesValue
-  dateFrom.value = ''
-  dateTo.value = ''
+  dateFrom.value = defaultDateRange.start
+  dateTo.value = defaultDateRange.end
 }
 
 function openDetails(row: any) {
