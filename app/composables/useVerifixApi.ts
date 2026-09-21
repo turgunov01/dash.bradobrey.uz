@@ -28,9 +28,10 @@ export type VerifixSchedule = {
   branch_id: string
   barber_id: string | null
   day_of_week: number
-  start_time: string
+  start_time: string | null
   end_time: string | null
   grace_minutes: number | null
+  is_working: boolean
   is_active: boolean
 }
 
@@ -41,7 +42,8 @@ export type VerifixSchedulePayload = {
   end_time?: string | null
   grace_minutes?: number
   is_active?: boolean
-  start_time: string
+  is_working?: boolean
+  start_time?: string | null
 }
 
 export type VerifixPenaltySettings = {

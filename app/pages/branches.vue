@@ -684,14 +684,14 @@ async function removeBranch(row: BranchRow) {
                 <div v-for="schedule in verifixSchedules" :key="schedule.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 bg-charcoal-50/60 px-4 py-3">
                   <div class="min-w-0">
                     <p class="font-medium text-charcoal-950">
-                      {{ scheduleDays.find(day => day.value === schedule.day_of_week)?.label }} · {{ String(schedule.start_time).slice(0, 5) }}<span v-if="schedule.end_time">–{{ String(schedule.end_time).slice(0, 5) }}</span>
+                      {{ scheduleDays.find(day => day.value === schedule.day_of_week)?.label }} · <span v-if="schedule.is_working === false">Выходной</span><template v-else>{{ String(schedule.start_time).slice(0, 5) }}<span v-if="schedule.end_time">–{{ String(schedule.end_time).slice(0, 5) }}</span></template>
                     </p>
                     <p class="text-xs text-charcoal-500">
                       {{ schedule.barber_id ? (barberNameById.get(schedule.barber_id) || 'Сотрудник') : 'Все барберы филиала' }} · допуск {{ schedule.grace_minutes || 0 }} мин
                     </p>
                   </div>
                   <div class="flex shrink-0 gap-2">
-                    <UButton icon="i-lucide-pencil" size="xs" variant="ghost" @click="editSchedule(schedule)" />
+                    <UButton icon="i-lucide-pencil" size="xs" variant="ghost" :disabled="schedule.is_working === false" :title="schedule.is_working === false ? 'Измените персональный график в карточке барбера' : undefined" @click="editSchedule(schedule)" />
                     <UButton icon="i-lucide-power" color="error" size="xs" variant="ghost" :disabled="scheduleSubmitting" @click="deactivateSchedule(schedule)" />
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import {
 import { formatCount, formatDateTime, formatMoney } from '~/utils/format'
 import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 import { flattenServicesPayload } from '~/utils/services'
+import type { VerifixSchedule } from '~/composables/useVerifixApi'
 import {
   employeePermissionDefinitions,
   employeePermissionSections,
@@ -65,6 +66,7 @@ const roleDescriptions: Record<EmployeeRole, string> = {
 
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
+const verifixApi = useVerifixApi()
 const financeApi = useFinanceApi()
 const historyApi = useHistoryApi()
 const kioskApi = useKioskApi()
@@ -143,6 +145,42 @@ const form = reactive({
   role: 'barber' as EmployeeRole,
   specialization: ''
 })
+
+type PersonalScheduleDay = {
+  day_of_week: number
+  enabled: boolean
+  end_time: string
+  grace_minutes: number
+  start_time: string
+}
+
+const workWeekDays = [
+  { label: 'Воскресенье', value: 0 },
+  { label: 'Понедельник', value: 1 },
+  { label: 'Вторник', value: 2 },
+  { label: 'Среда', value: 3 },
+  { label: 'Четверг', value: 4 },
+  { label: 'Пятница', value: 5 },
+  { label: 'Суббота', value: 6 }
+]
+const personalScheduleEnabled = ref(false)
+const personalScheduleDays = ref<PersonalScheduleDay[]>([])
+const personalScheduleLoading = ref(false)
+const personalScheduleLoaded = ref(true)
+const personalScheduleLoadError = ref(false)
+
+function resetPersonalSchedule() {
+  personalScheduleEnabled.value = false
+  personalScheduleDays.value = workWeekDays.map(day => ({
+    day_of_week: day.value,
+    enabled: false,
+    end_time: '20:00',
+    grace_minutes: 0,
+    start_time: '10:00'
+  }))
+  personalScheduleLoaded.value = true
+  personalScheduleLoadError.value = false
+}
 
 const fieldErrors = reactive<Record<string, string>>({})
 
@@ -952,6 +990,7 @@ function resetForm(clearEditing = true) {
   form.branch_id = branchStore.activeBranchId || ''
   form.permissions = [...employeeRolePermissionPresets.barber]
   isSyncingRolePreset.value = false
+  resetPersonalSchedule()
   clearFieldErrors()
 }
 
@@ -1008,9 +1047,40 @@ function clearAvatar() {
   form.photo_url = ''
 }
 
-function startEdit(row: EmployeeRow) {
+async function loadPersonalSchedule(barberId: string) {
+  personalScheduleLoading.value = true
+  personalScheduleLoadError.value = false
+  try {
+    const response = await verifixApi.schedules({ barber_id: barberId })
+    const schedules = (response.items || []).filter(schedule => schedule.is_active && schedule.barber_id === barberId)
+    resetPersonalSchedule()
+    if (schedules.length) {
+      personalScheduleEnabled.value = true
+      for (const schedule of schedules) {
+        const day = personalScheduleDays.value.find(item => item.day_of_week === schedule.day_of_week)
+        if (!day) continue
+        day.enabled = schedule.is_working !== false
+        day.start_time = String(schedule.start_time || day.start_time).slice(0, 5)
+        day.end_time = String(schedule.end_time || day.end_time).slice(0, 5)
+        day.grace_minutes = Number(schedule.grace_minutes || 0)
+      }
+    }
+    personalScheduleLoaded.value = true
+  }
+  catch {
+    personalScheduleLoadError.value = true
+    personalScheduleLoaded.value = false
+  }
+  finally {
+    personalScheduleLoading.value = false
+  }
+}
+
+async function startEdit(row: EmployeeRow) {
   clearFieldErrors()
   editingId.value = row.id
+  resetPersonalSchedule()
+  personalScheduleLoaded.value = false
 
   clearAvatarSelection()
   isSyncingRolePreset.value = true
@@ -1028,6 +1098,50 @@ function startEdit(row: EmployeeRow) {
   isSyncingRolePreset.value = false
 
   formModalOpen.value = true
+  await loadPersonalSchedule(row.id)
+}
+
+async function savePersonalSchedule(barberId: string, branchId: string, enabled: boolean) {
+  const response = await verifixApi.schedules({ barber_id: barberId })
+  const activeSchedules = (response.items || []).filter(schedule => schedule.is_active && schedule.barber_id === barberId)
+
+  if (!enabled) {
+    await Promise.all(activeSchedules.map(schedule => verifixApi.deactivateSchedule(schedule.id)))
+    return
+  }
+
+  const workDays = personalScheduleDays.value.filter(day => day.enabled)
+  if (!workDays.length) {
+    throw new Error('Выберите хотя бы один рабочий день или отключите индивидуальный график.')
+  }
+  if (workDays.some(day => !day.start_time || !day.end_time || day.start_time === day.end_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
+    throw new Error('Проверьте время смены и допуск для каждого рабочего дня.')
+  }
+
+  const schedulesByDay = new Map<number, VerifixSchedule[]>()
+  for (const schedule of activeSchedules) {
+    const existing = schedulesByDay.get(schedule.day_of_week) || []
+    existing.push(schedule)
+    schedulesByDay.set(schedule.day_of_week, existing)
+  }
+
+  for (const day of personalScheduleDays.value) {
+    const payload = {
+      barber_id: barberId,
+      branch_id: branchId,
+      day_of_week: day.day_of_week,
+      end_time: day.enabled ? day.end_time : null,
+      grace_minutes: Math.max(0, Number(day.grace_minutes) || 0),
+      is_working: day.enabled,
+      start_time: day.enabled ? day.start_time : null
+    }
+    const matching = schedulesByDay.get(day.day_of_week) || []
+    const [existing, ...duplicates] = matching
+
+    if (existing) await verifixApi.updateSchedule(existing.id, payload)
+    else await verifixApi.createSchedule(payload)
+    await Promise.all(duplicates.map(schedule => verifixApi.deactivateSchedule(schedule.id)))
+  }
 }
 
 function applyFieldErrors(issues: Array<{ message?: string, path?: PropertyKey[] }>) {
@@ -1095,6 +1209,19 @@ async function submitEmployee() {
     return
   }
 
+  const hasBarberRole = form.role === 'barber' || form.role === 'super-barber'
+  if (!personalScheduleLoaded.value) {
+    apiClient.notifyError(new Error('Не удалось загрузить персональный график'), 'Повторите загрузку графика перед сохранением сотрудника.')
+    return
+  }
+  if (hasBarberRole && personalScheduleEnabled.value) {
+    const workDays = personalScheduleDays.value.filter(day => day.enabled)
+    if (!workDays.length || workDays.some(day => !day.start_time || !day.end_time || day.start_time === day.end_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
+      apiClient.notifyError(new Error('Проверьте персональный график'), 'Выберите рабочие дни, задайте время смены и укажите неотрицательный допуск.')
+      return
+    }
+  }
+
   try {
     submitting.value = true
 
@@ -1119,6 +1246,7 @@ async function submitEmployee() {
 
       const body = avatarFile.value ? buildEmployeeFormData(parsed.data) : parsed.data
       await barbersApi.update(editingId.value, body)
+      await savePersonalSchedule(editingId.value, parsed.data.branch_id, hasBarberRole && personalScheduleEnabled.value)
     }
     else {
       const parsed = barberRegisterSchema.safeParse({
@@ -1140,7 +1268,17 @@ async function submitEmployee() {
       }
 
       const body = avatarFile.value ? buildEmployeeFormData(parsed.data) : parsed.data
-      await barbersApi.register(body)
+      const response = await barbersApi.register(body) as any
+      const barberId = String(response?.item?.id || response?.barber?.id || response?.user?.id || '')
+      if (!barberId && hasBarberRole && personalScheduleEnabled.value) {
+        throw new Error('Сотрудник создан, но не удалось определить его ID для сохранения графика.')
+      }
+      if (barberId && hasBarberRole && personalScheduleEnabled.value) {
+        // If schedule saving fails, keep the created employee in edit mode so
+        // the user can retry without submitting a duplicate registration.
+        editingId.value = barberId
+        await savePersonalSchedule(barberId, parsed.data.branch_id, true)
+      }
     }
 
     await refreshDirectory()
@@ -1656,6 +1794,43 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <div v-if="form.role === 'barber' || form.role === 'super-barber'" class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="space-y-1">
+                <h3 class="barbershop-heading text-xl text-charcoal-950">График работы</h3>
+                <p class="max-w-2xl text-sm leading-6 text-charcoal-500">
+                  Индивидуальный график мастера заменяет график филиала при проверке опозданий. Если он выключен, действует общий график филиала.
+                </p>
+              </div>
+              <USwitch v-model="personalScheduleEnabled" label="Индивидуальный график" :disabled="personalScheduleLoading || !personalScheduleLoaded" />
+            </div>
+
+            <div v-if="personalScheduleLoading" class="mt-4 rounded-xl bg-charcoal-50 px-4 py-3 text-sm text-charcoal-500">
+              Загружаю текущий график мастера…
+            </div>
+            <div v-else-if="personalScheduleLoadError" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Не удалось загрузить текущий график. Повторите попытку перед сохранением.
+              <UButton size="xs" color="error" variant="outline" @click="loadPersonalSchedule(editingId)">Повторить</UButton>
+            </div>
+
+            <div v-else-if="personalScheduleEnabled" class="mt-4 space-y-4">
+              <div class="grid gap-2">
+                <div v-for="day in personalScheduleDays" :key="day.day_of_week" class="grid gap-3 rounded-xl border border-charcoal-200 bg-charcoal-50/40 p-3 sm:grid-cols-[minmax(9rem,1.1fr)_repeat(3,minmax(6rem,1fr))] sm:items-center">
+                  <UCheckbox v-model="day.enabled" :label="workWeekDays.find(item => item.value === day.day_of_week)?.label" />
+                  <UFormField label="Начало">
+                    <UInput v-model="day.start_time" type="time" :disabled="!day.enabled" />
+                  </UFormField>
+                  <UFormField label="Окончание">
+                    <UInput v-model="day.end_time" type="time" :disabled="!day.enabled" />
+                  </UFormField>
+                  <UFormField label="Допуск, мин">
+                    <UInput v-model.number="day.grace_minutes" type="number" min="0" step="1" :disabled="!day.enabled" />
+                  </UFormField>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="space-y-1">
@@ -1774,7 +1949,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="flex flex-wrap items-center justify-end gap-3">
-            <UButton color="primary" :icon="submitIcon" type="submit" :loading="submitting">
+            <UButton color="primary" :icon="submitIcon" type="submit" :loading="submitting" :disabled="personalScheduleLoading || personalScheduleLoadError">
               {{ submitLabel }}
             </UButton>
             <UButton color="neutral" variant="ghost" type="button" :disabled="submitting" @click="resetForm(!isEditing)">

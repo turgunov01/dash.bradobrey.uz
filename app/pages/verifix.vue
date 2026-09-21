@@ -177,16 +177,21 @@ const employeeNameMap = computed(() => new Map(
 ))
 
 const schedulesByBranchAndDay = computed(() => {
-  const schedules = new Map<string, { graceMinutes: number, startMinutes: number, startTime: string }>()
+  const schedules = new Map<string, { graceMinutes: number, isWorking: boolean, startMinutes: number, startTime: string }>()
   for (const schedule of verifixData.value.schedules) {
-    const key = `${schedule.branch_id}:${schedule.day_of_week}`
-    if (!schedule.is_active || schedule.barber_id || schedules.has(key)) continue
+    const key = `${schedule.branch_id}:${schedule.barber_id || '*'}:${schedule.day_of_week}`
+    if (!schedule.is_active || schedules.has(key)) continue
+    if (schedule.is_working === false) {
+      schedules.set(key, { graceMinutes: 0, isWorking: false, startMinutes: 0, startTime: '' })
+      continue
+    }
     const startMinutes = getTimeMinutes(schedule.start_time)
     if (startMinutes === null) continue
     schedules.set(key, {
       graceMinutes: Math.max(0, Number(schedule.grace_minutes) || 0),
+      isWorking: true,
       startMinutes,
-      startTime: schedule.start_time.slice(0, 5)
+      startTime: String(schedule.start_time).slice(0, 5)
     })
   }
   return schedules
@@ -210,8 +215,10 @@ const lateRows = computed<LateRow[]>(() => {
   }
 
   return [...firstLogins.values()].flatMap(({ barberId, branchId, loginAt }) => {
-    const schedule = schedulesByBranchAndDay.value.get(`${branchId}:${loginAt.getDay()}`)
-    if (!schedule) return []
+    const dayOfWeek = loginAt.getDay()
+    const schedule = schedulesByBranchAndDay.value.get(`${branchId}:${barberId}:${dayOfWeek}`)
+      || schedulesByBranchAndDay.value.get(`${branchId}:*:${dayOfWeek}`)
+    if (!schedule?.isWorking) return []
 
     const loginMinutes = loginAt.getHours() * 60 + loginAt.getMinutes()
     const lateMinutes = Math.max(0, loginMinutes - schedule.startMinutes - schedule.graceMinutes)
