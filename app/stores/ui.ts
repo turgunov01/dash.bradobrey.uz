@@ -22,14 +22,18 @@ export type DebugEntry = {
 }
 
 function getDefaultRange(): StatisticsRange {
-  const end = new Date()
-  const start = new Date()
-
-  start.setDate(end.getDate() - 30)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric'
+  }).formatToParts(new Date())
+  const year = parts.find(part => part.type === 'year')?.value || '2000'
+  const month = parts.find(part => part.type === 'month')?.value || '01'
+  const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
 
   return {
-    end: end.toISOString().slice(0, 10),
-    start: start.toISOString().slice(0, 10)
+    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`,
+    start: `${year}-${month}-01`
   }
 }
 

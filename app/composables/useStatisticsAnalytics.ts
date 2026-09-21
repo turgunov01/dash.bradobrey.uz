@@ -3,6 +3,7 @@ import type { FlatServiceItem } from '~/utils/services'
 
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 import { formatPaymentMethod } from '~/utils/display'
+import { createServicePriceMap, getHistoryAmount, isCompletedHistoryStatus } from '~/utils/historyMetrics'
 import { flattenServicesPayload } from '~/utils/services'
 
 export type StatisticsScope = 'barber' | 'branch' | 'global'
@@ -172,13 +173,23 @@ function parseRangeDate(value: string | null | undefined) {
     return null
   }
 
-  const date = new Date(`${normalizedValue}T00:00:00`)
+  const date = new Date(`${normalizedValue}T00:00:00+05:00`)
 
   return Number.isNaN(date.getTime()) ? null : date
 }
 
 function toDateKey(timestamp: number) {
-  return new Date(timestamp).toISOString().slice(0, 10)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric'
+  }).formatToParts(timestamp)
+  const year = parts.find(part => part.type === 'year')?.value
+  const month = parts.find(part => part.type === 'month')?.value
+  const day = parts.find(part => part.type === 'day')?.value
+
+  return year && month && day ? `${year}-${month}-${day}` : ''
 }
 
 function shortId(value: string | null | undefined) {
@@ -196,7 +207,7 @@ function normalizeStatus(value: unknown) {
 }
 
 function isCompletedStatus(status: string) {
-  return ['completed', 'done', 'paid'].includes(status)
+  return isCompletedHistoryStatus(status)
 }
 
 function isCancelledStatus(status: string) {
@@ -265,7 +276,8 @@ function formatMinutes(value: number) {
 
 const shortDayFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
-  month: 'short'
+  month: 'short',
+  timeZone: 'Asia/Tashkent'
 })
 
 function toPieSlices<T>(
@@ -313,11 +325,10 @@ export async function useStatisticsAnalytics() {
   const statisticsData = useAsyncData('statistics-dashboard-rich', async () => {
     await branchStore.ensureLoaded()
 
-    const branchId = branchStore.activeBranchId || undefined
     const [historyResult, servicesResult, barbersResult] = await Promise.allSettled([
-      historyApi.listAll(branchId ? { branch_id: branchId } : undefined),
-      kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) }),
-      barbersApi.list(branchId ? { branch_id: branchId } : undefined)
+      historyApi.listAll({ __skipBranchScope: true }),
+      kioskApi.services({ __skipBranchScope: true, active: true, grouped: true }),
+      barbersApi.list({ __skipBranchScope: true })
     ])
 
     return {
@@ -332,8 +343,7 @@ export async function useStatisticsAnalytics() {
         : [] as FlatServiceItem[]
     }
   }, {
-    server: false,
-    watch: [() => branchStore.activeBranchId]
+    server: false
   })
 
   const { data, pending, refresh } = statisticsData
@@ -343,6 +353,8 @@ export async function useStatisticsAnalytics() {
       (data.value?.services || []).map((service): [string, FlatServiceItem] => [String(service.id), service])
     )
   )
+
+  const servicePriceMap = computed(() => createServicePriceMap(data.value?.services || []))
 
   const branchMap = computed<Map<string, Branch>>(() =>
     new Map<string, Branch>(
@@ -362,9 +374,7 @@ export async function useStatisticsAnalytics() {
       const clientPhone = getClientPhone(item)
       const serviceIds = getServiceIds(item)
       const status = normalizeStatus(item.status)
-      const estimatedRevenue = serviceIds.reduce((sum, serviceId) => {
-        return sum + getServicePrice(serviceMap.value.get(serviceId))
-      }, 0)
+      const estimatedRevenue = getHistoryAmount(item, servicePriceMap.value)
       const estimatedServiceMinutes = serviceIds.reduce((sum, serviceId) => {
         return sum + getServiceDuration(serviceMap.value.get(serviceId))
       }, 0)
@@ -681,7 +691,7 @@ export async function useStatisticsAnalytics() {
       cancelled: point.cancelled,
       completed: point.completed,
       dateKey,
-      label: shortDayFormatter.format(new Date(`${dateKey}T00:00:00`))
+      label: shortDayFormatter.format(new Date(`${dateKey}T00:00:00+05:00`))
     }))
   })
 

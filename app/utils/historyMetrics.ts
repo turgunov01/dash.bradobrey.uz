@@ -191,14 +191,12 @@ export function isCompletedHistoryStatus(value: unknown) {
 
 export function getHistoryDateKey(item: Record<string, any>) {
   const value = normalizeText(
-    item.completed_at
-    || item.completedAt
+    item.created_at
+    || item.createdAt
     || item.finished_at
     || item.finishedAt
-    || item.updated_at
-    || item.updatedAt
-    || item.created_at
-    || item.createdAt
+    || item.completed_at
+    || item.completedAt
   )
 
   if (!value) {
@@ -207,7 +205,19 @@ export function getHistoryDateKey(item: Record<string, any>) {
 
   const date = new Date(value)
 
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10)
+  if (Number.isNaN(date.getTime())) return null
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric'
+  }).formatToParts(date)
+  const year = parts.find(part => part.type === 'year')?.value
+  const month = parts.find(part => part.type === 'month')?.value
+  const day = parts.find(part => part.type === 'day')?.value
+
+  return year && month && day ? `${year}-${month}-${day}` : null
 }
 
 export function isHistoryInDateRange(item: Record<string, any>, range: HistoryMetricsRange) {

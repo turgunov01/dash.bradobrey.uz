@@ -56,7 +56,7 @@ const {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
-          subtitle="Выручка и средний чек считаются по прайсу услуг в завершённых записях, так как backend не отдаёт отдельное поле revenue."
+          subtitle="Выручка считается по сумме заказа или оплате, а если сумма недоступна — по прайсу услуг. Начальный период — текущий месяц."
           title="Бизнес-аналитика по истории записей"
         />
 

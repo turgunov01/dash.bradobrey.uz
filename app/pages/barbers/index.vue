@@ -1209,12 +1209,11 @@ async function submitEmployee() {
     return
   }
 
-  const hasBarberRole = form.role === 'barber' || form.role === 'super-barber'
   if (!personalScheduleLoaded.value) {
     apiClient.notifyError(new Error('Не удалось загрузить персональный график'), 'Повторите загрузку графика перед сохранением сотрудника.')
     return
   }
-  if (hasBarberRole && personalScheduleEnabled.value) {
+  if (personalScheduleEnabled.value) {
     const workDays = personalScheduleDays.value.filter(day => day.enabled)
     if (!workDays.length || workDays.some(day => !day.start_time || !day.end_time || day.start_time === day.end_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
       apiClient.notifyError(new Error('Проверьте персональный график'), 'Выберите рабочие дни, задайте время смены и укажите неотрицательный допуск.')
@@ -1246,7 +1245,7 @@ async function submitEmployee() {
 
       const body = avatarFile.value ? buildEmployeeFormData(parsed.data) : parsed.data
       await barbersApi.update(editingId.value, body)
-      await savePersonalSchedule(editingId.value, parsed.data.branch_id, hasBarberRole && personalScheduleEnabled.value)
+      await savePersonalSchedule(editingId.value, parsed.data.branch_id, personalScheduleEnabled.value)
     }
     else {
       const parsed = barberRegisterSchema.safeParse({
@@ -1270,10 +1269,10 @@ async function submitEmployee() {
       const body = avatarFile.value ? buildEmployeeFormData(parsed.data) : parsed.data
       const response = await barbersApi.register(body) as any
       const barberId = String(response?.item?.id || response?.barber?.id || response?.user?.id || '')
-      if (!barberId && hasBarberRole && personalScheduleEnabled.value) {
+      if (!barberId && personalScheduleEnabled.value) {
         throw new Error('Сотрудник создан, но не удалось определить его ID для сохранения графика.')
       }
-      if (barberId && hasBarberRole && personalScheduleEnabled.value) {
+      if (barberId && personalScheduleEnabled.value) {
         // If schedule saving fails, keep the created employee in edit mode so
         // the user can retry without submitting a duplicate registration.
         editingId.value = barberId
@@ -1794,19 +1793,19 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="form.role === 'barber' || form.role === 'super-barber'" class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
+          <div class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <h3 class="barbershop-heading text-xl text-charcoal-950">График работы</h3>
                 <p class="max-w-2xl text-sm leading-6 text-charcoal-500">
-                  Индивидуальный график мастера заменяет график филиала при проверке опозданий. Если он выключен, действует общий график филиала.
+                  Индивидуальный график сотрудника заменяет график филиала при проверке опозданий. Если он выключен, действует общий график филиала.
                 </p>
               </div>
               <USwitch v-model="personalScheduleEnabled" label="Индивидуальный график" :disabled="personalScheduleLoading || !personalScheduleLoaded" />
             </div>
 
             <div v-if="personalScheduleLoading" class="mt-4 rounded-xl bg-charcoal-50 px-4 py-3 text-sm text-charcoal-500">
-              Загружаю текущий график мастера…
+              Загружаю текущий график сотрудника…
             </div>
             <div v-else-if="personalScheduleLoadError" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Не удалось загрузить текущий график. Повторите попытку перед сохранением.

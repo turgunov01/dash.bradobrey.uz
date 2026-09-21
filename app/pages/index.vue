@@ -46,11 +46,13 @@ await Promise.all([
 ])
 
 const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${currentMonthRange.start}`, async () => {
+  const monthStartAt = `${currentMonthRange.start}T00:00:00+05:00`
+  const monthEndAt = `${currentMonthRange.end}T23:59:59.999+05:00`
   const rangeQuery = {
-    end_date: currentMonthRange.end,
-    from: currentMonthRange.start,
-    start_date: currentMonthRange.start,
-    to: currentMonthRange.end
+    end_date: monthEndAt,
+    from: monthStartAt,
+    start_date: monthStartAt,
+    to: monthEndAt
   }
   const [health, branches, promoDashboard, history, servicesPayload, queueStats] = await Promise.all([
     $fetch('/api/health').catch(() => null),
@@ -67,8 +69,8 @@ const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${curr
     }).catch(() => ({ services: [] })),
     statisticsApi.global({
       __skipBranchScope: true,
-      start_date: currentMonthRange.start,
-      end_date: `${currentMonthRange.end}T23:59:59.999Z`
+      start_date: monthStartAt,
+      end_date: monthEndAt
     }).catch(() => null)
   ])
   const statistics = summarizeHistoryMetrics(
