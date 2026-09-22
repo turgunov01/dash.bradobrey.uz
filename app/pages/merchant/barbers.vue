@@ -455,8 +455,7 @@ async function confirmDelete() {
                 :disabled="!branchOptions.length"
                 :items="branchOptions"
                 placeholder="Выберите филиал"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <UFormField label="Специализация">
@@ -466,8 +465,7 @@ async function confirmDelete() {
                 :items="serviceOptions"
                 multiple
                 placeholder="Выберите услуги"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">
@@ -535,8 +533,7 @@ async function confirmDelete() {
                 :disabled="!branchOptions.length"
                 :items="branchOptions"
                 placeholder="Выберите филиал"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <UFormField label="Специализация">
@@ -546,8 +543,7 @@ async function confirmDelete() {
                 :items="serviceOptions"
                 multiple
                 placeholder="Выберите услуги"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">

@@ -448,18 +448,36 @@ async function removeBranch(row: BranchRow) {
 <template>
   <UDashboardPanel id="branches">
     <template #header>
-      <UDashboardNavbar title="Филиалы" :ui="{ right: 'gap-3' }">
+      <UDashboardNavbar
+        class="service-categories-navbar"
+        title="Филиалы"
+        :ui="{ root: 'min-h-14 sm:min-h-16', right: 'gap-2 sm:gap-3' }"
+      >
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
 
         <template #right>
-          <UButton icon="i-lucide-calendar-days" :disabled="pending || !allScheduleBranches.length" @click="bulkScheduleOpen = true">Время для всех филиалов</UButton>
-          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
-            Обновить
+          <UButton
+            icon="i-lucide-calendar-days"
+            :disabled="pending || !allScheduleBranches.length"
+            aria-label="Время для всех филиалов"
+            @click="bulkScheduleOpen = true"
+          >
+            <span class="hidden sm:inline">Время для всех филиалов</span>
           </UButton>
-          <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal">
-            Создать
+          <UButton
+            color="neutral"
+            icon="i-lucide-refresh-cw"
+            :loading="pending"
+            variant="outline"
+            aria-label="Обновить"
+            @click="refresh()"
+          >
+            <span class="hidden sm:inline">Обновить</span>
+          </UButton>
+          <UButton color="primary" icon="i-lucide-plus" aria-label="Создать филиал" @click="openCreateModal">
+            <span class="hidden sm:inline">Создать</span>
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -648,10 +666,10 @@ async function removeBranch(row: BranchRow) {
 
             <div class="grid gap-4 md:grid-cols-2">
               <UFormField label="Сотрудник">
-                <USelectMenu v-model="scheduleForm.barber_id" class="w-full" :items="scheduleBarberOptions" placeholder="Все барберы филиала" value-key="value" />
+                <USelectMenu v-model="scheduleForm.barber_id" class="w-full" :items="scheduleBarberOptions" placeholder="Все барберы филиала" value-key="value" portal="body" />
               </UFormField>
               <UFormField label="День недели" required>
-                <USelectMenu v-model="scheduleForm.day_of_week" class="w-full" :items="scheduleDays" value-key="value" />
+                <USelectMenu v-model="scheduleForm.day_of_week" class="w-full" :items="scheduleDays" value-key="value" portal="body" />
               </UFormField>
               <UFormField label="Начало смены" required>
                 <UInput v-model="scheduleForm.start_time" type="time" />

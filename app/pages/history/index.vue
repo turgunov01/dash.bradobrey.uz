@@ -760,7 +760,7 @@ async function loadAllHistoryPages(query: Record<string, string>) {
 }
 
 const initialHistoryPageSize = 100
-const { data, pending, refresh } = await useAsyncData('history-current-filter', async () => {
+const { data, pending, error: historyError, refresh } = await useAsyncData('history-current-filter', async () => {
   const response = await historyApi.list({
     ...historyQuery.value,
     limit: initialHistoryPageSize,
@@ -836,6 +836,7 @@ const statusFilterOptions = [
   { label: 'Все статусы', value: allStatusesValue },
   { label: 'Завершён', value: 'completed' },
   { label: 'Отменён', value: 'cancelled' },
+  { label: 'Отклонён', value: 'rejected' },
   { label: 'Неявка', value: 'no_show' },
   { label: 'Не вовремя', value: 'not_in_time' },
   { label: 'Подозрительный', value: suspiciousStatusValue }
@@ -1011,7 +1012,9 @@ async function loadHistoryDay(date: string) {
     }
     const dayItems = await loadAllHistoryPages(query)
     const otherDays = historyItems.value.filter(item => getVisitDateKey(item as Record<string, any>) !== date)
-    if (data.value) data.value = { ...data.value, items: [...otherDays, ...dayItems] }
+    const existingDayItems = historyItems.value.filter(item => getVisitDateKey(item as Record<string, any>) === date)
+    const resolvedDayItems = dayItems.length ? dayItems : existingDayItems
+    if (data.value) data.value = { ...data.value, items: [...otherDays, ...resolvedDayItems] }
     loadedHistoryDays.value[date] = true
   }
   catch {
@@ -1180,12 +1183,17 @@ async function exportHistoryToExcel() {
 
 <template>
   <UDashboardPanel id="history-global">
+    <template #header>
+      <UDashboardNavbar title="История">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" variant="soft">
   {{ allBranches ? 'Все филиалы' : (branchStore.activeBranch?.name || 'Общее по всем филиалам') }}
         </UBadge>
-        <div class="flex items-center gap-2">
+        <div class="history-actions flex flex-wrap items-center justify-end gap-2">
           <UBadge color="neutral" variant="outline">
             {{ rows.length }} записей
           </UBadge>
@@ -1208,7 +1216,7 @@ async function exportHistoryToExcel() {
             >
               Столбцы
             </UButton>
-            <div v-if="columnMenuOpen" class="absolute right-0 z-30 mt-2 w-64 space-y-2 rounded-xl border border-charcoal-200 bg-white p-4 shadow-xl">
+            <div v-if="columnMenuOpen" class="history-column-menu absolute right-0 z-30 mt-2 w-64 space-y-2 rounded-xl border border-charcoal-200 bg-white p-4 shadow-xl">
               <UCheckbox
                 v-for="option in columnOptions"
                 :key="option.key"
@@ -1226,7 +1234,7 @@ async function exportHistoryToExcel() {
         </div>
       </div>
 
-      <div class="mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
+      <div class="history-filters mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
         <UFormField label="Поиск">
           <UInput v-model="search" class="w-full" icon="i-lucide-search" placeholder="Клиент, телефон, барбер, услуга или ID" />
         </UFormField>
@@ -1236,8 +1244,7 @@ async function exportHistoryToExcel() {
             v-model="selectedBarberId"
             class="w-full"
             :items="barberFilterOptions"
-            value-key="value"
-          />
+            value-key="value" portal="body" />
         </UFormField>
 
         <UFormField label="Статус">
@@ -1245,8 +1252,7 @@ async function exportHistoryToExcel() {
             v-model="selectedStatus"
             class="w-full"
             :items="statusFilterOptions"
-            value-key="value"
-          />
+            value-key="value" portal="body" />
         </UFormField>
 
         <UFormField label="От">
@@ -1268,8 +1274,8 @@ async function exportHistoryToExcel() {
         </UButton>
       </div>
 
-      <div v-if="rows.length" class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-        <div class="flex-1 overflow-auto">
+      <div v-if="rows.length" class="flex flex-col rounded-[1.25rem] border border-charcoal-200 bg-white/90 sm:max-h-[70vh] sm:overflow-hidden">
+        <div class="sm:flex-1 sm:overflow-auto">
           <div v-for="day in historyDays" :key="day.date" class="border-b border-charcoal-200 last:border-b-0">
             <button type="button" class="flex w-full cursor-pointer items-center px-4 py-3 text-left text-sm font-semibold text-charcoal-950 hover:bg-charcoal-50" @click="toggleHistoryDay(day.date)">
               <span class="mr-2 text-charcoal-500 transition-transform duration-200" :class="expandedHistoryDays[day.date] ? 'rotate-90' : ''">▸</span>{{ day.date }}<span class="ml-2 text-xs font-normal text-charcoal-500">({{ day.items.length }})</span>
@@ -1372,6 +1378,15 @@ async function exportHistoryToExcel() {
           </div>
         </div>
       </div>
+
+      <UAlert
+        v-if="historyError"
+        class="mb-4"
+        color="error"
+        icon="i-lucide-triangle-alert"
+        title="Не удалось загрузить историю"
+        description="Проверьте подключение к API и повторите запрос."
+      />
 
       <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
         По выбранным фильтрам записи отсутствуют.

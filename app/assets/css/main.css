@@ -52,6 +52,78 @@
 body {
   background: var(--dashboard-shell);
   color: var(--color-charcoal-900);
+  overflow-x: hidden;
+}
+
+/* Keep the application shell usable on narrow phones. Wide data tables keep
+ * their own horizontal scroll, while the page itself never becomes wider than
+ * the viewport. */
+.dashboard-shell {
+  min-width: 0;
+  max-width: 100vw;
+}
+
+.dashboard-shell [data-slot='right'] {
+  min-width: 0;
+}
+
+.dashboard-shell [data-slot='right'] > * {
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .history-actions > button,
+  .history-actions > .relative {
+    flex: 1 1 auto;
+  }
+
+  .history-actions > button {
+    justify-content: center;
+  }
+
+  .history-column-menu {
+    left: 0;
+    right: auto;
+    width: min(16rem, calc(100vw - 2rem));
+  }
+
+  .history-filters {
+    padding: 0.875rem;
+  }
+
+  .dashboard-shell [data-slot='title'] {
+    min-width: 0;
+    max-width: min(52vw, 14rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dashboard-shell [data-slot='right'] {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .dashboard-shell [data-slot='right'] > button,
+  .dashboard-shell [data-slot='right'] > a {
+    max-width: 100%;
+  }
+
+  .dashboard-shell [data-slot='body'] {
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .dashboard-shell .warm-card {
+    border-radius: 1.25rem;
+  }
+
+  .dashboard-shell .overflow-x-auto,
+  .dashboard-shell [data-slot='root'].overflow-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
 }
 
 ::selection {

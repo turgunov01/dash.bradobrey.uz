@@ -37,7 +37,7 @@ const utilityLinks = computed(() =>
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
+  <UDashboardGroup class="dashboard-shell" unit="rem">
     <UDashboardSidebar
       id="main"
       v-model:open="open"

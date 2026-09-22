@@ -65,12 +65,11 @@ const uiStore = useUiStore()
             { label: 'Филиал', value: 'branch' },
             { label: 'Барбер', value: 'barber' }
           ]"
-          value-key="value"
-        />
+          value-key="value" portal="body" />
       </UFormField>
 
       <UFormField v-if="scope === 'barber'" label="Барбер">
-        <USelectMenu v-model="selectedBarberId" :items="barberOptions" value-key="value" />
+        <USelectMenu v-model="selectedBarberId" :items="barberOptions" value-key="value" portal="body" />
       </UFormField>
     </div>
   </UCard>

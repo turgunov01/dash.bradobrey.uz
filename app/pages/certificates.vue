@@ -232,12 +232,17 @@ async function lookupCertificate() {
 
 <template>
   <UDashboardPanel id="certificates">
+    <template #header>
+      <UDashboardNavbar title="Сертификаты">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" size="lg" variant="soft">
           {{ activeCertificates.length }} активных
         </UBadge>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal()">
             Создать
           </UButton>
@@ -359,8 +364,7 @@ async function lookupCertificate() {
             :items="serviceOptions"
             multiple
             placeholder="Выберите услуги"
-            value-key="value"
-          />
+            value-key="value" portal="body" />
         </UFormField>
 
         <UFormField label="Действует до (ISO)">

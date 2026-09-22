@@ -426,7 +426,7 @@ function clearAvailability() {
                 <USelect
                   v-model="selectedBarberId"
                   class="w-full sm:w-72"
-                  :items="barbers.map(b => ({ label: b.name, value: b.id }))"
+                  :items="barbers.map(b => ({ label: b.name, value: b.id }))" portal="body"
                 />
               </div>
 
@@ -438,7 +438,7 @@ function clearAvailability() {
                   v-model="selectedServiceIds"
                   multiple
                   class="w-full sm:w-96"
-                  :items="services.map(s => ({ label: s.name, value: s.id }))"
+                  :items="services.map(s => ({ label: s.name, value: s.id }))" portal="body"
                 />
               </div>
             </div>

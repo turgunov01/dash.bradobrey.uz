@@ -295,23 +295,35 @@ async function deletePurchase(row: PurchaseRow) {
 <template>
   <UDashboardPanel id="warehouse-purchases">
     <template #header>
-      <UDashboardNavbar title="Склад · Закупки" :ui="{ right: 'gap-3' }">
+      <UDashboardNavbar
+        class="responsive-dashboard-navbar"
+        title="Склад · Закупки"
+        :ui="{ root: 'min-h-14 sm:min-h-16', right: 'gap-2 sm:gap-3' }"
+      >
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
 
         <template #right>
-          <UInput v-model="period" type="month" size="sm" class="w-[9.5rem]" />
-          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="purchasesPending" variant="outline" @click="refreshPurchases()">
-            Обновить
+          <UInput v-model="period" type="month" size="sm" class="w-32 sm:w-[9.5rem]" aria-label="Период закупок" />
+          <UButton
+            color="neutral"
+            icon="i-lucide-refresh-cw"
+            :loading="purchasesPending"
+            variant="outline"
+            aria-label="Обновить"
+            @click="refreshPurchases()"
+          >
+            <span class="hidden sm:inline">Обновить</span>
           </UButton>
           <UButton
             color="primary"
             icon="i-lucide-plus"
             :disabled="!branchOptions.length || !positionOptions.length"
+            aria-label="Создать закупку"
             @click="openCreatePurchase"
           >
-            Создать закупку
+            <span class="hidden sm:inline">Создать закупку</span>
           </UButton>
         </template>
       </UDashboardNavbar>
@@ -362,10 +374,10 @@ async function deletePurchase(row: PurchaseRow) {
           <div class="space-y-4">
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Филиал" required>
-                <USelectMenu v-model="purchaseForm.branch_id" :items="branchOptions" value-key="value" class="w-full" />
+                <USelectMenu v-model="purchaseForm.branch_id" :items="branchOptions" value-key="value" class="w-full" portal="body" />
               </UFormField>
               <UFormField label="Позиция" required>
-                <USelectMenu v-model="purchaseForm.position_id" :items="positionOptions" value-key="value" class="w-full" />
+                <USelectMenu v-model="purchaseForm.position_id" :items="positionOptions" value-key="value" class="w-full" portal="body" />
               </UFormField>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
@@ -387,7 +399,7 @@ async function deletePurchase(row: PurchaseRow) {
                 <UInput v-model="purchaseForm.purchased_at" type="date" />
               </UFormField>
               <UFormField label="Статус">
-                <USelectMenu v-model="purchaseForm.status" :items="statusOptions" value-key="value" class="w-full" />
+                <USelectMenu v-model="purchaseForm.status" :items="statusOptions" value-key="value" class="w-full" portal="body" />
               </UFormField>
             </div>
             <UAlert

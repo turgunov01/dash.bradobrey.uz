@@ -283,7 +283,7 @@ async function deletePosition(row: PositionRow) {
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Категория">
-                <USelectMenu v-model="positionForm.category" :items="categoryOptions" value-key="value" class="w-full" />
+                <USelectMenu v-model="positionForm.category" :items="categoryOptions" value-key="value" class="w-full" portal="body" />
               </UFormField>
               <UFormField label="Единица">
                 <UInput v-model="positionForm.unit" placeholder="шт, мл, кг" />

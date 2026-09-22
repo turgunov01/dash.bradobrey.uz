@@ -464,11 +464,11 @@ async function removePromo(row: PromoRow) {
 
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Тип скидки">
-                <USelectMenu v-model="createForm.discount_type" :items="discountTypeOptions" value-key="value" />
+                <USelectMenu v-model="createForm.discount_type" :items="discountTypeOptions" value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="Статус">
-                <USelectMenu v-model="createForm.status" :items="statusOptions" value-key="value" />
+                <USelectMenu v-model="createForm.status" :items="statusOptions" value-key="value" portal="body" />
               </UFormField>
             </div>
 
@@ -515,11 +515,11 @@ async function removePromo(row: PromoRow) {
 
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Тип скидки">
-                <USelectMenu v-model="editForm.discount_type" :items="discountTypeOptions" value-key="value" />
+                <USelectMenu v-model="editForm.discount_type" :items="discountTypeOptions" value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="Статус">
-                <USelectMenu v-model="editForm.status" :items="statusOptions" value-key="value" />
+                <USelectMenu v-model="editForm.status" :items="statusOptions" value-key="value" portal="body" />
               </UFormField>
             </div>
 

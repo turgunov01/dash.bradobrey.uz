@@ -2,6 +2,7 @@ const statusLabels: Record<string, string> = {
   active: 'Активно',
   called: 'Вызван',
   cancelled: 'Отменено',
+  rejected: 'Отклонено',
   completed: 'Завершено',
   done: 'Завершено',
   error: 'Ошибка',

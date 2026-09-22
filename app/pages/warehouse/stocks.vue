@@ -269,10 +269,10 @@ async function submitStock() {
         <template #body>
           <div class="space-y-4">
             <UFormField label="Филиал" required>
-              <USelectMenu v-model="stockForm.branch_id" :items="branchOptions" value-key="value" class="w-full" />
+              <USelectMenu v-model="stockForm.branch_id" :items="branchOptions" value-key="value" class="w-full" portal="body" />
             </UFormField>
             <UFormField label="Позиция" required>
-              <USelectMenu v-model="stockForm.position_id" :items="positionOptions" value-key="value" class="w-full" />
+              <USelectMenu v-model="stockForm.position_id" :items="positionOptions" value-key="value" class="w-full" portal="body" />
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Количество">

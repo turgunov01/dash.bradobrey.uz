@@ -287,7 +287,11 @@ async function cloneToAllBranches() {
 <template>
   <UDashboardPanel id="service-categories">
     <template #header>
-      <UDashboardNavbar title="Категории услуг" :ui="{ right: 'gap-3' }">
+      <UDashboardNavbar
+        class="service-categories-navbar"
+        title="Категории услуг"
+        :ui="{ root: 'min-h-14 sm:min-h-16', right: 'gap-2 sm:gap-3' }"
+      >
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -298,9 +302,10 @@ async function cloneToAllBranches() {
             icon="i-lucide-refresh-cw"
             :loading="pending"
             variant="outline"
+            aria-label="Обновить"
             @click="refresh()"
           >
-            Обновить
+            <span class="hidden sm:inline">Обновить</span>
           </UButton>
           <UButton
             color="neutral"
@@ -308,12 +313,19 @@ async function cloneToAllBranches() {
             :disabled="!branchStore.activeBranchId || !rows.length || submitting"
             :loading="cloning"
             variant="outline"
+            aria-label="Клонировать на все филиалы"
             @click="cloneToAllBranches"
           >
-            Клонировать на все филиалы
+            <span class="hidden sm:inline">Клонировать на все филиалы</span>
           </UButton>
-          <UButton color="primary" icon="i-lucide-plus" :disabled="!branchStore.activeBranchId" @click="openCreate">
-            Добавить категорию
+          <UButton
+            color="primary"
+            icon="i-lucide-plus"
+            :disabled="!branchStore.activeBranchId"
+            aria-label="Добавить категорию"
+            @click="openCreate"
+          >
+            <span class="hidden sm:inline">Добавить категорию</span>
           </UButton>
         </template>
       </UDashboardNavbar>

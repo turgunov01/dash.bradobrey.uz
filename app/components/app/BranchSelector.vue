@@ -176,7 +176,6 @@ watch(
       color="neutral"
       :items="options"
       :placeholder="collapsed ? 'Филиал' : 'Выберите филиал'"
-      value-key="value"
-    />
+      value-key="value" portal="body" />
   </div>
 </template>

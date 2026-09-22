@@ -565,8 +565,7 @@ async function confirmDelete() {
                   class="w-full"
                   :items="scheduleBarberOptions"
                   placeholder="Все барберы филиала"
-                  value-key="value"
-                />
+                  value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="День недели" required>
@@ -574,8 +573,7 @@ async function confirmDelete() {
                   v-model="scheduleForm.day_of_week"
                   class="w-full"
                   :items="scheduleDays"
-                  value-key="value"
-                />
+                  value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="Начало смены" required>

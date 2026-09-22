@@ -47,6 +47,11 @@ async function testNotifications() {
 
 <template>
   <UDashboardPanel id="settings-notifications">
+    <template #header>
+      <UDashboardNavbar title="Настройки уведомлений">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="max-w-3xl space-y-6">
         <div>

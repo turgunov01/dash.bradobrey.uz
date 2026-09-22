@@ -323,8 +323,7 @@ async function deleteTemplate(row: TemplateRow) {
                     value-key="value"
                     placeholder="Выберите позицию"
                     class="w-full"
-                    @update:model-value="updateTemplateItemUnit(item)"
-                  />
+                    @update:model-value="updateTemplateItemUnit(item)" portal="body" />
                   <UInput v-model="item.quantity" type="number" min="0.01" step="0.01" placeholder="Количество" />
                   <UButton icon="i-lucide-trash-2" color="error" variant="ghost" aria-label="Удалить позицию" @click="removeTemplateItem(index)" />
                 </div>

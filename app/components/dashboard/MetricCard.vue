@@ -14,7 +14,7 @@ defineProps<{
         <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
           {{ label }}
         </p>
-        <p class="barbershop-heading text-3xl text-charcoal-950">
+        <p class="barbershop-heading break-words text-2xl text-charcoal-950 sm:text-3xl">
           {{ value }}
         </p>
         <p v-if="description" class="text-sm leading-6 text-charcoal-500">

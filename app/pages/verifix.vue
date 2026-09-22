@@ -304,6 +304,11 @@ const detailColumns: TableColumn<LateRow>[] = [
 
 <template>
   <UDashboardPanel id="verifix">
+    <template #header>
+      <UDashboardNavbar title="Verifix">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="space-y-5 sm:space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -326,7 +331,7 @@ const detailColumns: TableColumn<LateRow>[] = [
             </label>
             <label class="space-y-2">
               <span class="text-xs font-semibold uppercase tracking-[0.1em] text-charcoal-500">Филиал</span>
-              <USelectMenu v-model="selectedBranchId" :items="branchOptions" value-key="value" size="lg" class="w-full" placeholder="Выберите филиал" />
+              <USelectMenu v-model="selectedBranchId" :items="branchOptions" value-key="value" size="lg" class="w-full" placeholder="Выберите филиал" portal="body" />
             </label>
           </div>
         </UCard>

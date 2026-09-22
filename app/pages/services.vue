@@ -387,13 +387,18 @@ function openPreview(src: string, title: string) {
 
 <template>
   <UDashboardPanel id="services">
+    <template #header>
+      <UDashboardNavbar title="Услуги">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" size="lg" variant="soft">
           {{ totalServices }} услуг
         </UBadge>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <USelect
             v-model="sortDirection"
             :disabled="savingOrder"
@@ -402,8 +407,7 @@ function openPreview(src: string, title: string) {
               { label: 'A → Я', value: 'asc' },
               { label: 'Я → A', value: 'desc' }
             ]"
-            size="sm"
-          />
+            size="sm" portal="body" />
           <UButton color="success" icon="i-lucide-save" variant="solid" :loading="savingOrder" :disabled="pending || categoriesPending || !totalServices" @click="persistAllOrders">
             Сохранить порядок услуг
           </UButton>
@@ -547,8 +551,7 @@ function openPreview(src: string, title: string) {
                 class="w-full"
                 :items="categoryOptions"
                 placeholder="Выберите категорию"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <div class="grid gap-4 sm:grid-cols-2">

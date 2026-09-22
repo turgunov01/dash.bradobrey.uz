@@ -308,8 +308,7 @@ async function deleteBarbershop(row: BarbershopRow) {
                     { label: 'Только активные', value: 'active' },
                     { label: 'Только неактивные', value: 'inactive' },
                     { label: 'Все', value: 'all' }
-                  ]"
-                />
+                  ]" portal="body" />
 
                 <UButton color="primary" icon="i-lucide-search" @click="applyFilters">
                   Показать

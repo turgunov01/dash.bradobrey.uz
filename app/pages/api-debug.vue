@@ -101,7 +101,7 @@ async function executeRequest() {
 
             <div class="space-y-4">
               <UFormField label="Пресет">
-                <USelectMenu v-model="selectedPreset" :items="presets" value-key="value" />
+                <USelectMenu v-model="selectedPreset" :items="presets" value-key="value" portal="body" />
               </UFormField>
               <div class="grid gap-4 sm:grid-cols-[0.3fr_0.7fr]">
                 <UFormField label="Метод">
@@ -114,8 +114,7 @@ async function executeRequest() {
                       { label: 'PUT', value: 'PUT' },
                       { label: 'DELETE', value: 'DELETE' }
                     ]"
-                    value-key="value"
-                  />
+                    value-key="value" portal="body" />
                 </UFormField>
                 <UFormField label="Путь">
                   <UInput v-model="form.path" />

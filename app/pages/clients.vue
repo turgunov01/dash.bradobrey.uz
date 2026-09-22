@@ -623,8 +623,13 @@ function getVisitServiceIds(visit: Record<string, any>) {
 
 <template>
   <UDashboardPanel id="clients">
+    <template #header>
+      <UDashboardNavbar title="Клиенты">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
-      <div class="flex items-center justify-between pb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div class="flex items-center gap-3">
           <UBadge color="neutral" size="lg" variant="soft">
             {{ formatCount(filteredClientRows.length) }} клиентов
@@ -655,8 +660,7 @@ function getVisitServiceIds(visit: Record<string, any>) {
         <USelect
           v-model="serviceFilter"
           :items="serviceOptions"
-          placeholder="Все услуги"
-        />
+          placeholder="Все услуги" portal="body" />
       </div>
 
       <div class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">

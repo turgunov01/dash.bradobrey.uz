@@ -1258,6 +1258,18 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
 
 <template>
   <UDashboardPanel id="finance">
+    <template #header>
+      <UDashboardNavbar
+        class="responsive-dashboard-navbar"
+        title="Финансы"
+        :ui="{ root: 'min-h-14 sm:min-h-16' }"
+      >
+        <template #leading>
+          <UDashboardSidebarCollapse />
+        </template>
+      </UDashboardNavbar>
+    </template>
+
     <template #body>
       <VerifixPenaltySettings />
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
@@ -1271,27 +1283,36 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <UInput v-model="period" type="month" size="sm" class="w-[9.5rem]" />
-          <UButton color="primary" icon="i-lucide-save" :loading="saving" :disabled="!penaltySettings || !!penaltySettingsError" @click="saveToRemote">
-            Сохранить
+          <UInput v-model="period" type="month" size="sm" class="w-32 sm:w-[9.5rem]" aria-label="Период финансовых данных" />
+          <UButton
+            color="primary"
+            icon="i-lucide-save"
+            :loading="saving"
+            :disabled="!penaltySettings || !!penaltySettingsError"
+            aria-label="Сохранить"
+            @click="saveToRemote"
+          >
+            <span class="hidden sm:inline">Сохранить</span>
           </UButton>
           <UButton
             color="neutral"
             variant="outline"
             icon="i-lucide-rotate-ccw"
             :disabled="saving || employeesPending"
+            aria-label="Сбросить"
             @click="resetDraft"
           >
-            Сбросить
+            <span class="hidden sm:inline">Сбросить</span>
           </UButton>
           <UButton
             color="neutral"
             variant="outline"
             icon="i-lucide-refresh-cw"
             :loading="employeesPending || financeHistoryPending || financeServicesPending || verifixPending || verifixSchedulesPending || branchPayrollsPending || remoteLoading || overviewPending"
+            aria-label="Обновить"
             @click="refreshAll"
           >
-            Обновить
+            <span class="hidden sm:inline">Обновить</span>
           </UButton>
         </div>
       </div>

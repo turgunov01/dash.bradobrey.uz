@@ -16,7 +16,7 @@ const color = computed(() => {
     return 'warning'
   }
 
-  if (['cancelled', 'no_show', 'not_in_time', 'inactive', 'error'].includes(value)) {
+  if (['cancelled', 'rejected', 'no_show', 'not_in_time', 'inactive', 'error'].includes(value)) {
     return 'error'
   }
 

@@ -256,8 +256,7 @@ async function markNotInTime() {
                   :items="serviceOptions"
                   multiple
                   placeholder="Выберите одну или несколько услуг"
-                  value-key="value"
-                />
+                  value-key="value" portal="body" />
               </UFormField>
 
               <div class="flex justify-end">

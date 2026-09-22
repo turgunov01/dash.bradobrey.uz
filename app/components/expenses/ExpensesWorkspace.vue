@@ -264,16 +264,14 @@ async function remove(row: ExpenseRow) {
               :items="[{ label: 'Все категории', value: ALL_OPTION_VALUE }, ...categoryOptions]"
               value-key="value"
               class="w-full"
-              placeholder="Все категории"
-            />
+              placeholder="Все категории" portal="body" />
             <USelect
               v-if="canChooseBranch"
               v-model="branchFilter"
               :items="branchOptions"
               value-key="value"
               class="w-full"
-              placeholder="Все филиалы"
-            />
+              placeholder="Все филиалы" portal="body" />
           </div>
         </UCard>
 
@@ -307,9 +305,9 @@ async function remove(row: ExpenseRow) {
               <UFormField label="Дата" required><UInput v-model="form.spent_at" type="date" /></UFormField>
               <UFormField label="Сумма" required><UInput v-model="form.amount" type="number" min="0.01" step="0.01" /></UFormField>
             </div>
-            <UFormField label="Категория" required><USelect v-model="form.category" :items="categoryOptions" value-key="value" class="w-full" placeholder="Выберите категорию" /></UFormField>
+            <UFormField label="Категория" required><USelect v-model="form.category" :items="categoryOptions" value-key="value" class="w-full" placeholder="Выберите категорию" portal="body" /></UFormField>
             <UFormField label="Название" required><UInput v-model="form.name" placeholder="Например, ремонт оборудования" /></UFormField>
-            <UFormField v-if="canChooseBranch" label="Филиал" required><USelect v-model="form.branch_id" :items="branchOptions.slice(1)" value-key="value" class="w-full" placeholder="Выберите филиал" /></UFormField>
+            <UFormField v-if="canChooseBranch" label="Филиал" required><USelect v-model="form.branch_id" :items="branchOptions.slice(1)" value-key="value" class="w-full" placeholder="Выберите филиал" portal="body" /></UFormField>
             <UFormField label="Комментарий"><UTextarea v-model="form.comment" :rows="3" /></UFormField>
           </div>
         </template>

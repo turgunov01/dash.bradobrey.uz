@@ -423,8 +423,7 @@ function openPreview(row: ServiceRow) {
                 class="w-full"
                 :items="categoryOptions"
                 placeholder="Выберите категорию"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <UFormField label="Картинка (URL)">
@@ -488,8 +487,7 @@ function openPreview(row: ServiceRow) {
                 class="w-full"
                 :items="categoryOptions"
                 placeholder="Выберите категорию"
-                value-key="value"
-              />
+                value-key="value" portal="body" />
             </UFormField>
 
             <UFormField label="Картинка (URL)">

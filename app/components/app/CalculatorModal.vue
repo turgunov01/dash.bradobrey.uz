@@ -373,7 +373,7 @@ function handleButtonPress(button: CalculatorButton) {
             :color="button.color"
             :label="button.label"
             :variant="button.variant"
-            class="h-14 justify-center text-lg font-semibold"
+            class="h-12 justify-center text-base font-semibold sm:h-14 sm:text-lg"
             @click="handleButtonPress(button)"
           />
         </div>

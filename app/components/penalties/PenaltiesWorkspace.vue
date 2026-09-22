@@ -221,10 +221,10 @@ async function cancel(row: PenaltyRow) {
         <UCard class="warm-card">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <UInput v-model="period" type="month" placeholder="Период" />
-            <USelect v-if="canChooseBranch" :model-value="branchFilter" :items="branchOptions" value-key="value" class="w-full" placeholder="Все филиалы" @update:model-value="changeBranch" />
-            <USelect v-model="recipientFilter" :items="recipientFilterOptions" value-key="value" class="w-full" :disabled="canChooseBranch && branchFilter === ALL" placeholder="Все сотрудники" />
-            <USelect v-model="sourceFilter" :items="sourceOptions" value-key="value" class="w-full" placeholder="Все типы" />
-            <USelect v-model="statusFilter" :items="statusOptions" value-key="value" class="w-full" placeholder="Все статусы" />
+            <USelect v-if="canChooseBranch" :model-value="branchFilter" :items="branchOptions" value-key="value" class="w-full" placeholder="Все филиалы" @update:model-value="changeBranch" portal="body" />
+            <USelect v-model="recipientFilter" :items="recipientFilterOptions" value-key="value" class="w-full" :disabled="canChooseBranch && branchFilter === ALL" placeholder="Все сотрудники" portal="body" />
+            <USelect v-model="sourceFilter" :items="sourceOptions" value-key="value" class="w-full" placeholder="Все типы" portal="body" />
+            <USelect v-model="statusFilter" :items="statusOptions" value-key="value" class="w-full" placeholder="Все статусы" portal="body" />
           </div>
         </UCard>
         <UCard class="warm-card">
@@ -251,8 +251,8 @@ async function cancel(row: PenaltyRow) {
       <UModal v-model:open="modalOpen" class="sm:max-w-xl" title="Новый штраф">
         <template #body>
           <div class="space-y-4">
-            <UFormField v-if="canChooseBranch" label="Филиал" required><USelect v-model="form.branch_id" :items="branchOptions.slice(1)" value-key="value" class="w-full" placeholder="Выберите филиал" /></UFormField>
-            <UFormField label="Сотрудник" required><USelect v-model="form.recipient_id" :items="employeeOptions" value-key="value" class="w-full" placeholder="Выберите сотрудника" /></UFormField>
+            <UFormField v-if="canChooseBranch" label="Филиал" required><USelect v-model="form.branch_id" :items="branchOptions.slice(1)" value-key="value" class="w-full" placeholder="Выберите филиал" portal="body" /></UFormField>
+            <UFormField label="Сотрудник" required><USelect v-model="form.recipient_id" :items="employeeOptions" value-key="value" class="w-full" placeholder="Выберите сотрудника" portal="body" /></UFormField>
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Дата" required><UInput v-model="form.penalty_at" type="date" /></UFormField>
               <UFormField label="Сумма" required><UInput v-model="form.amount" type="number" min="0.01" step="0.01" /></UFormField>

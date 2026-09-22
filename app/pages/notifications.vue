@@ -6,6 +6,7 @@ const enablingPush = ref(false)
 const sendingTestPush = ref(false)
 const activeFilter = ref<'all' | 'unread'>('all')
 const search = ref('')
+const router = useRouter()
 
 const filteredItems = computed(() => {
   const query = search.value.trim().toLocaleLowerCase('ru')
@@ -61,6 +62,15 @@ async function runTodayCheck() {
     checking.value = false
   }
 }
+
+function goBack() {
+  if (import.meta.client && window.history.length > 1) {
+    router.back()
+    return
+  }
+
+  void router.push('/')
+}
 </script>
 
 <template>
@@ -71,9 +81,27 @@ async function runTodayCheck() {
       body: 'min-h-0 flex-1 overflow-y-auto overscroll-contain'
     }"
   >
+    <template #header>
+      <UDashboardNavbar title="Уведомления" :ui="{ right: 'gap-2' }">
+        <template #leading>
+          <div class="flex items-center gap-1">
+            <UDashboardSidebarCollapse />
+            <UButton
+              aria-label="Назад"
+              color="neutral"
+              icon="i-lucide-arrow-left"
+              size="sm"
+              variant="ghost"
+              @click="goBack"
+            />
+          </div>
+        </template>
+      </UDashboardNavbar>
+    </template>
+
     <template #body>
       <div class="mx-auto w-full max-w-6xl space-y-6">
-        <header class="flex flex-col gap-5 rounded-3xl border border-charcoal-200 bg-gradient-to-br from-white via-white to-primary/5 p-5 shadow-sm sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+        <section class="flex flex-col gap-5 rounded-3xl border border-charcoal-200 bg-gradient-to-br from-white via-white to-primary/5 p-5 shadow-sm sm:p-7 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex items-start gap-4">
             <span class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <UIcon name="i-lucide-bell-ring" class="size-6" />
@@ -92,7 +120,7 @@ async function runTodayCheck() {
             <UButton color="neutral" variant="outline" icon="i-lucide-check-check" :disabled="!unreadCount" @click="markAllRead">Прочитать все</UButton>
             <UButton color="primary" icon="i-lucide-search-check" :loading="checking" @click="runTodayCheck">Проверить заказы</UButton>
           </div>
-        </header>
+        </section>
 
         <p v-if="checkMessage" class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-charcoal-700" role="status">
           {{ checkMessage }}

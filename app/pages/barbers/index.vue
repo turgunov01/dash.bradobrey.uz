@@ -1352,6 +1352,11 @@ onBeforeUnmount(() => {
 
 <template>
   <UDashboardPanel id="employees">
+    <template #header>
+      <UDashboardNavbar title="Сотрудники">
+        <template #leading><UDashboardSidebarCollapse /></template>
+      </UDashboardNavbar>
+    </template>
     <template #body>
       <div class="space-y-6">
         <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
@@ -1381,8 +1386,7 @@ onBeforeUnmount(() => {
               v-model="roleFilter"
               :items="roleFilterOptions"
               value-key="value"
-              placeholder="Все роли"
-            />
+              placeholder="Все роли" portal="body" />
             <div class="flex w-full rounded-xl border border-charcoal-200 bg-charcoal-50/60 p-1">
               <UButton
                 class="flex-1"
@@ -1757,8 +1761,7 @@ onBeforeUnmount(() => {
                   class="w-full"
                   :items="branchOptions"
                   placeholder="Выберите филиал"
-                  value-key="value"
-                />
+                  value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="Роль" name="role" :error="fieldErrors.role">
@@ -1767,8 +1770,7 @@ onBeforeUnmount(() => {
                   class="w-full"
                   :items="roleOptions"
                   placeholder="Выберите роль"
-                  value-key="value"
-                />
+                  value-key="value" portal="body" />
               </UFormField>
 
               <UFormField label="Логин" name="login" :error="fieldErrors.login">
