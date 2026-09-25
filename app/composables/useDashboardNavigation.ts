@@ -122,6 +122,16 @@ export function useDashboardNavigation() {
             to: "/dashboard/marketplace",
           },
           {
+            icon: "i-lucide-users-round",
+            label: "Пользователи приложения",
+            to: "/dashboard/marketplace/users",
+          },
+          {
+            icon: "i-lucide-star",
+            label: "Отзывы",
+            to: "/dashboard/marketplace/reviews",
+          },
+          {
             icon: "i-lucide-ticket-percent",
             label: "Промокоды",
             to: "/promo-codes",

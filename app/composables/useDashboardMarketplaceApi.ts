@@ -14,6 +14,14 @@ export type DashboardMarketplaceAvailabilityQuery = {
   service_ids?: string[] | string
 }
 
+export type MarketplacePageQuery = {
+  q?: string
+  rating?: number
+  active?: boolean
+  limit?: number
+  offset?: number
+}
+
 export function useDashboardMarketplaceApi() {
   const client = useApiClient()
 
@@ -62,7 +70,18 @@ export function useDashboardMarketplaceApi() {
           ...(serviceIds ? { service_ids: serviceIds } : {})
         }
       })
+    },
+
+    fetchMobileUsers(query: MarketplacePageQuery = {}) {
+      return client.request<MarketplaceListResponse>('/api/marketplace/admin/mobile-users', {
+        query: { __skipBranchScope: true, ...query }
+      })
+    },
+
+    fetchReviews(query: MarketplacePageQuery = {}) {
+      return client.request<MarketplaceListResponse>('/api/marketplace/admin/reviews', {
+        query: { __skipBranchScope: true, ...query }
+      })
     }
   }
 }
-
