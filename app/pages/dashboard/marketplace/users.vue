@@ -13,10 +13,12 @@ type MobileUser = {
 }
 
 const api = useDashboardMarketplaceApi()
+const apiClient = useApiClient()
 const search = ref('')
 const active = ref('all')
 const page = ref(1)
 const pageSize = 25
+const testNotificationId = ref<string | null>(null)
 
 const columns: TableColumn<MobileUser>[] = [
   { accessorKey: 'display_name', header: 'Имя' },
@@ -24,7 +26,8 @@ const columns: TableColumn<MobileUser>[] = [
   { accessorKey: 'language', header: 'Язык' },
   { accessorKey: 'is_active', header: 'Статус' },
   { accessorKey: 'created_at', header: 'Регистрация' },
-  { accessorKey: 'last_login_at', header: 'Последний вход' }
+  { accessorKey: 'last_login_at', header: 'Последний вход' },
+  { id: 'actions', header: '' }
 ]
 
 const { data, pending, refresh } = await useAsyncData('marketplace-mobile-users', () => api.fetchMobileUsers({
@@ -41,6 +44,19 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 function submitSearch() {
   page.value = 1
   refresh()
+}
+
+async function sendTestNotification(user: MobileUser) {
+  const label = user.display_name || user.phone || 'пользователю'
+  if (import.meta.client && !window.confirm(`Отправить тестовое уведомление пользователю ${label}?`)) return
+
+  testNotificationId.value = user.id
+  try {
+    await api.sendTestNotification(user.id)
+    apiClient.notifySuccess('Тестовое уведомление отправлено', label)
+  } finally {
+    testNotificationId.value = null
+  }
 }
 </script>
 
@@ -62,7 +78,23 @@ function submitSearch() {
           <USelect v-model="active" :items="[{ label: 'Все пользователи', value: 'all' }, { label: 'Активные', value: 'active' }, { label: 'Отключённые', value: 'inactive' }]" class="w-48" />
           <UButton color="primary" @click="submitSearch">Найти</UButton>
         </div>
-        <UTable :columns="columns" :data="rows" :loading="pending" />
+        <UTable :columns="columns" :data="rows" :loading="pending">
+          <template #actions-cell="{ row }">
+            <div class="flex justify-end">
+              <UButton
+                color="primary"
+                icon="i-lucide-bell-ring"
+                size="xs"
+                variant="outline"
+                :loading="testNotificationId === row.original.id"
+                :disabled="!!testNotificationId"
+                @click="sendTestNotification(row.original)"
+              >
+                Тест
+              </UButton>
+            </div>
+          </template>
+        </UTable>
         <div class="flex justify-end border-t border-charcoal-100 pt-3">
           <UPagination v-model:page="page" :page-count="pageCount" :total="total" :per-page="pageSize" size="sm" />
         </div>

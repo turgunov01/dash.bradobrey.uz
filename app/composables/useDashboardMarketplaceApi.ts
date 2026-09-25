@@ -78,6 +78,13 @@ export function useDashboardMarketplaceApi() {
       })
     },
 
+    sendTestNotification(clientId: string, body: { title?: string, body?: string } = {}) {
+      return client.request<{ sent: boolean, delivered: number, tokens: number }>(
+        `/api/marketplace/admin/mobile-users/${clientId}/test-notification`,
+        { method: 'POST', body, query: { __skipBranchScope: true } }
+      )
+    },
+
     fetchReviews(query: MarketplacePageQuery = {}) {
       return client.request<MarketplaceListResponse>('/api/marketplace/admin/reviews', {
         query: { __skipBranchScope: true, ...query }
