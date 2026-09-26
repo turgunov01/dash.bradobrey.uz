@@ -1274,14 +1274,14 @@ async function exportHistoryToExcel() {
         </UButton>
       </div>
 
-      <div v-if="rows.length" class="flex flex-col rounded-[1.25rem] border border-charcoal-200 bg-white/90 sm:max-h-[70vh] sm:overflow-hidden">
-        <div class="sm:flex-1 sm:overflow-auto">
+      <div v-if="rows.length" class="rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <div class="min-w-0">
           <div v-for="day in historyDays" :key="day.date" class="border-b border-charcoal-200 last:border-b-0">
             <button type="button" class="flex w-full cursor-pointer items-center px-4 py-3 text-left text-sm font-semibold text-charcoal-950 hover:bg-charcoal-50" @click="toggleHistoryDay(day.date)">
               <span class="mr-2 text-charcoal-500 transition-transform duration-200" :class="expandedHistoryDays[day.date] ? 'rotate-90' : ''">▸</span>{{ day.date }}<span class="ml-2 text-xs font-normal text-charcoal-500">({{ day.items.length }})</span>
             </button>
             <Transition name="history-day">
-              <div v-if="expandedHistoryDays[day.date]" class="overflow-hidden">
+              <div v-if="expandedHistoryDays[day.date]" class="min-w-0">
                 <p v-if="historyDayErrors[day.date]" class="flex items-center justify-between gap-3 bg-red-50 px-4 py-3 text-sm text-red-700">
                   Не удалось загрузить визиты за этот день.
                   <UButton size="xs" color="error" variant="outline" @click="loadHistoryDay(day.date)">Повторить</UButton>
