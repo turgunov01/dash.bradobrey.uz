@@ -153,6 +153,11 @@ export function useDashboardNavigation() {
             to: "/settings/loyalty-ranks",
           },
           {
+            icon: "i-lucide-percent",
+            label: "Кэшбэк",
+            to: "/settings/cashback",
+          },
+          {
             icon: "i-lucide-monitor-play",
             label: "Реклама киоска",
             to: "/settings/kiosk-ads",
