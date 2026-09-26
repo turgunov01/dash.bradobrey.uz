@@ -13,15 +13,12 @@ type CashbackSettingsResponse = {
 
 export function useCashbackSettingsApi() {
   const client = useApiClient()
-  const { authHeader } = useAdminToken()
-
-  const headers = () => authHeader.value ? { Authorization: authHeader.value } : undefined
 
   return {
     async getSettings() {
       const response = await client.request<CashbackSettingsResponse>('/api/marketplace/admin/settings', {
-        headers: headers(),
-        query: { __skipBranchScope: true }
+        query: { __skipBranchScope: true },
+        skipAuth: true
       })
       const item = response.settings?.find(setting => setting.key === 'cashback')
       return item?.value || {
@@ -37,9 +34,9 @@ export function useCashbackSettingsApi() {
         '/api/marketplace/admin/settings/cashback',
         {
           body: { value },
-          headers: headers(),
           method: 'PATCH',
-          query: { __skipBranchScope: true }
+          query: { __skipBranchScope: true },
+          skipAuth: true
         }
       )
     }
