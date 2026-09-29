@@ -15,6 +15,7 @@ export const routePermissions: Record<string, EmployeePermission[]> = {
   '/barbers/expenses': ['expenses.read'],
   '/dashboard/marketplace': ['dashboard.access'],
   '/content': ['dashboard.access'], // локальная страница контента
+  '/settings/banners': ['dashboard.access'],
   '/api-debug': ['dashboard.access'] // дополнительно ограничим ролью в middleware
 }
 

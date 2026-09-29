@@ -163,6 +163,11 @@ export function useDashboardNavigation() {
             to: "/settings/kiosk-ads",
           },
           {
+            icon: "i-lucide-panels-top-left",
+            label: "Баннеры приложения",
+            to: "/settings/banners",
+          },
+          {
             icon: "i-lucide-bell-ring",
             label: "Уведомления",
             to: "/settings/notifications",
