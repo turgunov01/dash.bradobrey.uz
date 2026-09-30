@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { CashbackSettings } from '~/composables/useCashbackSettingsApi'
 
+definePageMeta({ alias: '/dashboard/marketplace/cashback' })
+
 const apiClient = useApiClient()
 const settingsApi = useCashbackSettingsApi()
 const sessionStore = useSessionStore()

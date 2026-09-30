@@ -163,6 +163,24 @@ function getClientName(item: Record<string, any>) {
   )
 }
 
+function historyStatusLabel(status: unknown) {
+  const value = normalizeText(status)?.toLowerCase() || ''
+  const labels: Record<string, string> = {
+    waiting: 'Ожидает', called: 'Вызван', swapped: 'Передан другому барберу',
+    transfer_pending: 'Ожидает подтверждения передачи', in_progress: 'В работе',
+    completed: 'Завершён', cancelled: 'Отменён', rejected: 'Отклонён',
+    no_show: 'Не пришёл', not_in_time: 'Не успел', suspicious: 'Подозрительный'
+  }
+  return labels[value] || (value || '—')
+}
+
+function transferBarberName(id: unknown, name?: unknown) {
+  const resolvedName = normalizeText(name)
+  if (resolvedName) return resolvedName
+  const barberId = normalizeText(id)
+  return barberId ? barberNameMap.value.get(barberId) || `Барбер ${shortId(barberId)}` : 'Барбер не указан'
+}
+
 function shortId(value: string) {
   return value.length > 8 ? value.slice(0, 8) : value
 }
@@ -620,6 +638,7 @@ const suspiciousStatusValue = '__suspicious__'
 // silently narrowing the history list on initial load.
 const allBranches = computed(() => route.query.scope !== 'branch')
 const selectedBarberId = ref(typeof route.query.barber_id === 'string' ? route.query.barber_id : allBarbersValue)
+const selectedOriginBarberId = ref(allBarbersValue)
 const selectedStatus = ref(typeof route.query.status === 'string' ? route.query.status : allStatusesValue)
 const search = ref('')
 
@@ -749,6 +768,7 @@ const hasActiveFilters = computed(() =>
   Boolean(
     search.value.trim()
     || selectedBarberId.value !== allBarbersValue
+    || selectedOriginBarberId.value !== allBarbersValue
     || selectedStatus.value !== allStatusesValue
     || dateFrom.value !== defaultDateRange.start
     || dateTo.value !== defaultDateRange.end
@@ -834,11 +854,20 @@ const historyItems = computed<HistoryItem[]>(() => data.value?.items || [])
 
 const statusFilterOptions = [
   { label: 'Все статусы', value: allStatusesValue },
+  { label: 'Ожидает', value: 'waiting' },
+  { label: 'Вызван', value: 'called' },
+  { label: 'Ожидает подтверждения передачи', value: 'transfer_pending' },
+  { label: 'Принят новым барбером', value: 'transfer_accepted' },
+  { label: 'Отклонён новым барбером', value: 'transfer_rejected' },
+  { label: 'Возвращён исходному барберу', value: 'transfer_returned' },
+  { label: 'Передача просрочена', value: 'transfer_expired' },
+  { label: 'В работе', value: 'in_progress' },
+  { label: 'Передан другому барберу', value: 'swapped' },
   { label: 'Завершён', value: 'completed' },
   { label: 'Отменён', value: 'cancelled' },
   { label: 'Отклонён', value: 'rejected' },
   { label: 'Неявка', value: 'no_show' },
-  { label: 'Не вовремя', value: 'not_in_time' },
+  { label: 'Не успел', value: 'not_in_time' },
   { label: 'Подозрительный', value: suspiciousStatusValue }
 ]
 
@@ -857,7 +886,9 @@ const barberFilterOptions = computed(() => {
   for (const item of historyItems.value) {
     const visit = item as Record<string, any>
 
-    for (const id of [getVisitSelectedBarberId(visit), getVisitExecutingBarberId(visit)]) {
+    const transferIds = (Array.isArray(visit.transfer_history) ? visit.transfer_history : [])
+      .flatMap((event: any) => [event.from_barber_id, event.to_barber_id])
+    for (const id of [getVisitSelectedBarberId(visit), getVisitExecutingBarberId(visit), ...transferIds]) {
       if (id && !options.has(id)) {
         options.set(id, barberNameMap.value.get(id) || `Барбер ${shortId(id)}`)
       }
@@ -894,10 +925,13 @@ function isVisitBySelectedBarber(visit: Record<string, any>) {
     return true
   }
 
-  return [
-    getVisitSelectedBarberId(visit),
-    getVisitExecutingBarberId(visit)
-  ].includes(selectedBarberId.value)
+  return getVisitExecutingBarberId(visit) === selectedBarberId.value
+}
+
+function isVisitByOriginBarber(visit: Record<string, any>) {
+  if (selectedOriginBarberId.value === allBarbersValue) return true
+  const firstTransfer = Array.isArray(visit.transfer_history) ? visit.transfer_history[0] : null
+  return (firstTransfer?.from_barber_id || getVisitSelectedBarberId(visit)) === selectedOriginBarberId.value
 }
 
 function isVisitBySelectedStatus(visit: Record<string, any>) {
@@ -905,7 +939,12 @@ function isVisitBySelectedStatus(visit: Record<string, any>) {
     ? true
     : selectedStatus.value === suspiciousStatusValue
       ? isSuspiciousOrder(visit)
-      : normalizeText(visit.status) === selectedStatus.value
+      : selectedStatus.value.startsWith('transfer_')
+        ? (Array.isArray(visit.transfer_history) ? visit.transfer_history : []).some((event: any) =>
+            selectedStatus.value === 'transfer_returned'
+              ? ['rejected', 'expired', 'returned'].includes(event.status)
+              : `transfer_${event.status}` === selectedStatus.value)
+        : normalizeText(visit.status) === selectedStatus.value
 }
 
 function isVisitMatchingSearch(visit: Record<string, any>) {
@@ -918,6 +957,7 @@ function isVisitMatchingSearch(visit: Record<string, any>) {
     getClientPhone(visit),
     getVisitSelectedBarberName(visit),
     getVisitExecutingBarberName(visit),
+    ...(Array.isArray(visit.transfer_history) ? visit.transfer_history.flatMap((event: any) => [transferBarberName(event.from_barber_id), transferBarberName(event.to_barber_id)]) : []),
     visit.status,
     visit.payment_method,
     getServiceNames(visit).join(' ')
@@ -939,6 +979,7 @@ const filteredHistory = computed(() =>
 
     return branchMatches
       && isVisitBySelectedBarber(visit)
+      && isVisitByOriginBarber(visit)
       && isVisitBySelectedStatus(visit)
       && isVisitMatchingSearch(visit)
       && isVisitInSelectedDateRange(visit)
@@ -1078,7 +1119,7 @@ const pageTo = computed(() =>
 )
 
 watch(
-  [() => branchStore.activeBranchId, selectedBarberId, selectedStatus, search, dateFrom, dateTo],
+  [() => branchStore.activeBranchId, selectedBarberId, selectedOriginBarberId, selectedStatus, search, dateFrom, dateTo],
   () => {
     page.value = 1
     loadedHistoryDays.value = {}
@@ -1104,6 +1145,7 @@ const selectedEntry = ref<any | null>(null)
 function resetHistoryFilters() {
   search.value = ''
   selectedBarberId.value = allBarbersValue
+  selectedOriginBarberId.value = allBarbersValue
   selectedStatus.value = allStatusesValue
   dateFrom.value = defaultDateRange.start
   dateTo.value = defaultDateRange.end
@@ -1247,6 +1289,10 @@ async function exportHistoryToExcel() {
             value-key="value" portal="body" />
         </UFormField>
 
+        <UFormField label="Исходный барбер">
+          <USelect v-model="selectedOriginBarberId" class="w-full" :items="barberFilterOptions" value-key="value" portal="body" />
+        </UFormField>
+
         <UFormField label="Статус">
           <USelect
             v-model="selectedStatus"
@@ -1310,7 +1356,7 @@ async function exportHistoryToExcel() {
               <UTooltip v-if="row.original.suspicious" :text="suspiciousOrderTitle(row.original)">
                 <UBadge color="error" variant="soft">Подозрительный</UBadge>
               </UTooltip>
-              <SharedStatusBadge v-else :label="row.original.status" />
+              <SharedStatusBadge v-else :label="historyStatusLabel(row.original.status)" />
             </template>
 
             <template #payment_method-cell="{ row }">
@@ -1407,7 +1453,7 @@ async function exportHistoryToExcel() {
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Статус</p>
-                <p class="text-sm font-semibold text-charcoal-950">{{ selectedEntry.status || '—' }}</p>
+                <p class="text-sm font-semibold text-charcoal-950">{{ historyStatusLabel(selectedEntry.status) }}</p>
               </div>
               <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Оплата</p>
@@ -1468,6 +1514,29 @@ async function exportHistoryToExcel() {
                   {{ hasBarberSwap(selectedEntry) ? 'Да' : 'Нет' }}
                 </UBadge>
               </div>
+            </div>
+
+            <div v-if="Array.isArray(selectedEntry.transfer_history) && selectedEntry.transfer_history.length" class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">История передачи заказа</p>
+              <ol class="space-y-3">
+                <li v-for="transfer in selectedEntry.transfer_history" :key="transfer.id" class="border-l-2 border-charcoal-200 pl-3">
+                  <p class="font-medium text-charcoal-950">{{ transferBarberName(transfer.from_barber_id, transfer.from_barber_name) }} → {{ transferBarberName(transfer.to_barber_id, transfer.to_barber_name) }}</p>
+                  <p class="text-sm text-charcoal-600">{{ transfer.status === 'pending' ? 'Ожидает подтверждения' : transfer.status === 'accepted' ? 'Принят новым барбером' : transfer.status === 'rejected' ? 'Отклонён, возвращён исходному барберу' : transfer.status === 'expired' ? 'Просрочен, возвращён исходному барберу' : historyStatusLabel(transfer.status) }}</p>
+                  <p class="text-xs text-charcoal-500">Передача: {{ formatDateTime(transfer.requested_at) }}<span v-if="transfer.responded_at"> · Ответ: {{ formatDateTime(transfer.responded_at) }}</span></p>
+                  <p v-if="transfer.reason" class="text-xs text-charcoal-600">Причина: {{ transfer.reason }}</p>
+                </li>
+              </ol>
+              <p class="mt-3 text-sm font-medium text-charcoal-800">Текущий ответственный: {{ getVisitExecutingBarberName(selectedEntry) }}</p>
+            </div>
+
+            <div v-if="Array.isArray(selectedEntry.status_history) && selectedEntry.status_history.length" class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">История статусов</p>
+              <ol class="space-y-2">
+                <li v-for="event in selectedEntry.status_history" :key="event.id" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-charcoal-100 pb-2 last:border-0">
+                  <span class="text-sm text-charcoal-800">{{ event.from_status ? `${historyStatusLabel(event.from_status)} → ` : '' }}{{ historyStatusLabel(event.to_status) }}<span v-if="event.barber_id"> · {{ transferBarberName(event.barber_id, event.barber_name) }}</span></span>
+                  <time class="text-xs text-charcoal-500">{{ formatDateTime(event.occurred_at) }}</time>
+                </li>
+              </ol>
             </div>
 
             <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">

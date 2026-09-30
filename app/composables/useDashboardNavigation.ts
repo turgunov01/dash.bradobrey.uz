@@ -131,6 +131,8 @@ export function useDashboardNavigation() {
             label: "Отзывы",
             to: "/dashboard/marketplace/reviews",
           },
+          { icon: "i-lucide-award", label: "Ранги клиентов", to: "/dashboard/marketplace/loyalty-ranks" },
+          { icon: "i-lucide-percent", label: "Кэшбэк", to: "/dashboard/marketplace/cashback" },
           {
             icon: "i-lucide-ticket-percent",
             label: "Промокоды",
@@ -147,16 +149,6 @@ export function useDashboardNavigation() {
         icon: "i-lucide-settings",
         label: "Настройки",
         children: [
-          {
-            icon: "i-lucide-award",
-            label: "Ранги клиентов",
-            to: "/settings/loyalty-ranks",
-          },
-          {
-            icon: "i-lucide-percent",
-            label: "Кэшбэк",
-            to: "/settings/cashback",
-          },
           {
             icon: "i-lucide-monitor-play",
             label: "Реклама киоска",

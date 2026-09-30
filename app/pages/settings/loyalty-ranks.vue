@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LoyaltyRank, LoyaltyRanksSettings } from '~/composables/useLoyaltyRanksSettingsApi'
 
-definePageMeta({})
+definePageMeta({ alias: '/dashboard/marketplace/loyalty-ranks' })
 
 const apiClient = useApiClient()
 const ranksApi = useLoyaltyRanksSettingsApi()
@@ -49,6 +49,10 @@ const validationErrors = computed(() => {
     if (!Number.isFinite(cashback) || cashback < 0 || cashback > 100) {
       errors.push(`Статус ${name || index + 1}: cashback должен быть от 0 до 100%`)
     }
+    for (const [field, label] of [['cancel_penalty_points', 'штраф за отмену'], ['no_show_penalty_points', 'штраф за неявку']] as const) {
+      const penalty = Number(level[field])
+      if (!Number.isSafeInteger(penalty) || penalty < 0) errors.push(`Статус ${name || index + 1}: ${label} должен быть целым числом от 0`)
+    }
   })
   return [...new Set(errors)]
 })
@@ -61,7 +65,9 @@ function addLevel() {
   levels.value.push({
     name: 'NEW_RANK',
     min_points: Number(last?.min_points || 0) + 100,
-    cashback_percent: Number(last?.cashback_percent || 0)
+    cashback_percent: Number(last?.cashback_percent || 0),
+    cancel_penalty_points: Number(last?.cancel_penalty_points ?? 10),
+    no_show_penalty_points: Number(last?.no_show_penalty_points ?? 30)
   })
   successMessage.value = ''
 }
@@ -94,7 +100,9 @@ async function submit() {
     const response = await ranksApi.updateSettings(levels.value.map(level => ({
       name: level.name.trim(),
       min_points: Number(level.min_points),
-      cashback_percent: Number(level.cashback_percent)
+      cashback_percent: Number(level.cashback_percent),
+      cancel_penalty_points: Number(level.cancel_penalty_points),
+      no_show_penalty_points: Number(level.no_show_penalty_points)
     })))
     applySettings(response?.settings)
     successMessage.value = 'Настройки рангов сохранены'
@@ -143,7 +151,7 @@ function formatUpdatedAt(value: string | null | undefined) {
             <UButton color="neutral" variant="outline" @click="refresh()">Повторить</UButton>
           </div>
           <div v-else class="space-y-5">
-            <div v-for="(level, index) in levels" :key="index" class="grid items-end gap-4 rounded-2xl border border-charcoal-200 p-4 md:grid-cols-[1.2fr_1fr_1fr_auto]">
+            <div v-for="(level, index) in levels" :key="index" class="grid items-end gap-4 rounded-2xl border border-charcoal-200 p-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
               <UFormField label="Название статуса" :name="`level-${index}-name`">
                 <UInput v-model="level.name" maxlength="40" placeholder="Например: SILVER" />
               </UFormField>
@@ -152,6 +160,12 @@ function formatUpdatedAt(value: string | null | undefined) {
               </UFormField>
               <UFormField label="Cashback, %" :name="`level-${index}-cashback`">
                 <UInput v-model.number="level.cashback_percent" type="number" inputmode="decimal" min="0" max="100" step="0.1" />
+              </UFormField>
+              <UFormField label="Списание за отмену, баллов" :name="`level-${index}-cancel-penalty`">
+                <UInput v-model.number="level.cancel_penalty_points" type="number" inputmode="numeric" min="0" step="1" />
+              </UFormField>
+              <UFormField label="Списание за неявку, баллов" :name="`level-${index}-no-show-penalty`">
+                <UInput v-model.number="level.no_show_penalty_points" type="number" inputmode="numeric" min="0" step="1" />
               </UFormField>
               <UButton v-if="index > 0" color="error" variant="ghost" :disabled="submitting" @click="levels.splice(index, 1)">Удалить</UButton>
               <span v-else class="pb-2 text-xs text-charcoal-500">Начальный уровень</span>

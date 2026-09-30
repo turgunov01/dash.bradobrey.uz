@@ -2,6 +2,8 @@ export type LoyaltyRank = {
   name: string
   min_points: number
   cashback_percent: number
+  cancel_penalty_points: number
+  no_show_penalty_points: number
 }
 
 export type LoyaltyRanksSettings = {
