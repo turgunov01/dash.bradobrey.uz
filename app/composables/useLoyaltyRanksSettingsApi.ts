@@ -1,9 +1,12 @@
+export type LoyaltyRank = {
+  name: string
+  min_points: number
+  cashback_percent: number
+}
+
 export type LoyaltyRanksSettings = {
-  id: string
-  bronze_min_visits: number
-  silver_min_visits: number
-  gold_min_visits: number
-  updated_at: string
+  levels: LoyaltyRank[]
+  updated_at: string | null
 }
 
 type LoyaltyRanksSettingsResponse = {
@@ -26,13 +29,12 @@ export function useLoyaltyRanksSettingsApi() {
         query: { __skipBranchScope: true }
       })
     },
-    updateSettings(body: { bronze_min_visits?: number, silver_min_visits?: number, gold_min_visits?: number }) {
+    updateSettings(levels: LoyaltyRank[]) {
       return client.request<LoyaltyRanksSettingsResponse>('/api/loyalty/ranks/settings', {
-        body,
+        body: { levels },
         headers: buildAuthHeaders(),
         method: 'PATCH'
       })
     }
   }
 }
-
