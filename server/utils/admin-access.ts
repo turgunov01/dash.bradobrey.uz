@@ -1,13 +1,21 @@
 import { createError, type H3Event } from 'h3'
 import { z } from 'zod'
 
-import { operationalBarberRoles } from '~~/shared/auth/employees'
+import {
+  getEffectiveEmployeePermissions,
+  isEmployeePermission,
+  operationalBarberRoles
+} from '~~/shared/auth/employees'
 
 import { backendRequest } from './backend'
 
 const identifierSchema = z.union([z.string(), z.number()]).transform(value => String(value))
 const optionalIdentifierSchema = identifierSchema.optional().nullable()
 const optionalTextSchema = z.string().trim().optional().nullable()
+const optionalPermissionsSchema = z.preprocess(
+  value => value === null ? undefined : value,
+  z.array(z.string()).transform(values => values.filter(isEmployeePermission)).optional()
+)
 
 const accessUserSchema = z.object({
   branch_id: optionalIdentifierSchema,
@@ -17,6 +25,7 @@ const accessUserSchema = z.object({
   marketplaceBarbershopId: optionalIdentifierSchema,
   name: optionalTextSchema,
   phone: optionalTextSchema,
+  permissions: optionalPermissionsSchema,
   role: optionalTextSchema
 }).passthrough()
 
@@ -76,6 +85,7 @@ export function toDashboardUser(accessUser: AccessUser) {
     marketplace_barbershop_id: marketplaceBarbershopId,
     name: accessUser.name || login || 'Администратор',
     phone: accessUser.phone ?? null,
+    permissions: getEffectiveEmployeePermissions(accessUser),
     role: accessUser.role || null
   }
 }

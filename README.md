@@ -1,51 +1,21 @@
-# Nuxt Dashboard Template
+# Bradobrey Dashboard
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+Server-rendered administration dashboard for Bradobrey. The application is built with Nuxt 4, Vue 3, Nuxt UI and Pinia. Nitro routes under `server/api` act as a BFF for the Bradobrey backend API.
 
-Get started with the Nuxt dashboard template with multiple pages, collapsible sidebar, keyboard shortcuts, light & dark mode, command palette and more, powered by [Nuxt UI](https://ui.nuxt.com).
+## Requirements
 
-- [Live demo](https://dashboard-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
-
-<a href="https://dashboard-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/dashboard-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/dashboard-light.png">
-    <img alt="Nuxt Dashboard Template" src="https://ui.nuxt.com/assets/templates/nuxt/dashboard-light.png">
-  </picture>
-</a>
-
-> The dashboard template for Vue is on https://github.com/nuxt-ui-templates/dashboard-vue.
-
-## Quick Start
-
-```bash [Terminal]
-npm create nuxt@latest -- -t ui/dashboard
-```
-
-## Deploy your own
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=dashboard&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fdashboard&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fdashboard-dark.png&demo-url=https%3A%2F%2Fdashboard-template.nuxt.dev%2F&demo-title=Nuxt%20Dashboard%20Template&demo-description=A%20dashboard%20template%20with%20multi-column%20layout%20for%20building%20sophisticated%20admin%20interfaces.)
+- Node.js 22+
+- npm
 
 ## Setup
 
-Make sure to install the dependencies:
-
-```bash
-pnpm install
+```powershell
+npm ci
+Copy-Item .env.example .env
+npm run dev
 ```
 
-## Development Server
-
-Start the development server on port `3000`:
-
-```bash
-pnpm dev
-```
-
-## Environment
-
-The dashboard talks to the backend API through Nuxt server routes. Configure:
+The local environment must provide at least:
 
 ```bash
 NUXT_PUBLIC_API_BASE=https://api.bradobrey.uz
@@ -53,25 +23,25 @@ NUXT_ADMIN_SESSION_SECRET=replace-with-a-long-random-secret
 NUXT_COOKIE_SECURE=true
 ```
 
-Database access and file storage are handled by the backend API, not by the
-dashboard runtime.
+Never commit `.env` or real credentials. Database access and file storage belong to the backend API, not this repository.
+
+## Verification
+
+```bash
+npm run typecheck
+npm run test
+npm run build
+```
 
 ## Production
 
-Build the application for production:
+The dashboard must run as a Nuxt/Nitro server because authentication and backend proxying depend on `server/api` routes. See [docs/ssr-deploy.md](docs/ssr-deploy.md).
 
 ```bash
-pnpm build
+npm run build
+npm start
 ```
 
-Locally preview production build:
+## Project knowledge
 
-```bash
-pnpm preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+Durable engineering context, active work and security risks are recorded in `.project/`. Architectural migration notes remain in `theory/`.

@@ -20,7 +20,7 @@ test('allows barbers to read their queue without branch management access', () =
 test('uses explicit permissions when they are present', () => {
   assert.equal(canReadQueue({ role: 'barber', permissions: ['queue.read', 'queue.manage.branch'] }), true)
   assert.equal(canManageBranchQueue({ role: 'barber', permissions: ['queue.read', 'queue.manage.branch'] }), true)
-  assert.equal(canReadQueue({ role: 'manager', permissions: [] }), true)
+  assert.equal(canReadQueue({ role: 'manager', permissions: [] }), false)
 })
 
 test('denies queue access to users without queue permissions', () => {

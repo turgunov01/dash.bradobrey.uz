@@ -296,6 +296,30 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
   ]
 }
 
+export type PermissionUser = {
+  permissions?: unknown
+  role?: unknown
+}
+
+const legacyDashboardRolePermissionPresets: Record<string, EmployeePermission[]> = {
+  admin_branch: [...employeeRolePermissionPresets.manager],
+  admin_network: [...employeeRolePermissionPresets.admin]
+}
+
+export function getEffectiveEmployeePermissions(user: PermissionUser | null | undefined): EmployeePermission[] {
+  if (Array.isArray(user?.permissions)) {
+    return [...new Set(user.permissions.filter(isEmployeePermission))]
+  }
+
+  const role = String(user?.role ?? '').trim().toLowerCase()
+
+  if (isEmployeeRole(role)) {
+    return [...employeeRolePermissionPresets[role]]
+  }
+
+  return [...(legacyDashboardRolePermissionPresets[role] || [])]
+}
+
 export function isEmployeeRole(value: unknown): value is EmployeeRole {
   return employeeRoles.includes(value as EmployeeRole)
 }

@@ -1,3 +1,6 @@
+import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
+import { canAccessPath, firstAllowedPath, requiredForPath } from '~/utils/access'
+
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path === "/login") {
     return;
@@ -31,5 +34,22 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!isMerchant && to.path.startsWith("/merchant")) {
     return navigateTo("/");
+  }
+
+  if (!isMerchant && requiredForPath(to.path)) {
+    const permissions = new Set(getEffectiveEmployeePermissions(sessionStore.user))
+
+    if (!canAccessPath(permissions, to.path)) {
+      const fallback = firstAllowedPath(permissions)
+
+      if (fallback && fallback !== to.path) {
+        return navigateTo(fallback)
+      }
+
+      return abortNavigation(createError({
+        statusCode: 403,
+        statusMessage: 'Недостаточно прав для доступа к разделу.'
+      }))
+    }
   }
 });

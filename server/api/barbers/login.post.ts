@@ -1,6 +1,10 @@
 import { createError, readBody, type H3Event } from 'h3'
 
-import { backendDashboardRoles, marketplaceMerchantRoles } from '~~/shared/auth/employees'
+import {
+  backendDashboardRoles,
+  getEffectiveEmployeePermissions,
+  marketplaceMerchantRoles
+} from '~~/shared/auth/employees'
 import { loginSchema, type LoginPayload } from '~~/shared/schemas'
 
 import { assertDashboardAccessUser } from '~~/server/utils/admin-access'
@@ -152,6 +156,7 @@ function buildAdminUser(rawUser: Record<string, any>, fallbackLogin: string) {
     marketplace_barbershop_id: normalizeOptionalId(rawUser.marketplace_barbershop_id),
     name: normalizeText(rawUser.name) || login || 'Administrator',
     phone: rawUser.phone ?? null,
+    permissions: getEffectiveEmployeePermissions(rawUser),
     role
   }
 }
@@ -230,6 +235,10 @@ function buildDashboardLoginUser(
     ),
     name: normalizeText(rawUser.name) || login || 'Administrator',
     phone: rawUser.phone ?? accessUser.phone ?? null,
+    permissions: getEffectiveEmployeePermissions({
+      permissions: rawUser.permissions ?? accessUser.permissions,
+      role
+    }),
     role
   }
 }
@@ -244,6 +253,7 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
     id: user.id,
     login: user.login,
     marketplace_barbershop_id: user.marketplace_barbershop_id,
+    permissions: user.permissions,
     role: user.role
   })
 }

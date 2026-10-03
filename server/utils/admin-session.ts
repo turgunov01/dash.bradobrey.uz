@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createError, deleteCookie, getCookie, setCookie, type H3Event } from 'h3'
 import { z } from 'zod'
 
+import { isEmployeePermission } from '~~/shared/auth/employees'
+
 import { shouldUseSecureCookie } from './cookie-security'
 
 const adminSessionSchema = z.object({
@@ -10,6 +12,7 @@ const adminSessionSchema = z.object({
   id: z.string().trim().min(1),
   login: z.string().trim().min(1),
   marketplace_barbershop_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
+  permissions: z.array(z.string()).transform(values => values.filter(isEmployeePermission)).optional(),
   role: z.string().trim().optional().nullable()
 })
 

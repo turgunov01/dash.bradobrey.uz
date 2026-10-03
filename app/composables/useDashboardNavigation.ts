@@ -1,6 +1,7 @@
 import { useCalculatorModal } from "#imports";
 import type { NavigationMenuItem } from "@nuxt/ui";
-import { employeeRolePermissionPresets, type EmployeePermission } from "~~/shared/auth/employees";
+import { getEffectiveEmployeePermissions } from "~~/shared/auth/employees";
+import { canAccessPath } from "~/utils/access";
 
 function flattenNavigationItems(
   items: NavigationMenuItem[],
@@ -169,42 +170,27 @@ export function useDashboardNavigation() {
     ],
   ] satisfies NavigationMenuItem[][];
 
-  const canViewExpenses = computed(() => {
-    const role = String(sessionStore.user?.role || '').trim().toLowerCase();
-    const explicit = sessionStore.user?.permissions;
-    const permissions = Array.isArray(explicit) && explicit.length
-      ? explicit as EmployeePermission[]
-      : employeeRolePermissionPresets[role as keyof typeof employeeRolePermissionPresets] || [];
+  const permissions = computed(() => new Set(getEffectiveEmployeePermissions(sessionStore.user)));
 
-    return permissions.includes('expenses.read');
-  });
-  const canViewPenalties = computed(() => {
-    const role = String(sessionStore.user?.role || '').trim().toLowerCase();
-    const explicit = sessionStore.user?.permissions;
-    const permissions = Array.isArray(explicit) && explicit.length
-      ? explicit as EmployeePermission[]
-      : employeeRolePermissionPresets[role as keyof typeof employeeRolePermissionPresets] || [];
-    return permissions.includes('penalties.read');
-  });
-
-  function filterExpenseLinks(items: NavigationMenuItem[]): NavigationMenuItem[] {
+  function filterAccessibleLinks(items: NavigationMenuItem[]): NavigationMenuItem[] {
     return items.flatMap((item) => {
       const source = item as NavigationMenuItem & { children?: NavigationMenuItem[] };
 
-      if (source.to === '/warehouse/expenses' && !canViewExpenses.value) {
+      if (typeof source.to === 'string' && !canAccessPath(permissions.value, source.to)) {
         return [];
       }
-      if (source.to === '/penalties' && !canViewPenalties.value) return [];
 
       if (Array.isArray(source.children)) {
-        return [{ ...source, children: filterExpenseLinks(source.children) }];
+        const children = filterAccessibleLinks(source.children);
+
+        return children.length ? [{ ...source, children }] : [];
       }
 
       return [item];
     });
   }
 
-  const primaryLinks = computed(() => rawPrimaryLinks.map(group => filterExpenseLinks(group)));
+  const primaryLinks = computed(() => rawPrimaryLinks.map(group => filterAccessibleLinks(group)));
 
   const supportLinks = [[]] satisfies NavigationMenuItem[][];
 
