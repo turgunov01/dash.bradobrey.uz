@@ -1,6 +1,6 @@
 import { getHeader, setResponseStatus } from 'h3'
 
-import { clearAdminBackendToken, clearAdminSession, getAdminSession, setAdminSession } from '~~/server/utils/admin-session'
+import { clearAdminBackendToken, clearAdminSession, getAdminBackendToken, getAdminSession, setAdminBackendToken, setAdminSession } from '~~/server/utils/admin-session'
 import { assertDashboardAccessUser, getCurrentBackendAccessUser, toDashboardUser } from '~~/server/utils/admin-access'
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken } from '~~/server/utils/session'
@@ -13,7 +13,9 @@ function getBearerToken(event: Parameters<typeof getHeader>[0]) {
 }
 
 export default defineEventHandler(async (event): Promise<unknown> => {
-  const adminSession = getAdminSession(event)
+  const bearerToken = getBearerToken(event)
+  const backendToken = getAdminBackendToken(event)
+  const adminSession = bearerToken || backendToken ? null : getAdminSession(event)
 
   if (adminSession) {
     try {
@@ -42,7 +44,6 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   }
 
   try {
-    const bearerToken = getBearerToken(event)
     const response = await backendRequest<{ barber?: Record<string, any> | null, user?: Record<string, any> | null }>(event, {
       auth: 'required',
       method: 'GET',

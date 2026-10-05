@@ -84,7 +84,7 @@ The browser login path currently uses the canonical external API directly as a c
 - Login debug helpers redact password/token fields, though production logging still needs minimization.
 - Typecheck, unit tests and production build pass after the 2026-10-03 permission changes.
 - Employee-quality aggregate, evidence and review routes enforce self/branch/global scope at both Dashboard BFF and external API layers; responses are allowlisted and request-bound.
-- Dashboard typecheck, 30/30 tests and production build pass. External API 70/70 tests and syntax checks for 111 JavaScript files pass.
+- Dashboard typecheck, 42/42 tests and production build pass. External API 71/71 tests and syntax checks for 111 JavaScript files pass.
 - The Dashboard/API review DTO mismatch found during independent retest is fixed and covered by canonical request, response, and replay fixtures. Unsupported `reopen` is rejected on both sides.
 - Persisted suspicious notifications no longer expose undefined/`NaN` duration values. Terminal service/payment mutations and the dedicated completion-route terminal/race bypass are blocked with regression coverage.
 - PostgreSQL migration, concurrent review, DB privileges and query-plan/p95 checks remain unverified because no isolated staging database was available.

@@ -109,6 +109,8 @@ test('does not issue a backend token cookie before signing the dashboard session
 })
 
 test('persists a validated direct-login bearer token for SSR and full-page reloads', () => {
+  assert.match(meHandlerSource, /const backendToken = getAdminBackendToken\(event\)/)
+  assert.match(meHandlerSource, /const adminSession = bearerToken \|\| backendToken \? null : getAdminSession\(event\)/)
   assert.match(meHandlerSource, /getHeader\(event, 'authorization'\)/)
   assert.match(meHandlerSource, /const bearerToken = getBearerToken\(event\)/)
   assert.match(meHandlerSource, /assertDashboardAccessUser\(response\.data\?\.user\)/)
