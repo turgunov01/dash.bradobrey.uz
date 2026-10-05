@@ -1,6 +1,5 @@
-import { StorageSerializers, useStorage } from '@vueuse/core'
-
 const ADMIN_TOKEN_STORAGE_KEY = 'brado_admin_jwt'
+const ADMIN_TOKEN_STATE_KEY = 'brado_admin_jwt_state'
 const ADMIN_TOKEN_TTL_MS = 12 * 60 * 60 * 1000
 
 type StoredAdminToken = {
@@ -83,27 +82,66 @@ function parseStoredToken(value: string | null): StoredAdminToken | null {
   return createStoredToken(raw)
 }
 
+function readClientToken() {
+  if (!import.meta.client) {
+    return null
+  }
+
+  try {
+    return globalThis.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY)
+  }
+  catch {
+    return null
+  }
+}
+
+function writeClientToken(value: string | null) {
+  if (!import.meta.client) {
+    return
+  }
+
+  try {
+    if (value === null) {
+      globalThis.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)
+    }
+    else {
+      globalThis.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, value)
+    }
+  }
+  catch {
+    // The HttpOnly session cookie remains the primary authentication channel.
+  }
+}
+
 export function useAdminToken() {
-  const token = useStorage<string | null>(ADMIN_TOKEN_STORAGE_KEY, null, undefined, {
-    listenToStorageChanges: false,
-    serializer: StorageSerializers.string
-  })
+  // useState is shared by every composable consumer in the current Nuxt app.
+  // Separate useStorage refs can be stale during the immediate /me request after login.
+  const token = useState<string | null>(ADMIN_TOKEN_STATE_KEY, () => null)
+
+  if (import.meta.client && token.value === null) {
+    token.value = readClientToken()
+  }
+
+  function updateToken(value: string | null) {
+    token.value = value
+    writeClientToken(value)
+  }
 
   function getValidStoredToken() {
     const stored = parseStoredToken(token.value)
 
     if (!stored) {
-      token.value = null
+      updateToken(null)
       return null
     }
 
     if (stored.expiresAt <= Date.now()) {
-      token.value = null
+      updateToken(null)
       return null
     }
 
     if (token.value !== serializeStoredToken(stored)) {
-      token.value = serializeStoredToken(stored)
+      updateToken(serializeStoredToken(stored))
     }
 
     return stored
@@ -118,29 +156,29 @@ export function useAdminToken() {
 
   function set(nextToken: string | null) {
     const value = normalizeToken(nextToken)
-    token.value = value ? serializeStoredToken(createStoredToken(value)) : null
+    updateToken(value ? serializeStoredToken(createStoredToken(value)) : null)
   }
 
   function clear() {
-    token.value = null
+    updateToken(null)
   }
 
   function clearExpired() {
     const stored = parseStoredToken(token.value)
 
     if (!stored) {
-      token.value = null
+      updateToken(null)
       return false
     }
 
     if (stored.expiresAt > Date.now()) {
       if (token.value !== serializeStoredToken(stored)) {
-        token.value = serializeStoredToken(stored)
+        updateToken(serializeStoredToken(stored))
       }
       return false
     }
 
-    token.value = null
+    updateToken(null)
     return true
   }
 

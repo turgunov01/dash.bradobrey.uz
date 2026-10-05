@@ -111,6 +111,11 @@ export function useDashboardNavigation() {
             label: "Сотрудники",
             to: "/statistics/employees",
           },
+          {
+            icon: "i-lucide-store",
+            label: "Филиал",
+            to: "/statistics/branch",
+          },
         ],
       },
       {

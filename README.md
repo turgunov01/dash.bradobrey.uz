@@ -20,10 +20,9 @@ The local environment must provide at least:
 ```bash
 NUXT_PUBLIC_API_BASE=https://api.bradobrey.uz
 NUXT_ADMIN_SESSION_SECRET=replace-with-a-long-random-secret
-NUXT_COOKIE_SECURE=true
 ```
 
-Never commit `.env` or real credentials. Database access and file storage belong to the backend API, not this repository.
+Cookie security is derived from the request protocol when `NUXT_COOKIE_SECURE` is unset. Use `NUXT_COOKIE_SECURE=false` only for local HTTP when an upstream proxy reports the wrong protocol; HTTPS deployments may explicitly set it to `true`. Never commit `.env` or real credentials. Database access and file storage belong to the backend API, not this repository.
 
 ## Verification
 

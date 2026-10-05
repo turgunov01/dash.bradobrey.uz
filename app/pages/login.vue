@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { ZodIssue } from 'zod'
 
+import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
 import { loginSchema } from '~~/shared/schemas'
+import { firstAllowedPath } from '~/utils/access'
 
 const apiClient = useApiClient()
 
@@ -113,7 +115,15 @@ async function submit() {
     const role = String(sessionStore.user?.role || '').trim().toLowerCase()
     const marketplaceBarbershopId = String(sessionStore.user?.marketplace_barbershop_id || '').trim()
     const isMerchant = Boolean(marketplaceBarbershopId) || role === 'merchant' || role === 'partner'
-    const redirectTo = isMerchant ? '/merchant' : '/'
+    const redirectTo = isMerchant
+      ? '/merchant'
+      : firstAllowedPath(new Set(getEffectiveEmployeePermissions(sessionStore.user)))
+
+    if (!redirectTo) {
+      await sessionStore.logout(undefined, { silent: true })
+      fieldErrors.password = 'Для этой учётной записи не настроены разрешения на разделы панели. Обратитесь к администратору.'
+      return
+    }
 
     logLoginDebug('response', {
       authenticated: Boolean(response?.authenticated),

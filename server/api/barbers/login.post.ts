@@ -1,10 +1,6 @@
 import { createError, readBody, type H3Event } from 'h3'
 
-import {
-  backendDashboardRoles,
-  getEffectiveEmployeePermissions,
-  marketplaceMerchantRoles
-} from '~~/shared/auth/employees'
+import { getEffectiveEmployeePermissions, marketplaceMerchantRoles } from '~~/shared/auth/employees'
 import { loginSchema, type LoginPayload } from '~~/shared/schemas'
 
 import { assertDashboardAccessUser } from '~~/server/utils/admin-access'
@@ -23,17 +19,11 @@ type LoginResult = {
   user: Record<string, any> | null
 }
 
-type AdminLoginResponse = {
-  token?: string | null
-  user?: Record<string, any> | null
-}
-
 type LegacyLoginResponse = {
   token?: string | null
   user?: Record<string, any> | null
 }
 
-const adminRoles = new Set<string>(backendDashboardRoles)
 const dashboardLoginRoles = new Set<string>(marketplaceMerchantRoles)
 const debugPrefix = '[barbers-login-debug]'
 
@@ -100,6 +90,10 @@ function getErrorDebugPayload(error: any) {
   }
 }
 
+function getErrorStatus(error: any) {
+  return Number(error?.statusCode || error?.response?.status || error?.status || 500)
+}
+
 function logBackendLoginRequest(event: H3Event, path: string, payload: LoginPayload, source: string) {
   console.log(`${debugPrefix} request`, {
     body: getLoginDebugBody(payload),
@@ -109,7 +103,7 @@ function logBackendLoginRequest(event: H3Event, path: string, payload: LoginPayl
   })
 }
 
-function logBackendLoginResponse(path: string, status: number, data: LegacyLoginResponse | AdminLoginResponse, source: string) {
+function logBackendLoginResponse(path: string, status: number, data: LegacyLoginResponse, source: string) {
   console.log(`${debugPrefix} response`, {
     authenticated: Boolean(data?.token),
     path,
@@ -126,71 +120,6 @@ function logBackendLoginError(path: string, error: any, source: string) {
     path,
     source
   })
-}
-
-function logBackendLoginFallback(loginError: any) {
-  console.warn(`${debugPrefix} fallback`, {
-    fallbackPath: '/api/barbers/admin/login',
-    primaryError: getErrorDebugPayload(loginError),
-    primaryPath: '/api/barbers/login',
-    reason: 'Primary /api/barbers/login returned a fallback-eligible status.'
-  })
-}
-
-function getErrorStatus(error: any) {
-  return Number(error?.statusCode || error?.response?.status || error?.status || 500)
-}
-
-function shouldTryAdminLoginFallback(error: any) {
-  return [400, 401, 403, 404, 405].includes(getErrorStatus(error))
-}
-
-function buildAdminUser(rawUser: Record<string, any>, fallbackLogin: string) {
-  const login = normalizeText(rawUser.login) || fallbackLogin
-  const role = normalizeText(rawUser.role).toLowerCase()
-
-  return {
-    branch_id: normalizeOptionalId(rawUser.branch_id),
-    id: normalizeText(rawUser.id),
-    login,
-    marketplace_barbershop_id: normalizeOptionalId(rawUser.marketplace_barbershop_id),
-    name: normalizeText(rawUser.name) || login || 'Administrator',
-    phone: rawUser.phone ?? null,
-    permissions: getEffectiveEmployeePermissions(rawUser),
-    role
-  }
-}
-
-function assertAdminLoginResponse(data: AdminLoginResponse, fallbackLogin: string) {
-  const token = normalizeText(data.token)
-  const rawUser = data.user || null
-  const role = normalizeText(rawUser?.role).toLowerCase()
-
-  if (!token) {
-    throw createError({
-      statusCode: 502,
-      message: 'Admin login did not return token.'
-    })
-  }
-
-  if (!rawUser || !normalizeText(rawUser.id)) {
-    throw createError({
-      statusCode: 502,
-      message: 'Admin login did not return user id.'
-    })
-  }
-
-  if (!adminRoles.has(role)) {
-    throw createError({
-      statusCode: 403,
-      message: 'Admin dashboard login is allowed only for backend dashboard roles.'
-    })
-  }
-
-  return {
-    token,
-    user: buildAdminUser(rawUser, fallbackLogin)
-  }
 }
 
 function assertBackendLoginResponse(data: LegacyLoginResponse) {
@@ -258,48 +187,11 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
   })
 }
 
-async function loginAdmin(event: H3Event, payload: LoginPayload): Promise<LoginResult> {
-  const path = '/api/barbers/admin/login'
-
-  logBackendLoginRequest(event, path, payload, 'admin-fallback')
-
-  let response
-
-  try {
-    response = await backendRequest<AdminLoginResponse>(event, {
-      auth: 'none',
-      body: {
-        login: payload.login,
-        password: payload.password
-      },
-      method: 'POST',
-      path
-    })
-  }
-  catch (error) {
-    logBackendLoginError(path, error, 'admin-fallback')
-    throw error
-  }
-
-  logBackendLoginResponse(path, response.status, response.data || {}, 'admin-fallback')
-
-  const { token, user } = assertAdminLoginResponse(response.data || {}, payload.login)
-
-  setDashboardLoginSession(event, token, user)
-
-  return {
-    authenticated: true,
-    token,
-    user
-  }
-}
-
 async function loginBackend(event: H3Event, payload: LoginPayload): Promise<LoginResult> {
   const path = '/api/barbers/login'
   const body = {
     login: payload.login,
-    password: payload.password,
-    ...(payload.branch_id ? { branch_id: payload.branch_id } : {})
+    password: payload.password
   }
 
   logBackendLoginRequest(event, path, payload, 'primary')
@@ -310,6 +202,10 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
     response = await backendRequest<LegacyLoginResponse>(event, {
       auth: 'none',
       body,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
       method: 'POST',
       path
     })
@@ -343,23 +239,16 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
 }
 
 export default defineEventHandler(async (event): Promise<LoginResult> => {
-  const payload = loginSchema.parse(await readBody(event))
+  const parsedPayload = loginSchema.safeParse(await readBody(event))
 
-  try {
-    return await loginBackend(event, payload)
+  if (!parsedPayload.success) {
+    throw createError({
+      statusCode: 400,
+      message: 'Введите корректные логин и пароль.'
+    })
   }
-  catch (loginError: any) {
-    if (!shouldTryAdminLoginFallback(loginError)) {
-      throw loginError
-    }
 
-    logBackendLoginFallback(loginError)
+  const payload = parsedPayload.data
 
-    try {
-      return await loginAdmin(event, payload)
-    }
-    catch {
-      throw loginError
-    }
-  }
+  return loginBackend(event, payload)
 })

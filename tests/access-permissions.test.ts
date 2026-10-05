@@ -2,6 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  employeePermissionDefinitions,
+  employeePermissions,
+  employeePermissionSections,
   employeeRolePermissionPresets,
   getEffectiveEmployeePermissions
 } from '../shared/auth/employees.ts'
@@ -35,6 +38,17 @@ test('uses role presets only when the backend does not provide an override', () 
   )
 })
 
+test('gives admin accounts full dashboard access when backend returns empty permissions', () => {
+  assert.deepEqual(
+    getEffectiveEmployeePermissions({ permissions: [], role: 'admin' }),
+    employeeRolePermissionPresets.admin
+  )
+  assert.deepEqual(
+    getEffectiveEmployeePermissions({ permissions: [], role: 'admin_network' }),
+    employeeRolePermissionPresets.admin
+  )
+})
+
 test('maps legacy dashboard roles to compatible permission presets', () => {
   assert.deepEqual(
     getEffectiveEmployeePermissions({ role: 'admin_network' }),
@@ -44,6 +58,20 @@ test('maps legacy dashboard roles to compatible permission presets', () => {
     getEffectiveEmployeePermissions({ role: 'admin_branch' }),
     employeeRolePermissionPresets.manager
   )
+})
+
+test('assigns quality review only to intended management presets', () => {
+  assert.equal(employeePermissions.includes('statistics.quality.review'), true)
+  assert.equal(employeePermissionDefinitions['statistics.quality.review'].label, 'Проверка качества заказов')
+  assert.equal(
+    employeePermissionSections.some(section => section.items.includes('statistics.quality.review')),
+    true
+  )
+  assert.equal(employeeRolePermissionPresets.admin.includes('statistics.quality.review'), true)
+  assert.equal(employeeRolePermissionPresets.manager.includes('statistics.quality.review'), true)
+  assert.equal(employeeRolePermissionPresets['super-manager'].includes('statistics.quality.review'), true)
+  assert.equal(employeeRolePermissionPresets.barber.includes('statistics.quality.review'), false)
+  assert.equal(employeeRolePermissionPresets['super-barber'].includes('statistics.quality.review'), false)
 })
 
 test('protects marketplace aliases and their original settings routes', () => {
@@ -69,4 +97,7 @@ test('uses the most specific route policy and denies self-only access to the glo
     canAccessPath(new Set(employeeRolePermissionPresets.barber), '/'),
     false
   )
+  assert.deepEqual(requiredForPath('/statistics/branch'), ['statistics.read.branch', 'statistics.read.global'])
+  assert.equal(canAccessPath(new Set(employeeRolePermissionPresets.barber), '/statistics/branch'), false)
+  assert.equal(canAccessPath(new Set(employeeRolePermissionPresets.manager), '/statistics/branch'), true)
 })

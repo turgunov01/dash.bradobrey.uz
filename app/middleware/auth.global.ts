@@ -48,7 +48,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
       return abortNavigation(createError({
         statusCode: 403,
-        statusMessage: 'Недостаточно прав для доступа к разделу.'
+        message: 'Недостаточно прав для доступа к разделу.'
       }))
     }
   }

@@ -21,6 +21,7 @@ const {
   refresh,
   scope,
   scopeContextLabel,
+  scopeOptions,
   selectedBarberId,
   selectedPeriodDays,
   serviceBreakdown,
@@ -29,7 +30,7 @@ const {
   timelineRows,
   topBranches,
   topServices
-} = await useStatisticsAnalytics()
+} = useStatisticsAnalytics()
 </script>
 
 <template>
@@ -56,6 +57,7 @@ const {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :scope-options="scopeOptions"
           subtitle="Выручка считается по сумме заказа или оплате, а если сумма недоступна — по прайсу услуг. Начальный период — текущий месяц."
           title="Бизнес-аналитика по истории записей"
         />

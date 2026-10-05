@@ -1,6 +1,6 @@
 import { setResponseStatus } from 'h3'
 
-import { clearAdminBackendToken, clearAdminSession, getAdminSession } from '~~/server/utils/admin-session'
+import { clearAdminBackendToken, clearAdminSession, getAdminSession, setAdminSession } from '~~/server/utils/admin-session'
 import { assertDashboardAccessUser, getCurrentBackendAccessUser, toDashboardUser } from '~~/server/utils/admin-access'
 import { backendRequest } from '~~/server/utils/backend'
 import { clearBarberToken } from '~~/server/utils/session'
@@ -9,21 +9,22 @@ export default defineEventHandler(async (event): Promise<unknown> => {
   const adminSession = getAdminSession(event)
 
   if (adminSession) {
-    if (adminSession.role) {
-      const accessUser = assertDashboardAccessUser(adminSession)
-
-      return {
-        barber: null,
-        user: toDashboardUser(accessUser)
-      }
-    }
-
     try {
       const accessUser = await getCurrentBackendAccessUser(event)
+      const user = toDashboardUser(accessUser)
+
+      setAdminSession(event, {
+        branch_id: user.branch_id,
+        id: user.id,
+        login: user.login || adminSession.login,
+        marketplace_barbershop_id: user.marketplace_barbershop_id,
+        permissions: user.permissions,
+        role: user.role
+      })
 
       return {
         barber: null,
-        user: toDashboardUser(accessUser)
+        user
       }
     }
     catch (error) {

@@ -184,6 +184,12 @@ export default defineNuxtConfig({
     }
   },
 
+  vite: {
+    resolve: {
+      extensions: ['.mjs', '.mts', '.ts', '.tsx', '.js', '.jsx', '.json']
+    }
+  },
+
   typescript: {
     strict: true,
     typeCheck: true

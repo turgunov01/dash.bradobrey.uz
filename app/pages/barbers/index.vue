@@ -17,6 +17,7 @@ import {
   employeePermissionSections,
   employeeRoleLabels,
   employeeRolePermissionPresets,
+  getEffectiveEmployeePermissions,
   getEmployeeRoleLabel,
   type EmployeePermission,
   type EmployeeRole
@@ -25,6 +26,11 @@ import { barberRegisterSchema, barberUpdateSchema } from '~~/shared/schemas'
 
 const apiClient = useApiClient();
 const config = useRuntimeConfig();
+const sessionStore = useSessionStore();
+const canViewBranchStatistics = computed(() => {
+  const permissions = new Set(getEffectiveEmployeePermissions(sessionStore.user))
+  return permissions.has('statistics.read.branch') || permissions.has('statistics.read.global')
+})
 
 type EmployeeRow = {
   branch: string
@@ -1493,7 +1499,7 @@ onBeforeUnmount(() => {
                       />
                     </UTooltip>
 
-                    <UTooltip text="Статистика по филиалу">
+                    <UTooltip v-if="canViewBranchStatistics" text="Статистика по филиалу">
                       <UButton
                         aria-label="Открыть статистику филиала"
                         color="neutral"

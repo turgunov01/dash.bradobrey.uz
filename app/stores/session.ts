@@ -23,7 +23,7 @@ export const useSessionStore = defineStore("session", () => {
 
   const isAuthenticated = computed(() => Boolean(user.value));
 
-  async function ensureLoaded(options: { force?: boolean } = {}): Promise<SessionSnapshot> {
+  async function ensureLoaded(options: { force?: boolean; throwOnError?: boolean } = {}): Promise<SessionSnapshot> {
     if (status.value === "loaded" && !options.force) {
       return { barber: barber.value, user: user.value };
     }
@@ -44,6 +44,10 @@ export const useSessionStore = defineStore("session", () => {
 
       barber.value = null;
       user.value = null;
+
+      if (options.throwOnError) {
+        throw error;
+      }
     } finally {
       status.value = "loaded";
     }
@@ -59,15 +63,15 @@ export const useSessionStore = defineStore("session", () => {
         adminToken.set(typeof response?.token === "string" ? response.token : null);
       }
 
-      await ensureLoaded({ force: true });
+      await ensureLoaded({ force: true, throwOnError: true });
     }
 
     return response;
   }
 
-  async function logout(payload?: Record<string, unknown>) {
+  async function logout(payload?: Record<string, unknown>, options: { silent?: boolean } = {}) {
     try {
-      await barbersApi.logout(payload);
+      await barbersApi.logout(payload, options);
     } finally {
       if (import.meta.client) {
         adminToken.clear();

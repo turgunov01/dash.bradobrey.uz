@@ -48,6 +48,7 @@ export const employeePermissions = [
   'statistics.read.self',
   'statistics.read.branch',
   'statistics.read.global',
+  'statistics.quality.review',
   'clients.read',
   'services.read',
   'services.manage',
@@ -138,6 +139,10 @@ export const employeePermissionDefinitions: Record<EmployeePermission, Permissio
     description: 'Просмотр общей статистики по сети.',
     label: 'Глобальная статистика'
   },
+  'statistics.quality.review': {
+    description: 'Проверка подозрительных заказов с обязательным аудитом решения.',
+    label: 'Проверка качества заказов'
+  },
   'clients.read': {
     description: 'Просмотр списка клиентов и связанных данных.',
     label: 'Просмотр клиентов'
@@ -216,6 +221,7 @@ export const employeePermissionSections: PermissionSection[] = [
       'statistics.read.self',
       'statistics.read.branch',
       'statistics.read.global',
+      'statistics.quality.review',
       'clients.read'
     ],
     key: 'analytics',
@@ -255,6 +261,7 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
     'queue.manage.branch',
     'history.read.branch',
     'statistics.read.branch',
+    'statistics.quality.review',
     'clients.read',
     'services.read',
     'services.manage',
@@ -281,6 +288,7 @@ export const employeeRolePermissionPresets: Record<EmployeeRole, EmployeePermiss
     'history.read.branch',
     'statistics.read.branch',
     'statistics.read.global',
+    'statistics.quality.review',
     'clients.read',
     'services.read',
     'services.manage',
@@ -307,11 +315,18 @@ const legacyDashboardRolePermissionPresets: Record<string, EmployeePermission[]>
 }
 
 export function getEffectiveEmployeePermissions(user: PermissionUser | null | undefined): EmployeePermission[] {
+  const role = String(user?.role ?? '').trim().toLowerCase()
+
+  // Backend admin accounts are superusers. An empty permissions array means
+  // that no per-user permissions were provisioned, not that the admin should
+  // lose access to every dashboard section.
+  if (['admin', 'admin_network'].includes(role) && Array.isArray(user?.permissions) && user.permissions.length === 0) {
+    return [...employeeRolePermissionPresets.admin]
+  }
+
   if (Array.isArray(user?.permissions)) {
     return [...new Set(user.permissions.filter(isEmployeePermission))]
   }
-
-  const role = String(user?.role ?? '').trim().toLowerCase()
 
   if (isEmployeeRole(role)) {
     return [...employeeRolePermissionPresets[role]]

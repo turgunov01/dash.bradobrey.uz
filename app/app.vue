@@ -2,6 +2,11 @@
 import { ru } from '@nuxt/ui/locale'
 
 const colorMode = useColorMode()
+const toasterReady = ref(false)
+
+onMounted(() => {
+  toasterReady.value = true
+})
 
 colorMode.preference = 'light'
 
@@ -36,7 +41,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp :locale="ru" :toaster="{ position: 'top-right' }">
+  <UApp :locale="ru" :toaster="toasterReady ? { position: 'top-right' } : null">
     <NuxtLoadingIndicator />
 
     <NuxtLayout>

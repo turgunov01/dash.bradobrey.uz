@@ -1,12 +1,18 @@
 import type { Branch } from '~~/shared/schemas'
 import type { FlatServiceItem } from '~/utils/services'
 
+import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
+import {
+  getAllowedEmployeeQualityScopes,
+  type EmployeeQualityUiScope
+} from '~~/shared/statistics/employee-quality'
+
 import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 import { formatPaymentMethod } from '~/utils/display'
 import { createServicePriceMap, getHistoryAmount, isCompletedHistoryStatus } from '~/utils/historyMetrics'
 import { flattenServicesPayload } from '~/utils/services'
 
-export type StatisticsScope = 'barber' | 'branch' | 'global'
+export type StatisticsScope = EmployeeQualityUiScope
 
 type BarberAccount = {
   branch_id: string | null
@@ -308,27 +314,56 @@ function toPieSlices<T>(
     : head
 }
 
-export async function useStatisticsAnalytics() {
+export function useStatisticsAnalytics() {
   const branchStore = useBranchStore()
   const barbersApi = useBarbersApi()
   const historyApi = useHistoryApi()
   const kioskApi = useKioskApi()
+  const sessionStore = useSessionStore()
   const uiStore = useUiStore()
 
-  const scope = ref<StatisticsScope>('global')
+  const scope = ref<StatisticsScope>('branch')
   const selectedBarberId = ref('')
+  const allowedScopes = computed(() => getAllowedEmployeeQualityScopes(sessionStore.user))
+  const scopeOptions = computed(() => allowedScopes.value.map(value => ({
+    label: value === 'global'
+      ? 'Общая'
+      : value === 'branch'
+        ? 'Филиал'
+        : value === 'self'
+          ? 'Моя статистика'
+          : 'Сотрудник',
+    value
+  })))
+
+  watch(allowedScopes, (scopes) => {
+    if (scopes.length && !scopes.includes(scope.value)) {
+      scope.value = scopes[0]!
+    }
+  }, { immediate: true })
 
   // NOTE: register useAsyncData synchronously (no await before it). Inside a
   // composable the Nuxt instance context is lost after the first await, so
   // branchStore.ensureLoaded() runs inside the handler and the promise is
   // awaited at the very end, after every computed/watch is registered.
   const statisticsData = useAsyncData('statistics-dashboard-rich', async () => {
-    await branchStore.ensureLoaded()
+    await Promise.all([branchStore.ensureLoaded(), sessionStore.ensureLoaded()])
+    const permissions = new Set(getEffectiveEmployeePermissions(sessionStore.user))
+    const userId = normalizeText(sessionStore.user?.id || sessionStore.barber?.id)
+    const branchId = normalizeText(sessionStore.user?.branch_id || sessionStore.barber?.branch_id || branchStore.activeBranchId)
+    const historyQuery: Record<string, unknown> = permissions.has('statistics.read.global')
+      ? { __skipBranchScope: true }
+      : permissions.has('statistics.read.branch')
+        ? { ...(branchId ? { branch_id: branchId } : {}) }
+        : { ...(userId ? { barber_id: userId } : {}), ...(branchId ? { branch_id: branchId } : {}) }
+    const directoryQuery: Record<string, unknown> = permissions.has('statistics.read.global')
+      ? { __skipBranchScope: true }
+      : { ...(branchId ? { branch_id: branchId } : {}) }
 
     const [historyResult, servicesResult, barbersResult] = await Promise.allSettled([
-      historyApi.listAll({ __skipBranchScope: true }),
-      kioskApi.services({ __skipBranchScope: true, active: true, grouped: true }),
-      barbersApi.list({ __skipBranchScope: true })
+      historyApi.listAll(historyQuery),
+      kioskApi.services({ ...directoryQuery, active: true, grouped: true }),
+      barbersApi.list(directoryQuery)
     ])
 
     return {
@@ -343,10 +378,17 @@ export async function useStatisticsAnalytics() {
         : [] as FlatServiceItem[]
     }
   }, {
+    immediate: false,
     server: false
   })
 
   const { data, pending, refresh } = statisticsData
+
+  // Client-only data must start after hydration, otherwise loading icons,
+  // disabled attributes and conditional content differ from the SSR output.
+  onMounted(() => {
+    void refresh()
+  })
 
   const serviceMap = computed<Map<string, FlatServiceItem>>(() =>
     new Map<string, FlatServiceItem>(
@@ -458,7 +500,17 @@ export async function useStatisticsAnalytics() {
       })
     }
 
-    return [...options.values()].sort((left, right) => left.label.localeCompare(right.label, 'ru'))
+    const permissions = new Set(getEffectiveEmployeePermissions(sessionStore.user))
+    const ownId = normalizeText(sessionStore.user?.id || sessionStore.barber?.id)
+    const permittedBranchId = normalizeText(sessionStore.user?.branch_id || sessionStore.barber?.branch_id || branchStore.activeBranchId)
+
+    return [...options.values()]
+      .filter((option) => {
+        if (permissions.has('statistics.read.global')) return true
+        if (permissions.has('statistics.read.branch')) return Boolean(permittedBranchId) && option.branchId === permittedBranchId
+        return Boolean(ownId) && option.value === ownId
+      })
+      .sort((left, right) => left.label.localeCompare(right.label, 'ru'))
   })
 
   watch(
@@ -525,6 +577,11 @@ export async function useStatisticsAnalytics() {
 
       if (scope.value === 'barber') {
         return Boolean(selectedBarberId.value) && item.barberId === selectedBarberId.value
+      }
+
+      if (scope.value === 'self') {
+        const ownId = normalizeText(sessionStore.user?.id || sessionStore.barber?.id)
+        return Boolean(ownId) && item.barberId === ownId
       }
 
       return true
@@ -939,7 +996,6 @@ export async function useStatisticsAnalytics() {
   })
 
   const topBranches = computed(() => branchBreakdown.value.slice(0, 3))
-  const topBarbers = computed(() => barberBreakdown.value.slice(0, 3))
   const topServices = computed(() => serviceBreakdown.value.slice(0, 3))
 
   const operationsCards = computed(() => [
@@ -978,11 +1034,12 @@ export async function useStatisticsAnalytics() {
       return selectedBarber.value?.label || 'Барбер не выбран'
     }
 
+    if (scope.value === 'self') {
+      return sessionStore.user?.name || sessionStore.user?.login || 'Моя статистика'
+    }
+
     return 'Все филиалы'
   })
-
-  // Final await: nothing that needs Nuxt/Vue context runs after this point.
-  await statisticsData
 
   return {
     barberBreakdown,
@@ -1004,13 +1061,13 @@ export async function useStatisticsAnalytics() {
     refresh,
     scope,
     scopeContextLabel,
+    scopeOptions,
     selectedBarberId,
     selectedPeriodDays,
     serviceBreakdown,
     serviceChartData,
     statusPieItems,
     timelineRows,
-    topBarbers,
     topBranches,
     topServices
   }

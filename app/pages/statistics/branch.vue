@@ -4,6 +4,7 @@ import { formatCount, formatMoney, formatPercent } from '~/utils/format'
 
 const {
   barberBreakdown,
+  barberOptions,
   barberPieItems,
   filteredHistory,
   needsBranchSelection,
@@ -12,11 +13,24 @@ const {
   refresh,
   scope,
   scopeContextLabel,
-  topBarbers
-} = await useStatisticsAnalytics()
+  selectedBarberId
+} = useStatisticsAnalytics()
 
 // Эта страница всегда показывает статистику в разрезе филиала.
 scope.value = 'branch'
+const rankingRef = ref<{ refresh: () => Promise<unknown> | void } | null>(null)
+const refreshing = ref(false)
+const branchScopeOptions = [{ label: 'Филиал', value: 'branch' as const }]
+
+async function refreshAll() {
+  refreshing.value = true
+  try {
+    await Promise.all([refresh(), rankingRef.value?.refresh()])
+  }
+  finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <template>
@@ -28,7 +42,7 @@ scope.value = 'branch'
         </template>
 
         <template #right>
-          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
+          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending || refreshing" variant="outline" @click="refreshAll">
             Обновить
           </UButton>
         </template>
@@ -37,6 +51,17 @@ scope.value = 'branch'
 
     <template #body>
       <div class="space-y-6">
+        <StatisticsToolbar
+          v-model:scope="scope"
+          v-model:barber-id="selectedBarberId"
+          :barber-options="barberOptions"
+          :context-label="scopeContextLabel"
+          :count="filteredHistory.length"
+          :scope-options="branchScopeOptions"
+          subtitle="Период применяется одновременно к операционной статистике и рейтингу качества филиала."
+          title="Показатели филиала"
+        />
+
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="space-y-1">
             <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -70,7 +95,9 @@ scope.value = 'branch'
             />
           </div>
 
-          <div class="grid gap-6 xl:grid-cols-[0.62fr_0.38fr]">
+          <div class="space-y-6">
+            <StatisticsEmployeeQualityRanking ref="rankingRef" :scope="scope" />
+
             <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
@@ -78,8 +105,9 @@ scope.value = 'branch'
                     Разбивка
                   </p>
                   <h2 class="barbershop-heading text-2xl text-charcoal-950">
-                    По сотрудникам филиала
+                    По выручке сотрудников филиала
                   </h2>
+                  <p class="text-sm text-charcoal-500">Справочный срез: не влияет на рейтинг качества.</p>
                 </div>
               </template>
 
@@ -127,49 +155,6 @@ scope.value = 'branch'
               />
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
-              <template #header>
-                <div class="space-y-2">
-                  <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
-                    Top-лист
-                  </p>
-                  <h2 class="barbershop-heading text-2xl text-charcoal-950">
-                    Лучшие сотрудники
-                  </h2>
-                </div>
-              </template>
-
-              <div v-if="topBarbers.length" class="space-y-3">
-                <div
-                  v-for="(row, index) in topBarbers"
-                  :key="row.id"
-                  class="flex items-center justify-between gap-4 rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="flex size-9 items-center justify-center rounded-2xl bg-sand-100 font-semibold text-charcoal-900">
-                      {{ index + 1 }}
-                    </div>
-                    <div class="space-y-1">
-                      <p class="font-semibold text-charcoal-950">
-                        {{ row.label }}
-                      </p>
-                      <p class="text-xs text-charcoal-500">
-                        {{ formatCount(row.count) }} записей
-                      </p>
-                    </div>
-                  </div>
-                  <p class="font-semibold text-charcoal-950">
-                    {{ formatMoney(row.revenue) }}
-                  </p>
-                </div>
-              </div>
-              <SharedEmptyState
-                v-else
-                description="Нет сотрудников для ранжирования."
-                icon="i-lucide-award"
-                title="Top-лист пуст"
-              />
-            </UCard>
           </div>
         </template>
       </div>

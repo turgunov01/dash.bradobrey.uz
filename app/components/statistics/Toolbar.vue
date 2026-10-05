@@ -8,6 +8,7 @@ defineProps<{
   barberOptions: BarberOption[]
   contextLabel: string
   count: number
+  scopeOptions: Array<{ label: string, value: StatisticsScope }>
   subtitle: string
   title: string
 }>()
@@ -60,11 +61,7 @@ const uiStore = useUiStore()
       <UFormField label="Область">
         <USelectMenu
           v-model="scope"
-          :items="[
-            { label: 'Общая', value: 'global' },
-            { label: 'Филиал', value: 'branch' },
-            { label: 'Барбер', value: 'barber' }
-          ]"
+          :items="scopeOptions"
           value-key="value" portal="body" />
       </UFormField>
 

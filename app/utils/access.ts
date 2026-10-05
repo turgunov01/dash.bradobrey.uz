@@ -12,6 +12,7 @@ export const routePermissions: Record<string, EmployeePermission[]> = {
   '/services': ['services.read'],
   '/service-categories': ['services.read'],
   '/history': ['history.read.self', 'history.read.branch'],
+  '/statistics/branch': ['statistics.read.branch', 'statistics.read.global'],
   '/statistics': ['statistics.read.self', 'statistics.read.branch', 'statistics.read.global'],
   '/finance': ['dashboard.access', 'statistics.read.branch', 'statistics.read.global'],
   '/promo-codes': ['promo.manage'],

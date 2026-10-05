@@ -2,9 +2,15 @@
 import { ru } from '@nuxt/ui/locale'
 import type { NuxtError } from '#app'
 
-defineProps<{
+const props = defineProps<{
   error: NuxtError
 }>()
+
+const isAccessError = computed(() => [401, 403].includes(Number(props.error?.statusCode || 0)))
+
+function recoverFromError() {
+  clearError({ redirect: isAccessError.value ? '/login' : '/' })
+}
 
 useSeoMeta({
   title: 'Ошибка панели',
@@ -13,7 +19,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp :locale="ru">
+  <UApp :locale="ru" :toaster="null">
     <div class="min-h-screen bg-[var(--dashboard-shell)] px-4 py-12">
       <div class="mx-auto max-w-xl">
         <UCard class="warm-card rounded-[2rem] border border-charcoal-200">
@@ -38,10 +44,13 @@ useSeoMeta({
             />
 
             <div class="flex flex-wrap gap-3">
-              <UButton color="primary" to="/">
+              <UButton v-if="isAccessError" color="primary" @click="recoverFromError">
+                Войти заново
+              </UButton>
+              <UButton v-else color="primary" to="/">
                 На главную
               </UButton>
-              <UButton color="neutral" variant="outline" @click="clearError({ redirect: '/' })">
+              <UButton color="neutral" variant="outline" @click="recoverFromError">
                 Сбросить приложение
               </UButton>
             </div>

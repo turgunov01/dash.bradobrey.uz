@@ -29,7 +29,8 @@ const paymentLabels: Record<string, string> = {
 const scopeLabels: Record<string, string> = {
   barber: 'Барбер',
   branch: 'Филиал',
-  global: 'Общий'
+  global: 'Общий',
+  self: 'Моя статистика'
 }
 
 function normalizeValue(value?: string | null) {

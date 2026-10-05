@@ -64,15 +64,15 @@ export function useBarbersApi() {
           password: payload.password,
         },
         method: "POST",
+        silent: true,
         skipAuth: true,
-        successMessage: "Вход выполнен",
       });
     },
-    logout(payload?: Record<string, unknown>) {
+    logout(payload?: Record<string, unknown>, options: { silent?: boolean } = {}) {
       return client.request("/api/barbers/logout", {
         body: payload,
         method: "POST",
-        successMessage: "Выход выполнен",
+        ...(!options.silent ? { successMessage: "Выход выполнен" } : {}),
       });
     },
     me(options: { silent?: boolean } = {}) {

@@ -15,6 +15,7 @@ module.exports = {
         NITRO_HOST: '0.0.0.0',
         NITRO_PORT: '3000',
         NITRO_PRESET: 'node-server',
+        NUXT_ADMIN_SESSION_SECRET: process.env.NUXT_ADMIN_SESSION_SECRET,
         NUXT_COOKIE_SECURE: 'true',
         NUXT_PUBLIC_API_BASE: process.env.NUXT_PUBLIC_API_BASE || 'https://api.bradobrey.uz'
       }
