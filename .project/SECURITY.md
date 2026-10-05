@@ -45,6 +45,15 @@ Last reviewed: 2026-10-04
 - Required owner/operations action: rotate `NUXT_ADMIN_SESSION_SECRET` in every deployed environment, invalidate old sessions, then decide whether repository history must be purged.
 - Retest: confirm the deployed secret changed, old signed sessions fail, `git ls-files .env` is empty, and history scanning no longer reports live credentials.
 
+### Production login BFF session configuration
+
+- Severity: High availability / session integrity
+- Evidence: on 2026-10-05, direct `POST https://api.bradobrey.uz/api/barbers/login` returned 200 for the supplied JSON contract, while `POST https://dash.bradobrey.uz/api/barbers/login` returned 500 after obtaining the upstream token. The dashboard process had no usable `NUXT_ADMIN_SESSION_SECRET` to sign its session cookie.
+- Affected component: Dashboard Nitro BFF login route and PM2 runtime configuration.
+- Fix applied: PM2 now loads the deployment-local `.env` before reading runtime values and fails fast when the signing secret is absent. The login handler signs the dashboard session before issuing the upstream token cookie.
+- Status: Fixed in source; production deployment/restart remains pending.
+- Retest: after deployment, the dashboard route must return 200, set both dashboard session and backend-token cookies, and complete `/api/barbers/me`; a missing secret must prevent process startup rather than produce a partial login.
+
 ### Incomplete server-side authorization
 
 - Severity: High

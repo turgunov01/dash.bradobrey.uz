@@ -1,3 +1,19 @@
+const path = require('node:path')
+const { loadEnvFile } = require('node:process')
+
+// PM2 starts the generated Nitro server outside Nuxt's dotenv loader. Load the
+// deployment-local .env before reading runtime values, while preserving values
+// explicitly provided by the process manager/environment.
+try {
+  loadEnvFile(path.join(__dirname, '.env'))
+} catch (error) {
+  if (error?.code !== 'ENOENT') throw error
+}
+
+if (!process.env.NUXT_ADMIN_SESSION_SECRET) {
+  throw new Error('NUXT_ADMIN_SESSION_SECRET must be configured before starting bradobrey-dashboard')
+}
+
 module.exports = {
   apps: [
     {

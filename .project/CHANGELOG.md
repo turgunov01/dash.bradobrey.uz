@@ -59,3 +59,8 @@
 
 - Removed `.env` from Git tracking while preserving the ignored local file.
 - Recorded the required secret rotation and outstanding BFF authorization/dependency risks.
+# 2026-10-05
+
+- Audited the production login path against both domains. Confirmed the external API endpoint succeeds and the dashboard BFF forwards to the same `/api/barbers/login` contract.
+- Fixed PM2 runtime configuration to load the deployment-local `.env` before reading `NUXT_ADMIN_SESSION_SECRET`, with fail-fast startup when the signing secret is missing.
+- Fixed login session cookie ordering so a failed dashboard-session signature cannot leave an upstream backend token cookie behind.

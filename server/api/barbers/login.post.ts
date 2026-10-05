@@ -182,7 +182,10 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
   clearBarberToken(event)
   clearAdminBackendToken(event)
   clearAdminSession(event)
-  setAdminBackendToken(event, token)
+
+  // Sign the dashboard session before issuing the backend token. If the
+  // server-only session secret is missing/misconfigured, login must fail
+  // without leaving a valid upstream token in the browser's cookie jar.
   setAdminSession(event, {
     branch_id: user.branch_id,
     id: user.id,
@@ -191,6 +194,7 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
     permissions: user.permissions,
     role: user.role
   })
+  setAdminBackendToken(event, token)
 }
 
 async function loginBackend(event: H3Event, payload: LoginPayload): Promise<LoginResult> {

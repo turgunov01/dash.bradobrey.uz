@@ -85,3 +85,15 @@ test('resolves TypeScript sources before same-name JavaScript build artifacts', 
 test('passes the server-only admin session secret to the PM2 production process', () => {
   assert.match(pm2ConfigSource, /NUXT_ADMIN_SESSION_SECRET:\s*process\.env\.NUXT_ADMIN_SESSION_SECRET/)
 })
+
+test('loads PM2 runtime env before reading the admin session secret', () => {
+  assert.match(pm2ConfigSource, /loadEnvFile\(path\.join\(__dirname, '\.env'\)\)/)
+  assert.match(pm2ConfigSource, /NUXT_ADMIN_SESSION_SECRET must be configured before starting/)
+})
+
+test('does not issue a backend token cookie before signing the dashboard session', () => {
+  assert.match(
+    loginHandlerSource,
+    /setAdminSession\(event, \{[\s\S]*?role: user\.role\s*\}\)\s*setAdminBackendToken\(event, token\)/
+  )
+})
