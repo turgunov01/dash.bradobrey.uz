@@ -62,7 +62,7 @@ function getLoginDebugUser(user: any) {
 }
 
 function logLoginDebug(label: string, payload: Record<string, unknown>) {
-  if (!import.meta.client) return
+  if (!import.meta.client || !import.meta.dev) return
 
   console.log(`[barbers-login-debug:client] ${label}`, sanitizeDebugValue(payload))
 }

@@ -95,6 +95,8 @@ function getErrorStatus(error: any) {
 }
 
 function logBackendLoginRequest(event: H3Event, path: string, payload: LoginPayload, source: string) {
+  if (process.env.NODE_ENV === 'production') return
+
   console.log(`${debugPrefix} request`, {
     body: getLoginDebugBody(payload),
     method: 'POST',
@@ -104,6 +106,8 @@ function logBackendLoginRequest(event: H3Event, path: string, payload: LoginPayl
 }
 
 function logBackendLoginResponse(path: string, status: number, data: LegacyLoginResponse, source: string) {
+  if (process.env.NODE_ENV === 'production') return
+
   console.log(`${debugPrefix} response`, {
     authenticated: Boolean(data?.token),
     path,
@@ -115,6 +119,8 @@ function logBackendLoginResponse(path: string, status: number, data: LegacyLogin
 }
 
 function logBackendLoginError(path: string, error: any, source: string) {
+  if (process.env.NODE_ENV === 'production') return
+
   console.error(`${debugPrefix} error`, {
     error: getErrorDebugPayload(error),
     path,

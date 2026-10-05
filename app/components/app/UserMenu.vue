@@ -22,7 +22,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
       icon: 'i-lucide-map-pinned'
     }, {
       label: isConnected.value ? 'Онлайн-синхронизация активна' : 'Онлайн-синхронизация недоступна',
-      icon: isConnected.value ? 'i-lucide-broadcast' : 'i-lucide-wifi-off'
+      icon: isConnected.value ? 'i-lucide-radio-tower' : 'i-lucide-wifi-off'
     }
   ],
   [

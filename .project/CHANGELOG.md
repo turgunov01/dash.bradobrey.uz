@@ -25,6 +25,8 @@
 
 ## 2026-10-05
 
+- Replaced the unavailable `lucide:broadcast` reference with the installed `lucide:radio-tower` icon so the realtime status menu renders without an Iconify warning.
+- Disabled login request diagnostics in production; sanitized diagnostics remain available during development only.
 - Fixed admin login access when the backend returns `permissions: []`: `admin` and legacy `admin_network` accounts now receive the full admin permission preset.
 - Fixed History/Statistics 401/403 responses by requiring the authenticated backend session in their BFF proxy routes; added a regression contract test for the auth mode.
 - Dashboard admin authentication now uses only `POST /api/barbers/login` with the exact `{ login, password }` JSON payload and no `/api/barbers/admin/login` fallback.
