@@ -25,6 +25,10 @@ const loginHandlerSource = readFileSync(
   new URL('../server/api/barbers/login.post.ts', import.meta.url),
   'utf8'
 )
+const meHandlerSource = readFileSync(
+  new URL('../server/api/barbers/me.get.ts', import.meta.url),
+  'utf8'
+)
 const environmentExample = readFileSync(
   new URL('../.env.example', import.meta.url),
   'utf8'
@@ -102,4 +106,11 @@ test('does not issue a backend token cookie before signing the dashboard session
     loginHandlerSource,
     /setAdminSession\(event, \{[\s\S]*?role: user\.role\s*\}\)\s*setAdminBackendToken\(event, token\)/
   )
+})
+
+test('persists a validated direct-login bearer token for SSR and full-page reloads', () => {
+  assert.match(meHandlerSource, /getHeader\(event, 'authorization'\)/)
+  assert.match(meHandlerSource, /const bearerToken = getBearerToken\(event\)/)
+  assert.match(meHandlerSource, /assertDashboardAccessUser\(response\.data\?\.user\)/)
+  assert.match(meHandlerSource, /if \(bearerToken\) \{[\s\S]*?setAdminBackendToken\(event, bearerToken\)/)
 })

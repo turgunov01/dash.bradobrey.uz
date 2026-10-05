@@ -54,7 +54,7 @@ Last reviewed: 2026-10-05
 - Status: Fixed in source; production deployment/restart remains pending.
 - Retest: after deployment, the dashboard route must return 200, set both dashboard session and backend-token cookies, and complete `/api/barbers/me`; a missing secret must prevent process startup rather than produce a partial login.
 
-The browser login path currently uses the canonical external API directly as a compatibility mitigation. This avoids the broken BFF route, but it keeps the bearer token in browser state and therefore does not resolve the separate cookie-only authentication finding below. The first post-login `/me` request now receives that token explicitly, avoiding a client-state timing gap. The BFF secret/configuration still requires production remediation.
+The browser login path currently uses the canonical external API directly as a compatibility mitigation. This avoids the broken BFF route, but it keeps the bearer token in browser state and therefore does not resolve the separate cookie-only authentication finding below. The first post-login `/me` request receives that token explicitly and, after backend validation, persists it in the Dashboard HttpOnly backend-token cookie for SSR/reload continuity. The BFF secret/configuration still requires production remediation.
 
 ### Incomplete server-side authorization
 
