@@ -13,6 +13,12 @@ type SessionSnapshot = {
   user: BarberUser | null;
 };
 
+type SessionLoadOptions = {
+  force?: boolean;
+  throwOnError?: boolean;
+  token?: string;
+};
+
 export const useSessionStore = defineStore("session", () => {
   const barbersApi = useBarbersApi();
   const adminToken = useAdminToken();
@@ -23,7 +29,7 @@ export const useSessionStore = defineStore("session", () => {
 
   const isAuthenticated = computed(() => Boolean(user.value));
 
-  async function ensureLoaded(options: { force?: boolean; throwOnError?: boolean } = {}): Promise<SessionSnapshot> {
+  async function ensureLoaded(options: SessionLoadOptions = {}): Promise<SessionSnapshot> {
     if (status.value === "loaded" && !options.force) {
       return { barber: barber.value, user: user.value };
     }
@@ -31,7 +37,10 @@ export const useSessionStore = defineStore("session", () => {
     status.value = "loading";
 
     try {
-      const response = await barbersApi.me({ silent: true });
+      const response = await barbersApi.me({
+        ...(options.token ? { token: options.token } : {}),
+        silent: true,
+      });
 
       barber.value = response?.barber ?? null;
       user.value = response?.user ?? null;
@@ -57,13 +66,17 @@ export const useSessionStore = defineStore("session", () => {
 
   async function login(payload: LoginPayload) {
     const response = await barbersApi.login(payload);
+    const loginToken = typeof response?.token === "string" ? response.token : null;
 
     if (response?.authenticated) {
       if (import.meta.client) {
-        adminToken.set(typeof response?.token === "string" ? response.token : null);
+        adminToken.set(loginToken);
       }
 
-      await ensureLoaded({ force: true, throwOnError: true });
+      // Pass the freshly received token explicitly to the first /me request.
+      // This avoids a client-side state/localStorage timing race where login
+      // succeeds but the immediate profile request is sent without auth.
+      await ensureLoaded({ force: true, throwOnError: true, token: loginToken || undefined });
     }
 
     return response;

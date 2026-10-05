@@ -41,7 +41,10 @@ const pm2ConfigSource = readFileSync(
 test('shares the admin token before the post-login profile request', () => {
   assert.match(adminTokenSource, /useState<string \| null>\(ADMIN_TOKEN_STATE_KEY/)
   assert.doesNotMatch(adminTokenSource, /listenToStorageChanges:\s*false/)
-  assert.match(sessionSource, /adminToken\.set[\s\S]*ensureLoaded\(\{ force: true, throwOnError: true \}\)/)
+  assert.match(sessionSource, /adminToken\.set\(loginToken\)/)
+  assert.match(sessionSource, /ensureLoaded\(\{ force: true, throwOnError: true, token: loginToken \|\| undefined \}\)/)
+  assert.match(loginApiSource, /token\?: string/)
+  assert.match(loginApiSource, /Authorization: `Bearer \$\{options\.token\}`/)
 })
 
 test('redirects successful logins to an allowed route instead of always opening root', () => {

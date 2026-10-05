@@ -93,11 +93,12 @@ export function useBarbersApi() {
         ...(!options.silent ? { successMessage: "Выход выполнен" } : {}),
       });
     },
-    me(options: { silent?: boolean } = {}) {
+    me(options: { silent?: boolean; token?: string } = {}) {
       return client.request<{
         barber: BarberProfile | null;
         user: BarberUser | null;
       }>("/api/barbers/me", {
+        ...(options.token ? { headers: { Authorization: `Bearer ${options.token}` } } : {}),
         method: "GET",
         silent: options.silent,
       });
