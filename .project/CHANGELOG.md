@@ -25,6 +25,7 @@
 
 ## 2026-10-05
 
+- Fixed the Employee Quality API migration guard: partially applied schemas with missing quality columns now return the documented `501` unavailable response instead of masking the deployment issue as `500`; added API regression coverage.
 - Replaced the unavailable `lucide:broadcast` reference with the installed `lucide:radio-tower` icon so the realtime status menu renders without an Iconify warning.
 - Disabled login request diagnostics in production; sanitized diagnostics remain available during development only.
 - Fixed admin login access when the backend returns `permissions: []`: `admin` and legacy `admin_network` accounts now receive the full admin permission preset.

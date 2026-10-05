@@ -49,6 +49,7 @@ Last updated: 2026-10-04
 
 ## EMPLOYEE QUALITY RANKING — code complete, rollout pending
 
+- [ ] PRODUCTION BLOCKER (verified 2026-10-05): live `GET /api/statistics/employees` returns `501` because the external API database does not have the Employee Quality schema. Apply the API migration/backfill, provision the required statistics permissions, then rerun the authenticated smoke test.
 - [ ] Audit suspicious-order classification coverage and terminal-outcome attribution for the selected pilot period.
 - [x] Centralize and version the suspicious-order rule; snapshot expected service duration and persist review state.
 - [ ] Record actor type and reason for terminal outcomes before applying employee cancellation penalties.

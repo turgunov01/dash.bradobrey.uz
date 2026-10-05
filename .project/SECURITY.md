@@ -88,4 +88,5 @@ The browser login path currently uses the canonical external API directly as a c
 - The Dashboard/API review DTO mismatch found during independent retest is fixed and covered by canonical request, response, and replay fixtures. Unsupported `reopen` is rejected on both sides.
 - Persisted suspicious notifications no longer expose undefined/`NaN` duration values. Terminal service/payment mutations and the dedicated completion-route terminal/race bypass are blocked with regression coverage.
 - PostgreSQL migration, concurrent review, DB privileges and query-plan/p95 checks remain unverified because no isolated staging database was available.
+- Live retest on 2026-10-05 confirmed the quality aggregate is fail-closed with HTTP 501 until the external API migration is applied; no revenue fallback is used. Production migration and permission rollout remain pending owner/DB approval.
 - Production dependency audits still fail: Dashboard has 14 findings (13 high) and API has 25 findings (1 critical, 17 high, 6 moderate, 1 low).
