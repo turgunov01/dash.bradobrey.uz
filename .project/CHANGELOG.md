@@ -30,6 +30,7 @@
 - Fixed admin login access when the backend returns `permissions: []`: `admin` and legacy `admin_network` accounts now receive the full admin permission preset.
 - Fixed History/Statistics 401/403 responses by requiring the authenticated backend session in their BFF proxy routes; added a regression contract test for the auth mode.
 - Dashboard admin authentication now uses only `POST /api/barbers/login` with the exact `{ login, password }` JSON payload and no `/api/barbers/admin/login` fallback.
+- Changed the browser login request to call `https://api.bradobrey.uz/api/barbers/login` directly with `credentials: omit`; this avoids the production dashboard BFF 500 caused by a missing session-signing secret while preserving Bearer authorization for subsequent BFF calls.
 - Fixed successful-login redirects for restricted users: route to the first section allowed by the refreshed permissions, and clear the session with an actionable message when no dashboard section is permitted.
 - Prevented emitted JavaScript copies from shadowing TypeScript sources; removed untracked generated copies under `app/`, `server/`, and `shared/` that caused SSR module-resolution failures.
 - Distinguished invalid/missing login input from server failures (HTTP 400) and stopped the generic API toast from obscuring the login form's credential error.

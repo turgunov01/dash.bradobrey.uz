@@ -1,6 +1,6 @@
 # Project Context
 
-Last verified: 2026-10-03
+Last verified: 2026-10-05
 
 Bradobrey Dashboard is a Nuxt 4 SSR administration application. Vue/Nuxt UI pages live in `app/`; Nitro BFF routes in `server/api/` proxy the external backend configured by `NUXT_PUBLIC_API_BASE`. PostgreSQL and uploaded files are owned by that backend, not this repository.
 

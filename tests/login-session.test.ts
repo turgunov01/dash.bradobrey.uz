@@ -57,14 +57,17 @@ test('redirects successful logins to an allowed route instead of always opening 
 })
 
 test('shows login failures inline and returns a client error for malformed credentials', () => {
-  assert.match(loginApiSource, /login\(payload: LoginPayload\)[\s\S]*?silent:\s*true[\s\S]*?skipAuth:\s*true/)
+  assert.match(loginApiSource, /login\(payload: LoginPayload\)[\s\S]*?\$fetch<BackendLoginResponse>/)
   assert.match(loginHandlerSource, /loginSchema\.safeParse\(await readBody\(event\)\)/)
   assert.match(loginHandlerSource, /statusCode:\s*400/)
   assert.doesNotMatch(loginHandlerSource, /loginSchema\.parse\(/)
 })
 
 test('uses only the requested backend login endpoint and payload', () => {
-  assert.match(loginApiSource, /client\.request<any>\("\/api\/barbers\/login"/)
+  assert.match(loginApiSource, /\$fetch<BackendLoginResponse>\("\/api\/barbers\/login"/)
+  assert.match(loginApiSource, /baseURL,[\s\S]*?credentials: "omit"/)
+  assert.match(loginApiSource, /Accept: "application\/json"/)
+  assert.match(loginApiSource, /"Content-Type": "application\/json"/)
   assert.match(loginHandlerSource, /const path = '\/api\/barbers\/login'/)
   assert.match(loginHandlerSource, /Accept: 'application\/json'/)
   assert.match(loginHandlerSource, /'Content-Type': 'application\/json'/)

@@ -1,6 +1,6 @@
 # Security Status
 
-Last reviewed: 2026-10-04
+Last reviewed: 2026-10-05
 
 ## Release status
 
@@ -53,6 +53,8 @@ Last reviewed: 2026-10-04
 - Fix applied: PM2 now loads the deployment-local `.env` before reading runtime values and fails fast when the signing secret is absent. The login handler signs the dashboard session before issuing the upstream token cookie.
 - Status: Fixed in source; production deployment/restart remains pending.
 - Retest: after deployment, the dashboard route must return 200, set both dashboard session and backend-token cookies, and complete `/api/barbers/me`; a missing secret must prevent process startup rather than produce a partial login.
+
+The browser login path currently uses the canonical external API directly as a compatibility mitigation. This avoids the broken BFF route, but it keeps the bearer token in browser state and therefore does not resolve the separate cookie-only authentication finding below. The BFF secret/configuration still requires production remediation.
 
 ### Incomplete server-side authorization
 

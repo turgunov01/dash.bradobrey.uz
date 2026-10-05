@@ -12,6 +12,11 @@ import type {
   QueueUpdatePayload,
 } from "~~/shared/schemas";
 
+type BackendLoginResponse = {
+  token?: string;
+  user?: BarberUser | null;
+};
+
 export function useBarbersApi() {
   const client = useApiClient();
 
@@ -58,15 +63,28 @@ export function useBarbersApi() {
       });
     },
     login(payload: LoginPayload) {
-      return client.request<any>("/api/barbers/login", {
+      const config = useRuntimeConfig();
+      const baseURL = String(config.public.apiBase || "https://api.bradobrey.uz").replace(/\/+$/, "");
+
+      // Login must go directly to the canonical API. The dashboard BFF login
+      // route requires its own signing secret and can otherwise fail after
+      // the upstream API has already authenticated the user.
+      return $fetch<BackendLoginResponse>("/api/barbers/login", {
+        baseURL,
         body: {
           login: payload.login,
           password: payload.password,
         },
+        credentials: "omit",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
         method: "POST",
-        silent: true,
-        skipAuth: true,
-      });
+      }).then(response => ({
+        ...response,
+        authenticated: Boolean(response?.token),
+      }));
     },
     logout(payload?: Record<string, unknown>, options: { silent?: boolean } = {}) {
       return client.request("/api/barbers/logout", {
