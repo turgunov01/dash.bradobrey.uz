@@ -75,8 +75,6 @@ const {
           </div>
 
           <div class="space-y-6">
-            <StatisticsEmployeeQualityRanking :scope="scope" :selected-employee-id="selectedBarberId" />
-
             <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">

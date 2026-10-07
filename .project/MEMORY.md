@@ -16,7 +16,7 @@
 - The signed admin session now carries normalized permissions so a page refresh does not silently lose custom access.
 - Client navigation and route middleware are UX controls only. Sensitive BFF handlers still require server-side permission enforcement.
 - The external backend owns database migrations except for the reference SQL files kept under `scripts/postgres/`.
-- `/statistics/employees` and `/statistics/branch` now render the server-provided `employee-quality-v1` rank. The former revenue Top-list is removed; revenue remains only in a clearly labelled informational breakdown/column.
+- `/statistics/branch` renders the server-provided `employee-quality-v1` rank. The ranking module was removed from `/statistics/employees` on 2026-10-07 at the project owner's request; its existing revenue breakdown remains.
 - Employee ranking must not penalize `no_show`, `not_in_time`, or unattributed cancellations. Only explicitly employee-attributed terminal failures may reduce rank.
 - Suspicious-order classification is currently duplicated and inconsistent across History, dashboard statistics, backend manager statistics, and notifications. The durable target is one versioned server-side rule using `started_at -> finished_at` and an immutable expected-duration snapshot.
 - Revenue is informational only for employee quality ranking and must not participate in ordering.

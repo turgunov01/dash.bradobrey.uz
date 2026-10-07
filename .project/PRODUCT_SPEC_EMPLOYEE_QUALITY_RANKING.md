@@ -2,11 +2,13 @@
 
 Status: IMPLEMENTED IN CODE — DATABASE MIGRATION, PERMISSION PROVISIONING, STAGING VALIDATION AND PILOT PENDING  
 Owner: Product / Operations  
-Affected UI: `/statistics/employees`  
+Affected UI: `/statistics/branch`; employee ranking is intentionally not rendered on `/statistics/employees`
 Affected systems: Bradobrey Dashboard and the external Bradobrey API  
 Prepared: 2026-10-04
 
 Implementation note (2026-10-04): the Dashboard quality leaderboard, PII-free evidence UI/BFF, review BFF, permission-aware scopes, and the external API aggregate/evidence/review contracts are implemented. The API migration has not been applied to staging/production. Generic terminal actions intentionally remain unattributed and neutral until their actor/reason transaction workflow is implemented. The ranking must therefore remain in controlled rollout until the deployment gates in section 11 pass.
+
+UI scope note (2026-10-07): at the project owner's request, the quality ranking module is no longer displayed on `/statistics/employees`. It remains available on `/statistics/branch`; the employee page retains its existing operational metrics and revenue breakdown.
 
 ## 1. Objective
 
