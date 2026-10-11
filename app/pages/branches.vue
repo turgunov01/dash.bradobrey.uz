@@ -464,8 +464,8 @@ function useMyLocation() {
   mapPickerLoading.value = true
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
-      locationForm.latitude = coords.latitude.toFixed(6)
-      locationForm.longitude = coords.longitude.toFixed(6)
+      mapPickerDraft.latitude = coords.latitude.toFixed(6)
+      mapPickerDraft.longitude = coords.longitude.toFixed(6)
       updateMapPoint(coords.latitude, coords.longitude)
       mapPickerLoading.value = false
     },
