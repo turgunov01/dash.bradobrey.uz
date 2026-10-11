@@ -121,6 +121,7 @@ const googleMapInstance = ref<any>(null)
 const googleMapMarker = ref<any>(null)
 const googleMapMarkerIsAdvanced = ref(false)
 let googleMapsLoader: Promise<any> | null = null
+const mapPickerDraft = reactive({ latitude: '', longitude: '' })
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 const form = reactive({
@@ -319,35 +320,38 @@ async function saveLocation() {
 }
 
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
-const googleMapsApiKey = String(useRuntimeConfig().public.googleMapsApiKey || '').trim()
+const publicRuntimeConfig = useRuntimeConfig().public
+const googleMapsApiKey = String(publicRuntimeConfig.googleMapsApiKey || '').trim()
+const googleMapsMapId = String(publicRuntimeConfig.googleMapsMapId || '').trim()
 
 async function resolveGoogleMapsApi() {
   const google = (window as any).google
-  if (!google?.maps) throw new Error('Google Maps loaded without the Maps JavaScript API')
+  if (!google?.maps) throw new Error('Google Maps загружена без Maps JavaScript API')
 
-  // With loading=async the global namespace can exist before the constructors
-  // are published. Always resolve the library explicitly before using Map.
   if (typeof google.maps.importLibrary === 'function') {
     const mapsLibrary = await google.maps.importLibrary('maps')
     const markerLibrary = await google.maps.importLibrary('marker')
-    if (typeof mapsLibrary?.Map !== 'function') throw new Error('Google Maps Maps library is unavailable')
-    const Marker = markerLibrary?.AdvancedMarkerElement || google.maps.Marker
-    if (typeof Marker !== 'function') throw new Error('Google Maps marker library is unavailable')
+    if (typeof mapsLibrary?.Map !== 'function') throw new Error('Библиотека Google Maps недоступна')
+    const advancedMarker = markerLibrary?.AdvancedMarkerElement
+    const legacyMarker = google.maps.Marker
+    if (typeof advancedMarker !== 'function' && typeof legacyMarker !== 'function') {
+      throw new Error('Библиотека маркеров Google Maps недоступна')
+    }
     return {
       Map: mapsLibrary.Map,
-      Marker,
-      advancedMarker: Marker === markerLibrary?.AdvancedMarkerElement
+      Marker: googleMapsMapId && typeof advancedMarker === 'function' ? advancedMarker : legacyMarker,
+      advancedMarker: Boolean(googleMapsMapId && typeof advancedMarker === 'function')
     }
   }
 
-  if (typeof google.maps.Map !== 'function') throw new Error('Google Maps Map constructor is unavailable')
+  if (typeof google.maps.Map !== 'function' || typeof google.maps.Marker !== 'function') {
+    throw new Error('Конструкторы Google Maps недоступны')
+  }
   return { Map: google.maps.Map, Marker: google.maps.Marker, advancedMarker: false }
 }
 
 function loadGoogleMaps() {
-  if (typeof window !== 'undefined' && (window as any).google?.maps) {
-    return resolveGoogleMapsApi()
-  }
+  if (typeof window !== 'undefined' && (window as any).google?.maps) return resolveGoogleMapsApi()
   if (googleMapsLoader) return googleMapsLoader
   if (!googleMapsApiKey) return Promise.reject(new Error('Google Maps API key is not configured'))
 
@@ -370,22 +374,22 @@ function loadGoogleMaps() {
       cleanup()
       callback(value)
     }
-    timeout = window.setTimeout(() => {
-      finish(reject, new Error('Google Maps не активирована для этого API-ключа. Включите Maps JavaScript API в Google Cloud.'))
-    }, 15000)
     const authFailure = () => {
       previousAuthFailure?.()
-      finish(reject, new Error('Google Maps отклонила API-ключ. Проверьте активацию Maps JavaScript API и ограничения сайта.'))
+      finish(reject, new Error('Google Maps отклонила API-ключ. Проверьте Maps JavaScript API и ограничения домена.'))
     }
     ;(window as any).gm_authFailure = authFailure
     ;(window as any)[callbackName] = () => {
       resolveGoogleMapsApi().then(value => finish(resolve, value), error => finish(reject, error))
     }
+    timeout = window.setTimeout(() => {
+      finish(reject, new Error('Google Maps не ответила. Проверьте активацию Maps JavaScript API, billing и ограничения домена.'))
+    }, 15000)
     const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async&libraries=marker&callback=${callbackName}`
     script.async = true
     script.defer = true
-    script.onerror = () => finish(reject, new Error('Не удалось загрузить Google Maps. Проверьте сеть и ограничения CSP.'))
+    script.onerror = () => finish(reject, new Error('Не удалось загрузить Google Maps. Проверьте сеть и CSP.'))
     document.head.appendChild(script)
   })
   googleMapsLoader.catch(() => {
@@ -427,8 +431,8 @@ function readMarkerPoint(event: any) {
 function applyMarkerPoint(event: any) {
   const point = readMarkerPoint(event)
   if (!point) return
-  locationForm.latitude = point.latitude.toFixed(6)
-  locationForm.longitude = point.longitude.toFixed(6)
+  mapPickerDraft.latitude = point.latitude.toFixed(6)
+  mapPickerDraft.longitude = point.longitude.toFixed(6)
   updateMapPoint(point.latitude, point.longitude, false)
 }
 
@@ -438,10 +442,7 @@ function destroyMapPicker() {
       if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.map = null
       else googleMapMarker.value.setMap?.(null)
     }
-    catch {
-      // Google can throw while detaching a marker after a failed API load.
-      // Cleanup must not surface an unhandled error from the modal lifecycle.
-    }
+    catch { /* Google can throw while detaching a marker after a failed load. */ }
   }
   googleMapMarker.value = null
   googleMapMarkerIsAdvanced.value = false
@@ -478,16 +479,28 @@ function useMyLocation() {
   )
 }
 
-async function openMapPicker() {
+function openMapPicker() {
+  mapPickerDraft.latitude = locationForm.latitude
+  mapPickerDraft.longitude = locationForm.longitude
   mapPickerOpen.value = true
   mapPickerLoading.value = true
   mapPickerError.value = ''
+}
+
+function applyMapPicker() {
+  if (!validMapPoint(mapPickerDraft.latitude, mapPickerDraft.longitude)) return
+  locationForm.latitude = mapPickerDraft.latitude
+  locationForm.longitude = mapPickerDraft.longitude
+  mapPickerOpen.value = false
+}
+
+async function initializeMapPicker() {
+  if (googleMapInstance.value || !mapPickerOpen.value) return
   try {
-    await nextTick()
     const mapElement = await waitForMapPickerElement()
     const { Map, Marker, advancedMarker } = await loadGoogleMaps()
-    const latitude = Number(locationForm.latitude)
-    const longitude = Number(locationForm.longitude)
+    const latitude = Number(mapPickerDraft.latitude)
+    const longitude = Number(mapPickerDraft.longitude)
     const center = {
       lat: Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
       lng: Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
@@ -498,7 +511,7 @@ async function openMapPicker() {
       streetViewControl: false,
       mapTypeControl: false,
       fullscreenControl: true,
-      mapId: useRuntimeConfig().public.googleMapsMapId || 'DEMO_MAP_ID'
+      ...(googleMapsMapId ? { mapId: googleMapsMapId } : {})
     })
     googleMapMarker.value = new Marker({
       ...(advancedMarker ? { gmpDraggable: true } : { draggable: true }),
@@ -507,9 +520,7 @@ async function openMapPicker() {
       title: 'Локация филиала'
     })
     googleMapMarkerIsAdvanced.value = advancedMarker
-    googleMapInstance.value.addListener('click', (event: any) => {
-      applyMarkerPoint(event)
-    })
+    googleMapInstance.value.addListener('click', applyMarkerPoint)
     if (advancedMarker) googleMapMarker.value.addEventListener('gmp-dragend', applyMarkerPoint)
     else googleMapMarker.value.addListener('dragend', applyMarkerPoint)
     await refreshGeolocationAvailability()
@@ -898,7 +909,7 @@ async function removeBranch(row: BranchRow) {
         <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
       </UModal>
 
-      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:leave="destroyMapPicker">
+      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:enter="initializeMapPicker" @after:leave="destroyMapPicker">
         <template #body>
           <div class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
             <div ref="mapPickerElement" class="absolute inset-0"></div>
@@ -909,15 +920,15 @@ async function removeBranch(row: BranchRow) {
             <UButton v-if="myLocationAvailable" icon="i-lucide-locate-fixed" color="neutral" variant="soft" @click="useMyLocation">Моё местоположение</UButton>
           </div>
           <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ locationForm.latitude || '—' }}</div>
-            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ locationForm.longitude || '—' }}</div>
+            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ mapPickerDraft.latitude || '—' }}</div>
+            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ mapPickerDraft.longitude || '—' }}</div>
           </div>
           <p class="mt-3 text-xs text-charcoal-500">Кликните по Google Maps, чтобы переместить метку. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="mapPickerOpen = false">Отмена</UButton>
-            <UButton color="primary" @click="mapPickerOpen = false">Применить</UButton>
+            <UButton color="primary" :disabled="!validMapPoint(mapPickerDraft.latitude, mapPickerDraft.longitude)" @click="applyMapPicker">Применить</UButton>
           </div>
         </template>
       </UModal>
