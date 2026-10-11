@@ -180,7 +180,12 @@ async function submit() {
     successMessage.value = 'Настройки ограничений сохранены'
     apiClient.notifySuccess(successMessage.value)
   } catch (err: any) {
-    errorMessage.value = err?.data?.error || err?.message || 'Не удалось сохранить настройки'
+    errorMessage.value = err?.data?.error
+      || err?.data?.message
+      || err?.response?._data?.error
+      || err?.response?._data?.message
+      || err?.message
+      || 'Не удалось сохранить настройки'
     apiClient.notifyError(err)
   } finally {
     submitting.value = false

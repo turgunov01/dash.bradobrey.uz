@@ -36,9 +36,17 @@ export function useNoShowRestrictionSettingsApi() {
       }
     },
     updateSettings(value: NoShowRestrictionSettings) {
+      const payload = {
+        enabled: Boolean(value.enabled),
+        automatic: Boolean(value.automatic),
+        first_violation_minutes: Number(value.first_violation_minutes),
+        second_violation_minutes: Number(value.second_violation_minutes),
+        third_plus_violation_minutes: Number(value.third_plus_violation_minutes),
+        lookback_days: Number(value.lookback_days)
+      }
       return client.request<{ setting: { value: NoShowRestrictionSettings, updated_at?: string | null } }>(
         '/api/marketplace/admin/settings/no_show_restrictions',
-        { body: { value }, method: 'PATCH', query: { __skipBranchScope: true }, skipAuth: true }
+        { body: { value: payload }, method: 'PATCH', query: { __skipBranchScope: true }, skipAuth: true }
       )
     }
   }
