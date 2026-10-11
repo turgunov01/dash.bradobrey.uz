@@ -112,6 +112,9 @@ const locationSubmitting = ref(false)
 const locationPending = ref(false)
 const locationBranch = ref<BranchRow | null>(null)
 const locationEvents = ref<LocationEvent[]>([])
+const mapPickerOpen = ref(false)
+const mapPickerElement = ref<HTMLElement | null>(null)
+const mapPickerSize = reactive({ width: 720, height: 420 })
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 const form = reactive({
@@ -307,6 +310,85 @@ async function saveLocation() {
   finally {
     locationSubmitting.value = false
   }
+}
+
+const mapPickerZoom = 16
+const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
+
+function mapLongitudeToWorld(longitude: number) {
+  return ((longitude + 180) / 360) * (256 * 2 ** mapPickerZoom)
+}
+
+function mapLatitudeToWorld(latitude: number) {
+  const radians = latitude * Math.PI / 180
+  return ((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2) * (256 * 2 ** mapPickerZoom)
+}
+
+function mapWorldToLongitude(worldX: number) {
+  return worldX / (256 * 2 ** mapPickerZoom) * 360 - 180
+}
+
+function mapWorldToLatitude(worldY: number) {
+  const normalized = Math.PI - (2 * Math.PI * worldY) / (256 * 2 ** mapPickerZoom)
+  return 180 / Math.PI * Math.atan(Math.sinh(normalized))
+}
+
+const mapPickerCenter = computed(() => {
+  const latitude = Number(locationForm.latitude)
+  const longitude = Number(locationForm.longitude)
+  return {
+    latitude: Number.isFinite(latitude) && latitude >= -85 && latitude <= 85 ? latitude : mapPickerFallback.latitude,
+    longitude: Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : mapPickerFallback.longitude
+  }
+})
+
+const mapPickerTiles = computed(() => {
+  const worldSize = 256 * 2 ** mapPickerZoom
+  const centerX = mapLongitudeToWorld(mapPickerCenter.value.longitude)
+  const centerY = mapLatitudeToWorld(mapPickerCenter.value.latitude)
+  const left = centerX - mapPickerSize.width / 2
+  const top = centerY - mapPickerSize.height / 2
+  const firstX = Math.floor(left / 256) - 1
+  const lastX = Math.ceil((left + mapPickerSize.width) / 256) + 1
+  const firstY = Math.max(0, Math.floor(top / 256) - 1)
+  const lastY = Math.min(2 ** mapPickerZoom - 1, Math.ceil((top + mapPickerSize.height) / 256) + 1)
+  const tiles: Array<{ key: string, left: number, top: number, url: string }> = []
+
+  for (let tileX = firstX; tileX <= lastX; tileX += 1) {
+    const wrappedX = ((tileX % 2 ** mapPickerZoom) + 2 ** mapPickerZoom) % 2 ** mapPickerZoom
+    for (let tileY = firstY; tileY <= lastY; tileY += 1) {
+      tiles.push({
+        key: `${wrappedX}-${tileY}`,
+        left: tileX * 256 - left,
+        top: tileY * 256 - top,
+        url: `https://tile.openstreetmap.org/${mapPickerZoom}/${wrappedX}/${tileY}.png`
+      })
+    }
+  }
+
+  return { tiles, markerLeft: centerX - left, markerTop: centerY - top, worldSize }
+})
+
+function updateMapPickerSize() {
+  if (!mapPickerElement.value) return
+  mapPickerSize.width = mapPickerElement.value.clientWidth || 720
+  mapPickerSize.height = mapPickerElement.value.clientHeight || 420
+}
+
+function openMapPicker() {
+  mapPickerOpen.value = true
+  nextTick(updateMapPickerSize)
+}
+
+function selectMapPoint(event: MouseEvent) {
+  if (!mapPickerElement.value) return
+  const rect = mapPickerElement.value.getBoundingClientRect()
+  const centerX = mapLongitudeToWorld(mapPickerCenter.value.longitude)
+  const centerY = mapLatitudeToWorld(mapPickerCenter.value.latitude)
+  const worldX = centerX - rect.width / 2 + (event.clientX - rect.left)
+  const worldY = centerY - rect.height / 2 + (event.clientY - rect.top)
+  locationForm.latitude = mapWorldToLatitude(worldY).toFixed(6)
+  locationForm.longitude = mapWorldToLongitude(worldX).toFixed(6)
 }
 
 async function openSchedules(row: BranchRow) {
@@ -657,6 +739,13 @@ async function removeBranch(row: BranchRow) {
               <UFormField label="Радиус, метров" required><UInput v-model.number="locationForm.radius_meters" type="number" min="1" max="50000" /></UFormField>
               <UCheckbox v-model="locationForm.is_enabled" class="self-end" label="Включить обязательную проверку" />
             </div>
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div>
+                <p class="text-sm font-semibold text-charcoal-950">Точка филиала</p>
+                <p class="text-xs text-charcoal-500">Отметьте место на карте — координаты заполнятся автоматически.</p>
+              </div>
+              <UButton icon="i-lucide-map" color="primary" variant="soft" @click="openMapPicker">Выбрать на карте</UButton>
+            </div>
             <div class="flex justify-end"><UButton :loading="locationSubmitting" icon="i-lucide-save" @click="saveLocation">Сохранить локацию</UButton></div>
             <div class="border-t border-charcoal-200 pt-4">
               <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
@@ -671,6 +760,32 @@ async function removeBranch(row: BranchRow) {
           </div>
         </template>
         <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
+      </UModal>
+
+      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку.">
+        <template #body>
+          <div ref="mapPickerElement" class="relative h-[min(60vh,28rem)] min-h-[20rem] cursor-crosshair overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100" @click="selectMapPoint">
+            <img v-for="tile in mapPickerTiles.tiles" :key="tile.key" :src="tile.url" alt="" class="pointer-events-none absolute h-64 w-64 max-w-none select-none" :style="{ left: `${tile.left}px`, top: `${tile.top}px` }">
+            <div class="pointer-events-none absolute -translate-x-1/2 -translate-y-full" :style="{ left: `${mapPickerTiles.markerLeft}px`, top: `${mapPickerTiles.markerTop}px` }">
+              <div class="flex flex-col items-center">
+                <span class="rounded-full bg-primary p-2 text-white shadow-lg"><UIcon name="i-lucide-map-pin" class="size-5" /></span>
+                <span class="h-2 w-0.5 bg-primary" />
+              </div>
+            </div>
+            <div class="pointer-events-none absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-1 text-xs text-charcoal-600 shadow">Кликните, чтобы переместить метку</div>
+          </div>
+          <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ locationForm.latitude || '—' }}</div>
+            <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ locationForm.longitude || '—' }}</div>
+          </div>
+          <p class="mt-3 text-xs text-charcoal-500">Карта использует OpenStreetMap. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
+        </template>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="ghost" @click="mapPickerOpen = false">Отмена</UButton>
+            <UButton color="primary" @click="mapPickerOpen = false">Применить</UButton>
+          </div>
+        </template>
       </UModal>
 
       <UModal
