@@ -119,6 +119,7 @@ const mapPickerError = ref('')
 const myLocationAvailable = ref(false)
 const googleMapInstance = ref<any>(null)
 const googleMapMarker = ref<any>(null)
+const googleMapMarkerIsAdvanced = ref(false)
 let googleMapsLoader: Promise<any> | null = null
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
@@ -320,25 +321,48 @@ async function saveLocation() {
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
 const googleMapsApiKey = String(useRuntimeConfig().public.googleMapsApiKey || '').trim()
 
+async function resolveGoogleMapsApi() {
+  const google = (window as any).google
+  if (!google?.maps) throw new Error('Google Maps loaded without the Maps JavaScript API')
+
+  // With loading=async the global namespace can exist before the constructors
+  // are published. Always resolve the library explicitly before using Map.
+  if (typeof google.maps.importLibrary === 'function') {
+    const mapsLibrary = await google.maps.importLibrary('maps')
+    const markerLibrary = await google.maps.importLibrary('marker')
+    if (typeof mapsLibrary?.Map !== 'function') throw new Error('Google Maps Maps library is unavailable')
+    return {
+      Map: mapsLibrary.Map,
+      Marker: markerLibrary?.AdvancedMarkerElement,
+      advancedMarker: typeof markerLibrary?.AdvancedMarkerElement === 'function'
+    }
+  }
+
+  if (typeof google.maps.Map !== 'function') throw new Error('Google Maps Map constructor is unavailable')
+  return { Map: google.maps.Map, Marker: google.maps.Marker, advancedMarker: false }
+}
+
 function loadGoogleMaps() {
-  if (typeof window !== 'undefined' && (window as any).google?.maps) return Promise.resolve((window as any).google)
+  if (typeof window !== 'undefined' && (window as any).google?.maps) {
+    return resolveGoogleMapsApi()
+  }
   if (googleMapsLoader) return googleMapsLoader
   if (!googleMapsApiKey) return Promise.reject(new Error('Google Maps API key is not configured'))
 
   googleMapsLoader = new Promise((resolve, reject) => {
+    const callbackName = `__bradobreyGoogleMapsLoaded_${Date.now()}`
     const previousAuthFailure = (window as any).gm_authFailure
     ;(window as any).gm_authFailure = () => {
       previousAuthFailure?.()
       reject(new Error('Google Maps rejected the API key. Check Maps JavaScript API and website restrictions.'))
     }
+    ;(window as any)[callbackName] = () => {
+      resolveGoogleMapsApi().then(resolve, reject)
+    }
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async&libraries=marker&callback=${callbackName}`
     script.async = true
     script.defer = true
-    script.onload = () => {
-      if ((window as any).google?.maps) resolve((window as any).google)
-      else reject(new Error('Google Maps loaded without the Maps JavaScript API'))
-    }
     script.onerror = () => reject(new Error('Google Maps could not be loaded'))
     document.head.appendChild(script)
   })
@@ -362,8 +386,35 @@ function validMapPoint(latitude: unknown, longitude: unknown) {
 function updateMapPoint(latitude: number, longitude: number, pan = true) {
   if (!googleMapInstance.value || !googleMapMarker.value) return
   const point = { lat: latitude, lng: longitude }
-  googleMapMarker.value.setPosition(point)
+  if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.position = point
+  else googleMapMarker.value.setPosition(point)
   if (pan) googleMapInstance.value.panTo(point)
+}
+
+function readMarkerPoint(event: any) {
+  const position = event?.latLng || event?.target?.position || googleMapMarker.value?.position
+  if (!position) return null
+  const latitude = typeof position.lat === 'function' ? position.lat() : Number(position.lat)
+  const longitude = typeof position.lng === 'function' ? position.lng() : Number(position.lng)
+  return validMapPoint(latitude, longitude) ? { latitude, longitude } : null
+}
+
+function applyMarkerPoint(event: any) {
+  const point = readMarkerPoint(event)
+  if (!point) return
+  locationForm.latitude = point.latitude.toFixed(6)
+  locationForm.longitude = point.longitude.toFixed(6)
+  updateMapPoint(point.latitude, point.longitude, false)
+}
+
+function destroyMapPicker() {
+  if (googleMapMarker.value) {
+    if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.map = null
+    else googleMapMarker.value.setMap?.(null)
+  }
+  googleMapMarker.value = null
+  googleMapMarkerIsAdvanced.value = false
+  googleMapInstance.value = null
 }
 
 async function refreshGeolocationAvailability() {
@@ -403,39 +454,33 @@ async function openMapPicker() {
   try {
     await nextTick()
     const mapElement = await waitForMapPickerElement()
-    const google = await loadGoogleMaps()
+    const { Map, Marker, advancedMarker } = await loadGoogleMaps()
     const latitude = Number(locationForm.latitude)
     const longitude = Number(locationForm.longitude)
     const center = {
       lat: Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
       lng: Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
     }
-    googleMapInstance.value = new google.maps.Map(mapElement, {
+    googleMapInstance.value = new Map(mapElement, {
       center,
       zoom: 16,
       streetViewControl: false,
       mapTypeControl: false,
-      fullscreenControl: true
+      fullscreenControl: true,
+      mapId: useRuntimeConfig().public.googleMapsMapId || 'DEMO_MAP_ID'
     })
-    googleMapMarker.value = new google.maps.Marker({
-      draggable: true,
+    googleMapMarker.value = new Marker({
+      ...(advancedMarker ? { gmpDraggable: true } : { draggable: true }),
       map: googleMapInstance.value,
       position: center,
       title: 'Локация филиала'
     })
+    googleMapMarkerIsAdvanced.value = advancedMarker
     googleMapInstance.value.addListener('click', (event: any) => {
-      if (!event.latLng) return
-      const nextLatitude = event.latLng.lat()
-      const nextLongitude = event.latLng.lng()
-      locationForm.latitude = nextLatitude.toFixed(6)
-      locationForm.longitude = nextLongitude.toFixed(6)
-      googleMapMarker.value?.setPosition(event.latLng)
+      applyMarkerPoint(event)
     })
-    googleMapMarker.value.addListener('dragend', (event: any) => {
-      if (!event.latLng) return
-      locationForm.latitude = event.latLng.lat().toFixed(6)
-      locationForm.longitude = event.latLng.lng().toFixed(6)
-    })
+    if (advancedMarker) googleMapMarker.value.addEventListener('gmp-dragend', applyMarkerPoint)
+    else googleMapMarker.value.addListener('dragend', applyMarkerPoint)
     await refreshGeolocationAvailability()
   }
   catch (error) {
@@ -822,9 +867,10 @@ async function removeBranch(row: BranchRow) {
         <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
       </UModal>
 
-      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку.">
+      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:leave="destroyMapPicker">
         <template #body>
-          <div ref="mapPickerElement" class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
+          <div class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
+            <div ref="mapPickerElement" class="absolute inset-0"></div>
             <div v-if="mapPickerLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
             <div v-if="mapPickerError" class="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-red-700">{{ mapPickerError }}</div>
           </div>
