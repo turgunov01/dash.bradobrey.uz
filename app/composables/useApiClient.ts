@@ -47,17 +47,18 @@ function buildScopedQuery(
   activeBranchId: string | null | undefined,
 ) {
   const normalizedMethod = (method || "GET").toUpperCase();
-
-  if (!["GET", "HEAD"].includes(normalizedMethod)) {
-    return query;
-  }
-
   const nextQuery: Record<string, unknown> = {
     ...(query || {})
   };
 
-  if ((nextQuery as any).__skipBranchScope) {
-    delete (nextQuery as any).__skipBranchScope;
+  const skipBranchScope = Boolean((nextQuery as any).__skipBranchScope);
+  delete (nextQuery as any).__skipBranchScope;
+
+  if (skipBranchScope) {
+    return nextQuery;
+  }
+
+  if (!["GET", "HEAD"].includes(normalizedMethod)) {
     return nextQuery;
   }
 

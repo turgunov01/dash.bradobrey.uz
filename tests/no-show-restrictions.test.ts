@@ -11,6 +11,15 @@ test('loads no-show settings through the supported collection endpoint', () => {
   assert.match(apiSource, /client\.request<SettingsResponse>\('\/api\/marketplace\/admin\/settings'/)
   assert.doesNotMatch(apiSource.split('updateSettings')[0], /\/api\/marketplace\/admin\/settings\/no_show_restrictions/)
   assert.match(apiSource, /method: 'PATCH'/)
+  assert.match(apiSource, /body: \{ value: payload \}/)
+  assert.match(apiSource, /first_violation_minutes: Number\(value\.first_violation_minutes\)/)
+  assert.match(apiSource, /lookback_days: Number\(value\.lookback_days\)/)
+})
+
+test('strips the internal branch-scope control parameter from mutation URLs', () => {
+  const clientSource = readFileSync(join(projectRoot, 'app/composables/useApiClient.ts'), 'utf8')
+  assert.match(clientSource, /const nextQuery: Record<string, unknown> = \{\n\s+\.\.\.\(query \|\| \{\}\)\n\s+\}/)
+  assert.match(clientSource, /delete \(nextQuery as any\).__skipBranchScope/)
 })
 
 test('uses SSR-compatible async data and avoids cloning reactive snapshots', () => {

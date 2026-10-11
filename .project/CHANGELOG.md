@@ -68,3 +68,7 @@
 - Audited the production login path against both domains. Confirmed the external API endpoint succeeds and the dashboard BFF forwards to the same `/api/barbers/login` contract.
 - Fixed PM2 runtime configuration to load the deployment-local `.env` before reading `NUXT_ADMIN_SESSION_SECRET`, with fail-fast startup when the signing secret is missing.
 - Fixed login session cookie ordering so a failed dashboard-session signature cannot leave an upstream backend token cookie behind.
+## 2026-10-11
+
+- Fixed Marketplace no-show settings PATCH requests leaking the internal `__skipBranchScope` query parameter on mutations. The request now preserves the authenticated API contract and sends only the allowlisted settings payload.
+
