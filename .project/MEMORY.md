@@ -62,6 +62,8 @@
 - Advanced markers require `googleMapsMapId` in public runtime config; the current default is `DEMO_MAP_ID` for compatibility, while production should set `NUXT_PUBLIC_GOOGLE_MAPS_MAP_ID` to a Google Cloud Map ID. Advanced marker positions are assigned through `.position`, and dragging uses `gmp-dragend`.
 - Location event timestamps must use an explicit timezone/locale in SSR-rendered templates; direct `toLocaleString()` can cause hydration mismatches between Node and the browser.
 
+- Production smoke test on 2026-10-12 reached the configured Google Maps JavaScript endpoint, but Google returned `ApiNotActivatedMapError` for the active browser key. This is a Google Cloud configuration blocker, not a dashboard transport/SSR failure. After enabling Maps JavaScript API, re-run the branch picker smoke test; the loader now times out, cleans up callbacks, and permits retry after failed initialization.
+
 ## Barber transfer realtime (2026-10-11)
 
 - Queue reassignment is a two-phase backend flow: `PATCH /api/barbers/queue/:id/reassign` creates a `transfer_pending` record, and the recipient must accept or reject it through `/api/barbers/queue/transfers/:transferId/{accept|reject}`.

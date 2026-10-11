@@ -331,10 +331,12 @@ async function resolveGoogleMapsApi() {
     const mapsLibrary = await google.maps.importLibrary('maps')
     const markerLibrary = await google.maps.importLibrary('marker')
     if (typeof mapsLibrary?.Map !== 'function') throw new Error('Google Maps Maps library is unavailable')
+    const Marker = markerLibrary?.AdvancedMarkerElement || google.maps.Marker
+    if (typeof Marker !== 'function') throw new Error('Google Maps marker library is unavailable')
     return {
       Map: mapsLibrary.Map,
-      Marker: markerLibrary?.AdvancedMarkerElement,
-      advancedMarker: typeof markerLibrary?.AdvancedMarkerElement === 'function'
+      Marker,
+      advancedMarker: Marker === markerLibrary?.AdvancedMarkerElement
     }
   }
 
@@ -352,19 +354,42 @@ function loadGoogleMaps() {
   googleMapsLoader = new Promise((resolve, reject) => {
     const callbackName = `__bradobreyGoogleMapsLoaded_${Date.now()}`
     const previousAuthFailure = (window as any).gm_authFailure
-    ;(window as any).gm_authFailure = () => {
-      previousAuthFailure?.()
-      reject(new Error('Google Maps rejected the API key. Check Maps JavaScript API and website restrictions.'))
+    let settled = false
+    let timeout = 0
+    const cleanup = () => {
+      window.clearTimeout(timeout)
+      delete (window as any)[callbackName]
+      if ((window as any).gm_authFailure === authFailure) {
+        if (previousAuthFailure) (window as any).gm_authFailure = previousAuthFailure
+        else delete (window as any).gm_authFailure
+      }
     }
+    const finish = (callback: (value: any) => void, value: any) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback(value)
+    }
+    timeout = window.setTimeout(() => {
+      finish(reject, new Error('Google Maps не активирована для этого API-ключа. Включите Maps JavaScript API в Google Cloud.'))
+    }, 15000)
+    const authFailure = () => {
+      previousAuthFailure?.()
+      finish(reject, new Error('Google Maps отклонила API-ключ. Проверьте активацию Maps JavaScript API и ограничения сайта.'))
+    }
+    ;(window as any).gm_authFailure = authFailure
     ;(window as any)[callbackName] = () => {
-      resolveGoogleMapsApi().then(resolve, reject)
+      resolveGoogleMapsApi().then(value => finish(resolve, value), error => finish(reject, error))
     }
     const script = document.createElement('script')
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async&libraries=marker&callback=${callbackName}`
     script.async = true
     script.defer = true
-    script.onerror = () => reject(new Error('Google Maps could not be loaded'))
+    script.onerror = () => finish(reject, new Error('Не удалось загрузить Google Maps. Проверьте сеть и ограничения CSP.'))
     document.head.appendChild(script)
+  })
+  googleMapsLoader.catch(() => {
+    googleMapsLoader = null
   })
   return googleMapsLoader
 }
@@ -409,8 +434,14 @@ function applyMarkerPoint(event: any) {
 
 function destroyMapPicker() {
   if (googleMapMarker.value) {
-    if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.map = null
-    else googleMapMarker.value.setMap?.(null)
+    try {
+      if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.map = null
+      else googleMapMarker.value.setMap?.(null)
+    }
+    catch {
+      // Google can throw while detaching a marker after a failed API load.
+      // Cleanup must not surface an unhandled error from the modal lifecycle.
+    }
   }
   googleMapMarker.value = null
   googleMapMarkerIsAdvanced.value = false

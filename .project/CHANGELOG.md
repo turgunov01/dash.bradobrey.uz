@@ -88,3 +88,8 @@
 
 - Added branch geolocation policy controls and login-location event history to the existing Branches page, with authenticated BFF proxy routes.
 
+# 2026-10-12 — Google Maps picker hardening
+
+- Hardened the browser Maps loader with explicit Maps/marker constructor fallback, timeout cleanup, retry after failed loads, and actionable API-key errors.
+- Production smoke testing confirmed the current Google Cloud key reaches the Maps JavaScript endpoint but the project returns `ApiNotActivatedMapError`; the Maps JavaScript API must be enabled in Google Cloud before the picker can render.
+
