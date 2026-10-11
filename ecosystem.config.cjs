@@ -33,7 +33,8 @@ module.exports = {
         NITRO_PRESET: 'node-server',
         NUXT_ADMIN_SESSION_SECRET: process.env.NUXT_ADMIN_SESSION_SECRET,
         NUXT_COOKIE_SECURE: 'true',
-        NUXT_PUBLIC_API_BASE: process.env.NUXT_PUBLIC_API_BASE || 'https://api.bradobrey.uz'
+        NUXT_PUBLIC_API_BASE: process.env.NUXT_PUBLIC_API_BASE || 'https://api.bradobrey.uz',
+        NUXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NUXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
       }
     }
   ]
