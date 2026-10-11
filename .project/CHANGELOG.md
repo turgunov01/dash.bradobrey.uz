@@ -71,4 +71,5 @@
 ## 2026-10-11
 
 - Fixed Marketplace no-show settings PATCH requests leaking the internal `__skipBranchScope` query parameter on mutations. The request now preserves the authenticated API contract and sends only the allowlisted settings payload.
+- Fixed Marketplace no-show settings GET/PATCH requests to include the authenticated admin bearer token.
 

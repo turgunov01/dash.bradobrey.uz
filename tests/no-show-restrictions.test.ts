@@ -14,6 +14,7 @@ test('loads no-show settings through the supported collection endpoint', () => {
   assert.match(apiSource, /body: \{ value: payload \}/)
   assert.match(apiSource, /first_violation_minutes: Number\(value\.first_violation_minutes\)/)
   assert.match(apiSource, /lookback_days: Number\(value\.lookback_days\)/)
+  assert.doesNotMatch(apiSource, /skipAuth:\s*true/)
 })
 
 test('strips the internal branch-scope control parameter from mutation URLs', () => {

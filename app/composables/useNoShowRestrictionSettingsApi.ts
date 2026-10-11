@@ -27,7 +27,6 @@ export function useNoShowRestrictionSettingsApi() {
     async getSettings() {
       const response = await client.request<SettingsResponse>('/api/marketplace/admin/settings', {
         query: { __skipBranchScope: true },
-        skipAuth: true
       })
       const item = response.settings?.find(setting => setting.key === 'no_show_restrictions')
       return {
@@ -46,7 +45,7 @@ export function useNoShowRestrictionSettingsApi() {
       }
       return client.request<{ setting: { value: NoShowRestrictionSettings, updated_at?: string | null } }>(
         '/api/marketplace/admin/settings/no_show_restrictions',
-        { body: { value: payload }, method: 'PATCH', query: { __skipBranchScope: true }, skipAuth: true }
+        { body: { value: payload }, method: 'PATCH', query: { __skipBranchScope: true } }
       )
     }
   }
