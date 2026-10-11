@@ -116,6 +116,7 @@ const mapPickerOpen = ref(false)
 const mapPickerElement = ref<HTMLElement | null>(null)
 const mapPickerLoading = ref(false)
 const mapPickerError = ref('')
+const myLocationAvailable = ref(false)
 const googleMapInstance = ref<any>(null)
 const googleMapMarker = ref<any>(null)
 let googleMapsLoader: Promise<any> | null = null
@@ -352,6 +353,49 @@ async function waitForMapPickerElement() {
   throw new Error('Map container was not rendered')
 }
 
+function validMapPoint(latitude: unknown, longitude: unknown) {
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180
+}
+
+function updateMapPoint(latitude: number, longitude: number, pan = true) {
+  if (!googleMapInstance.value || !googleMapMarker.value) return
+  const point = { lat: latitude, lng: longitude }
+  googleMapMarker.value.setPosition(point)
+  if (pan) googleMapInstance.value.panTo(point)
+}
+
+async function refreshGeolocationAvailability() {
+  myLocationAvailable.value = typeof navigator !== 'undefined' && 'geolocation' in navigator
+  if (!myLocationAvailable.value || !('permissions' in navigator)) return
+  try {
+    const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+    myLocationAvailable.value = permission.state !== 'denied'
+  }
+  catch { /* Some browsers do not expose geolocation permission state. */ }
+}
+
+function useMyLocation() {
+  if (!myLocationAvailable.value || !navigator.geolocation) return
+  mapPickerLoading.value = true
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      locationForm.latitude = coords.latitude.toFixed(6)
+      locationForm.longitude = coords.longitude.toFixed(6)
+      updateMapPoint(coords.latitude, coords.longitude)
+      mapPickerLoading.value = false
+    },
+    (error) => {
+      mapPickerError.value = error.code === error.PERMISSION_DENIED
+        ? 'Разрешите доступ к местоположению в браузере'
+        : 'Не удалось получить ваше местоположение'
+      mapPickerLoading.value = false
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  )
+}
+
 async function openMapPicker() {
   mapPickerOpen.value = true
   mapPickerLoading.value = true
@@ -373,7 +417,12 @@ async function openMapPicker() {
       mapTypeControl: false,
       fullscreenControl: true
     })
-    googleMapMarker.value = new google.maps.Marker({ map: googleMapInstance.value, position: center, title: 'Локация филиала' })
+    googleMapMarker.value = new google.maps.Marker({
+      draggable: true,
+      map: googleMapInstance.value,
+      position: center,
+      title: 'Локация филиала'
+    })
     googleMapInstance.value.addListener('click', (event: any) => {
       if (!event.latLng) return
       const nextLatitude = event.latLng.lat()
@@ -382,6 +431,12 @@ async function openMapPicker() {
       locationForm.longitude = nextLongitude.toFixed(6)
       googleMapMarker.value?.setPosition(event.latLng)
     })
+    googleMapMarker.value.addListener('dragend', (event: any) => {
+      if (!event.latLng) return
+      locationForm.latitude = event.latLng.lat().toFixed(6)
+      locationForm.longitude = event.latLng.lng().toFixed(6)
+    })
+    await refreshGeolocationAvailability()
   }
   catch (error) {
     mapPickerError.value = error instanceof Error ? error.message : 'Не удалось загрузить Google Maps'
@@ -390,6 +445,11 @@ async function openMapPicker() {
     mapPickerLoading.value = false
   }
 }
+
+watch([() => locationForm.latitude, () => locationForm.longitude], ([latitude, longitude]) => {
+  if (!validMapPoint(latitude, longitude)) return
+  updateMapPoint(Number(latitude), Number(longitude))
+})
 
 async function openSchedules(row: BranchRow) {
   scheduleBranch.value = row
@@ -767,6 +827,9 @@ async function removeBranch(row: BranchRow) {
           <div ref="mapPickerElement" class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
             <div v-if="mapPickerLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
             <div v-if="mapPickerError" class="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-red-700">{{ mapPickerError }}</div>
+          </div>
+          <div class="mt-3 flex flex-wrap justify-end gap-2">
+            <UButton v-if="myLocationAvailable" icon="i-lucide-locate-fixed" color="neutral" variant="soft" @click="useMyLocation">Моё местоположение</UButton>
           </div>
           <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ locationForm.latitude || '—' }}</div>
