@@ -5,6 +5,7 @@ import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import type { VerifixEvent, VerifixSchedule } from '~/composables/useVerifixApi'
+import type { BranchLocation, LocationEvent } from '~/composables/useBranchesApi'
 
 type LateRow = {
   id: string
@@ -31,6 +32,8 @@ type LateEmployeeGroup = {
 const branchStore = useBranchStore()
 const barbersApi = useBarbersApi()
 const verifixApi = useVerifixApi()
+const branchesApi = useBranchesApi()
+const apiClient = useApiClient()
 const { data: penaltySettings, refresh: refreshPenaltySettings } = await useVerifixPenalty()
 const penaltyOverrides = useStorage<Record<string, number>>('verifix-penalty-overrides', {})
 
@@ -116,10 +119,67 @@ const now = new Date()
 const fromDate = ref(dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
 const toDate = ref(dateInputValue(now))
 const selectedBranchId = ref<string>(branchStore.activeBranchId || 'all')
+const locationOpen = ref(false)
+const locationPending = ref(false)
+const locationSubmitting = ref(false)
+const locationBranch = ref<{ id: string, name: string } | null>(null)
+const locationEvents = ref<LocationEvent[]>([])
+const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 watch(() => branchStore.activeBranchId, branchId => {
   selectedBranchId.value = branchId || 'all'
 })
+
+async function openLocationModal() {
+  if (selectedBranchId.value === 'all') {
+    apiClient.notifyError(new Error('Сначала выберите конкретный филиал'))
+    return
+  }
+
+  const branch = branchStore.branches.find(item => String(item.id) === selectedBranchId.value)
+  if (!branch) return
+
+  locationBranch.value = { id: String(branch.id), name: String(branch.name || 'Филиал') }
+  locationOpen.value = true
+  locationPending.value = true
+
+  try {
+    const [locationResponse, eventsResponse] = await Promise.all([
+      branchesApi.getLocation(locationBranch.value.id),
+      branchesApi.locationEvents({ branch_id: locationBranch.value.id, limit: 20 })
+    ])
+    const location = locationResponse?.location as BranchLocation | null
+    locationForm.latitude = location ? String(location.latitude) : ''
+    locationForm.longitude = location ? String(location.longitude) : ''
+    locationForm.radius_meters = Number(location?.radius_meters || 1000)
+    locationForm.is_enabled = location?.is_enabled === true
+    locationEvents.value = Array.isArray(eventsResponse?.items) ? eventsResponse.items : []
+  }
+  finally {
+    locationPending.value = false
+  }
+}
+
+async function saveLocation() {
+  if (!locationBranch.value || locationSubmitting.value) return
+  const latitude = Number(locationForm.latitude)
+  const longitude = Number(locationForm.longitude)
+  const radius = Number(locationForm.radius_meters)
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || !Number.isFinite(radius) || radius < 1 || radius > 50000) {
+    apiClient.notifyError(new Error('Проверьте координаты и радиус'))
+    return
+  }
+
+  locationSubmitting.value = true
+  try {
+    await branchesApi.saveLocation(locationBranch.value.id, { latitude, longitude, radius_meters: radius, is_enabled: locationForm.is_enabled })
+    const eventsResponse = await branchesApi.locationEvents({ branch_id: locationBranch.value.id, limit: 20 })
+    locationEvents.value = Array.isArray(eventsResponse?.items) ? eventsResponse.items : []
+  }
+  finally {
+    locationSubmitting.value = false
+  }
+}
 
 const branchOptions = computed(() => [
   { label: 'Общий', value: 'all' },
@@ -316,7 +376,10 @@ const detailColumns: TableColumn<LateRow>[] = [
             <h1 class="barbershop-heading text-2xl text-charcoal-950 sm:text-3xl">Verifix</h1>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-charcoal-500">Опоздания по первому входу сотрудника относительно графика филиала.</p>
           </div>
-          <UButton class="w-full sm:w-auto" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refreshAll">Обновить</UButton>
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <UButton class="w-full sm:w-auto" icon="i-lucide-map-pin" color="primary" variant="soft" :disabled="selectedBranchId === 'all'" @click="openLocationModal">Локация филиала</UButton>
+            <UButton class="w-full sm:w-auto" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refreshAll">Обновить</UButton>
+          </div>
         </div>
 
         <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200 bg-white/90" :ui="{ body: 'p-4 sm:p-6' }">
@@ -335,6 +398,32 @@ const detailColumns: TableColumn<LateRow>[] = [
             </label>
           </div>
         </UCard>
+
+        <UModal v-model:open="locationOpen" class="sm:max-w-2xl" title="Геоконтроль входа" :description="locationBranch ? `Филиал: ${locationBranch.name}` : ''">
+          <template #body>
+            <div v-if="locationPending" class="flex justify-center py-8"><ULoader size="lg" /></div>
+            <div v-else class="space-y-5">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UFormField label="Широта" required><UInput v-model="locationForm.latitude" type="number" step="any" placeholder="41.3111" /></UFormField>
+                <UFormField label="Долгота" required><UInput v-model="locationForm.longitude" type="number" step="any" placeholder="69.2797" /></UFormField>
+                <UFormField label="Радиус, метров" required><UInput v-model.number="locationForm.radius_meters" type="number" min="1" max="50000" /></UFormField>
+                <UCheckbox v-model="locationForm.is_enabled" class="self-end" label="Включить обязательную проверку" />
+              </div>
+              <div class="flex justify-end"><UButton :loading="locationSubmitting" icon="i-lucide-save" @click="saveLocation">Сохранить локацию</UButton></div>
+              <div class="border-t border-charcoal-200 pt-4">
+                <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
+                <div v-if="locationEvents.length" class="space-y-2">
+                  <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
+                    <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
+                    <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</span>
+                  </div>
+                </div>
+                <p v-else class="text-sm text-charcoal-500">Событий входа пока нет.</p>
+              </div>
+            </div>
+          </template>
+          <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
+        </UModal>
 
         <VerifixPenaltySettings />
 
