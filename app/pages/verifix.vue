@@ -124,6 +124,9 @@ const locationPending = ref(false)
 const locationSubmitting = ref(false)
 const locationBranch = ref<{ id: string, name: string } | null>(null)
 const locationEvents = ref<LocationEvent[]>([])
+const locationHistoryOpen = ref(false)
+const locationHistoryPending = ref(false)
+const locationHistoryEvents = ref<LocationEvent[]>([])
 const mapOpen = ref(false)
 const mapEvent = ref<LocationEvent | null>(null)
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
@@ -183,12 +186,28 @@ async function saveLocation() {
   }
 }
 
+async function openLocationHistory() {
+  locationHistoryOpen.value = true
+  locationHistoryPending.value = true
+  try {
+    const query: Record<string, unknown> = { limit: 50 }
+    if (selectedBranchId.value !== 'all') query.branch_id = selectedBranchId.value
+    const response = await branchesApi.locationEvents(query)
+    locationHistoryEvents.value = Array.isArray(response?.items) ? response.items : []
+  }
+  finally {
+    locationHistoryPending.value = false
+  }
+}
+
 function openEventMap(event: LocationEvent) {
   if (event.latitude == null || event.longitude == null) {
     apiClient.notifyError(new Error('Для этого события координаты недоступны'))
     return
   }
   mapEvent.value = event
+  locationHistoryOpen.value = false
+  locationOpen.value = false
   mapOpen.value = true
 }
 
@@ -402,6 +421,7 @@ const detailColumns: TableColumn<LateRow>[] = [
             <p class="mt-2 max-w-2xl text-sm leading-6 text-charcoal-500">Опоздания по первому входу сотрудника относительно графика филиала.</p>
           </div>
           <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <UButton class="w-full sm:w-auto" icon="i-lucide-map" color="primary" @click="openLocationHistory">Карта входов</UButton>
             <UButton class="w-full sm:w-auto" icon="i-lucide-map-pin" color="primary" variant="soft" :disabled="selectedBranchId === 'all'" @click="openLocationModal">Локация филиала</UButton>
             <UButton class="w-full sm:w-auto" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refreshAll">Обновить</UButton>
           </div>
@@ -423,6 +443,25 @@ const detailColumns: TableColumn<LateRow>[] = [
             </label>
           </div>
         </UCard>
+
+        <UModal v-model:open="locationHistoryOpen" class="sm:max-w-3xl" title="Локации входов барберов" description="Фактические координаты, полученные при входе в приложение.">
+          <template #body>
+            <div v-if="locationHistoryPending" class="flex justify-center py-8"><ULoader size="lg" /></div>
+            <div v-else-if="locationHistoryEvents.length" class="max-h-[60vh] space-y-2 overflow-y-auto">
+              <div v-for="event in locationHistoryEvents" :key="event.id" class="flex flex-col gap-3 rounded-xl border border-charcoal-200 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                  <p class="font-semibold text-charcoal-950">{{ event.barber_name || event.barber_id }}</p>
+                  <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</p>
+                  <p class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</p>
+                </div>
+                <UButton v-if="event.latitude != null && event.longitude != null" class="shrink-0" size="sm" color="primary" icon="i-lucide-map" @click="openEventMap(event)">Открыть карту</UButton>
+                <span v-else class="shrink-0 text-xs text-charcoal-400">Координаты отсутствуют</span>
+              </div>
+            </div>
+            <p v-else class="py-8 text-center text-sm text-charcoal-500">История входов пока пуста.</p>
+          </template>
+          <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationHistoryOpen = false">Закрыть</UButton></div></template>
+        </UModal>
 
         <UModal v-model:open="locationOpen" class="sm:max-w-2xl" title="Геоконтроль входа" :description="locationBranch ? `Филиал: ${locationBranch.name}` : ''">
           <template #body>
