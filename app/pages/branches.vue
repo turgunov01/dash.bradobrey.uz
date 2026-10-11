@@ -325,23 +325,40 @@ function loadGoogleMaps() {
   if (!googleMapsApiKey) return Promise.reject(new Error('Google Maps API key is not configured'))
 
   googleMapsLoader = new Promise((resolve, reject) => {
+    const previousAuthFailure = (window as any).gm_authFailure
+    ;(window as any).gm_authFailure = () => {
+      previousAuthFailure?.()
+      reject(new Error('Google Maps rejected the API key. Check Maps JavaScript API and website restrictions.'))
+    }
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async`
     script.async = true
     script.defer = true
-    script.onload = () => resolve((window as any).google)
+    script.onload = () => {
+      if ((window as any).google?.maps) resolve((window as any).google)
+      else reject(new Error('Google Maps loaded without the Maps JavaScript API'))
+    }
     script.onerror = () => reject(new Error('Google Maps could not be loaded'))
     document.head.appendChild(script)
   })
   return googleMapsLoader
 }
 
+async function waitForMapPickerElement() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    if (mapPickerElement.value) return mapPickerElement.value
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  }
+  throw new Error('Map container was not rendered')
+}
+
 async function openMapPicker() {
   mapPickerOpen.value = true
   mapPickerLoading.value = true
   mapPickerError.value = ''
-  await nextTick()
   try {
+    await nextTick()
+    const mapElement = await waitForMapPickerElement()
     const google = await loadGoogleMaps()
     const latitude = Number(locationForm.latitude)
     const longitude = Number(locationForm.longitude)
@@ -349,7 +366,7 @@ async function openMapPicker() {
       lat: Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
       lng: Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
     }
-    googleMapInstance.value = new google.maps.Map(mapPickerElement.value, {
+    googleMapInstance.value = new google.maps.Map(mapElement, {
       center,
       zoom: 16,
       streetViewControl: false,
