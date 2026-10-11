@@ -118,11 +118,24 @@ const scopedBranchIds = computed(() => {
   ])
 })
 
+const hasNetworkBranchAccess = computed(() => {
+  const role = String(sessionStore.user?.role || '').trim().toLowerCase()
+  return role === 'admin' || role === 'admin_network'
+})
+
 const ownBranches = computed(() =>
   branchStore.branches.filter(branch => !hasMerchantInfo(branch))
 )
 
 const visibleBranches = computed(() => {
+  // Network administrators must be able to switch to marketplace-linked
+  // branches as well. Those branches are intentionally hidden from scoped
+  // employee/merchant accounts, but hiding them from admins makes the global
+  // branch filter silently lose the selected branch.
+  if (hasNetworkBranchAccess.value) {
+    return branchStore.branches
+  }
+
   if (!scopedBranchIds.value.size) {
     return ownBranches.value
   }
@@ -132,7 +145,7 @@ const visibleBranches = computed(() => {
 
 const options = computed(() =>
   [
-    ...(!scopedBranchIds.value.size ? [{ label: 'Общее', value: null }] : []),
+    ...(!scopedBranchIds.value.size || hasNetworkBranchAccess.value ? [{ label: 'Общее', value: null }] : []),
     ...visibleBranches.value.map((branch: Branch) => ({
       label: normalizeText(branch.name) || 'Филиал',
       value: branch.id
