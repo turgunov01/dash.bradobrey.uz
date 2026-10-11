@@ -114,7 +114,11 @@ const locationBranch = ref<BranchRow | null>(null)
 const locationEvents = ref<LocationEvent[]>([])
 const mapPickerOpen = ref(false)
 const mapPickerElement = ref<HTMLElement | null>(null)
-const mapPickerSize = reactive({ width: 720, height: 420 })
+const mapPickerLoading = ref(false)
+const mapPickerError = ref('')
+const googleMapInstance = ref<any>(null)
+const googleMapMarker = ref<any>(null)
+let googleMapsLoader: Promise<any> | null = null
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 const form = reactive({
@@ -312,83 +316,62 @@ async function saveLocation() {
   }
 }
 
-const mapPickerZoom = 16
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
+const googleMapsApiKey = String(useRuntimeConfig().public.googleMapsApiKey || '').trim()
 
-function mapLongitudeToWorld(longitude: number) {
-  return ((longitude + 180) / 360) * (256 * 2 ** mapPickerZoom)
+function loadGoogleMaps() {
+  if (typeof window !== 'undefined' && (window as any).google?.maps) return Promise.resolve((window as any).google)
+  if (googleMapsLoader) return googleMapsLoader
+  if (!googleMapsApiKey) return Promise.reject(new Error('Google Maps API key is not configured'))
+
+  googleMapsLoader = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve((window as any).google)
+    script.onerror = () => reject(new Error('Google Maps could not be loaded'))
+    document.head.appendChild(script)
+  })
+  return googleMapsLoader
 }
 
-function mapLatitudeToWorld(latitude: number) {
-  const radians = latitude * Math.PI / 180
-  return ((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2) * (256 * 2 ** mapPickerZoom)
-}
-
-function mapWorldToLongitude(worldX: number) {
-  return worldX / (256 * 2 ** mapPickerZoom) * 360 - 180
-}
-
-function mapWorldToLatitude(worldY: number) {
-  const normalized = Math.PI - (2 * Math.PI * worldY) / (256 * 2 ** mapPickerZoom)
-  return 180 / Math.PI * Math.atan(Math.sinh(normalized))
-}
-
-const mapPickerCenter = computed(() => {
-  const latitude = Number(locationForm.latitude)
-  const longitude = Number(locationForm.longitude)
-  return {
-    latitude: Number.isFinite(latitude) && latitude >= -85 && latitude <= 85 ? latitude : mapPickerFallback.latitude,
-    longitude: Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 ? longitude : mapPickerFallback.longitude
-  }
-})
-
-const mapPickerTiles = computed(() => {
-  const worldSize = 256 * 2 ** mapPickerZoom
-  const centerX = mapLongitudeToWorld(mapPickerCenter.value.longitude)
-  const centerY = mapLatitudeToWorld(mapPickerCenter.value.latitude)
-  const left = centerX - mapPickerSize.width / 2
-  const top = centerY - mapPickerSize.height / 2
-  const firstX = Math.floor(left / 256) - 1
-  const lastX = Math.ceil((left + mapPickerSize.width) / 256) + 1
-  const firstY = Math.max(0, Math.floor(top / 256) - 1)
-  const lastY = Math.min(2 ** mapPickerZoom - 1, Math.ceil((top + mapPickerSize.height) / 256) + 1)
-  const tiles: Array<{ key: string, left: number, top: number, url: string }> = []
-
-  for (let tileX = firstX; tileX <= lastX; tileX += 1) {
-    const wrappedX = ((tileX % 2 ** mapPickerZoom) + 2 ** mapPickerZoom) % 2 ** mapPickerZoom
-    for (let tileY = firstY; tileY <= lastY; tileY += 1) {
-      tiles.push({
-        key: `${wrappedX}-${tileY}`,
-        left: tileX * 256 - left,
-        top: tileY * 256 - top,
-        url: `https://tile.openstreetmap.org/${mapPickerZoom}/${wrappedX}/${tileY}.png`
-      })
-    }
-  }
-
-  return { tiles, markerLeft: centerX - left, markerTop: centerY - top, worldSize }
-})
-
-function updateMapPickerSize() {
-  if (!mapPickerElement.value) return
-  mapPickerSize.width = mapPickerElement.value.clientWidth || 720
-  mapPickerSize.height = mapPickerElement.value.clientHeight || 420
-}
-
-function openMapPicker() {
+async function openMapPicker() {
   mapPickerOpen.value = true
-  nextTick(updateMapPickerSize)
-}
-
-function selectMapPoint(event: MouseEvent) {
-  if (!mapPickerElement.value) return
-  const rect = mapPickerElement.value.getBoundingClientRect()
-  const centerX = mapLongitudeToWorld(mapPickerCenter.value.longitude)
-  const centerY = mapLatitudeToWorld(mapPickerCenter.value.latitude)
-  const worldX = centerX - rect.width / 2 + (event.clientX - rect.left)
-  const worldY = centerY - rect.height / 2 + (event.clientY - rect.top)
-  locationForm.latitude = mapWorldToLatitude(worldY).toFixed(6)
-  locationForm.longitude = mapWorldToLongitude(worldX).toFixed(6)
+  mapPickerLoading.value = true
+  mapPickerError.value = ''
+  await nextTick()
+  try {
+    const google = await loadGoogleMaps()
+    const latitude = Number(locationForm.latitude)
+    const longitude = Number(locationForm.longitude)
+    const center = {
+      lat: Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
+      lng: Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
+    }
+    googleMapInstance.value = new google.maps.Map(mapPickerElement.value, {
+      center,
+      zoom: 16,
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: true
+    })
+    googleMapMarker.value = new google.maps.Marker({ map: googleMapInstance.value, position: center, title: 'Локация филиала' })
+    googleMapInstance.value.addListener('click', (event: any) => {
+      if (!event.latLng) return
+      const nextLatitude = event.latLng.lat()
+      const nextLongitude = event.latLng.lng()
+      locationForm.latitude = nextLatitude.toFixed(6)
+      locationForm.longitude = nextLongitude.toFixed(6)
+      googleMapMarker.value?.setPosition(event.latLng)
+    })
+  }
+  catch (error) {
+    mapPickerError.value = error instanceof Error ? error.message : 'Не удалось загрузить Google Maps'
+  }
+  finally {
+    mapPickerLoading.value = false
+  }
 }
 
 async function openSchedules(row: BranchRow) {
@@ -764,21 +747,15 @@ async function removeBranch(row: BranchRow) {
 
       <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку.">
         <template #body>
-          <div ref="mapPickerElement" class="relative h-[min(60vh,28rem)] min-h-[20rem] cursor-crosshair overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100" @click="selectMapPoint">
-            <img v-for="tile in mapPickerTiles.tiles" :key="tile.key" :src="tile.url" alt="" class="pointer-events-none absolute h-64 w-64 max-w-none select-none" :style="{ left: `${tile.left}px`, top: `${tile.top}px` }">
-            <div class="pointer-events-none absolute -translate-x-1/2 -translate-y-full" :style="{ left: `${mapPickerTiles.markerLeft}px`, top: `${mapPickerTiles.markerTop}px` }">
-              <div class="flex flex-col items-center">
-                <span class="rounded-full bg-primary p-2 text-white shadow-lg"><UIcon name="i-lucide-map-pin" class="size-5" /></span>
-                <span class="h-2 w-0.5 bg-primary" />
-              </div>
-            </div>
-            <div class="pointer-events-none absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-1 text-xs text-charcoal-600 shadow">Кликните, чтобы переместить метку</div>
+          <div ref="mapPickerElement" class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
+            <div v-if="mapPickerLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
+            <div v-if="mapPickerError" class="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-red-700">{{ mapPickerError }}</div>
           </div>
           <div class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ locationForm.latitude || '—' }}</div>
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ locationForm.longitude || '—' }}</div>
           </div>
-          <p class="mt-3 text-xs text-charcoal-500">Карта использует OpenStreetMap. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
+          <p class="mt-3 text-xs text-charcoal-500">Кликните по Google Maps, чтобы переместить метку. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
