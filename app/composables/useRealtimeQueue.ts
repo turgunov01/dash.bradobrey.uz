@@ -4,6 +4,7 @@ import { io } from 'socket.io-client'
 const REFRESH_KEYS = [
   'overview-dashboard',
   'barber-workspace',
+  'barber-pending-transfers',
   'barber-queue-detail',
   'kiosk-dashboard',
   'history-global',
@@ -51,6 +52,9 @@ export function useRealtimeQueue() {
     socket.on('connect', () => {
       isConnected.value = true
       joinBranchRoom()
+      // Socket.IO does not replay events missed while the browser was offline.
+      // Re-read durable queue/transfer state after every reconnect.
+      refreshRelevantData()
     })
 
     socket.on('disconnect', () => {
@@ -58,6 +62,14 @@ export function useRealtimeQueue() {
     })
 
     socket.on('queue:update', () => {
+      refreshRelevantData()
+    })
+
+    socket.on('barber_changed', () => {
+      refreshRelevantData()
+    })
+
+    socket.on('queue.barber_changed', () => {
       refreshRelevantData()
     })
   })

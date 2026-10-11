@@ -17,6 +17,20 @@ type BackendLoginResponse = {
   user?: BarberUser | null;
 };
 
+export type PendingQueueTransfer = {
+  id: string;
+  queue_entry_id: string;
+  client_name?: string | null;
+  client_phone?: string | null;
+  from_barber_id?: string | null;
+  from_barber_name?: string | null;
+  service_id?: string | null;
+  service_ids?: string[] | null;
+  order_status?: string | null;
+  requested_at?: string | null;
+  expires_at?: string | null;
+};
+
 export function useBarbersApi() {
   const client = useApiClient();
 
@@ -104,6 +118,18 @@ export function useBarbersApi() {
         ...(options.token ? { headers: { Authorization: `Bearer ${options.token}` } } : {}),
         method: "GET",
         silent: options.silent,
+      });
+    },
+    pendingTransfers() {
+      return client.request<{ items: PendingQueueTransfer[] }>('/api/barbers/queue/transfers/pending', {
+        method: 'GET',
+        silent: true
+      });
+    },
+    respondToTransfer(id: string, decision: 'accept' | 'reject') {
+      return client.request(`/api/barbers/queue/transfers/${id}/${decision}`, {
+        method: 'PATCH',
+        successMessage: decision === 'accept' ? 'Передача клиента принята' : 'Передача клиента отклонена'
       });
     },
     queueHistory(query?: Record<string, unknown>) {

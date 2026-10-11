@@ -2,6 +2,9 @@
 
 ## 2026-10-11
 
+- Fixed the Google Maps picker DOM/lifecycle regression: Google now receives an isolated map host, initialization waits for the modal enter transition, cleanup runs after leave, and location-event timestamps use a deterministic Tashkent timezone for SSR hydration. Migrated to `AdvancedMarkerElement`, `loading=async`, and public Map ID configuration.
+- Repaired the Branches Google Maps picker: the loader now waits for the Maps API callback and resolves the `maps`/`marker` libraries before constructing controls, fixing `google.maps.Map is not a constructor`. Added draggable-marker updates, manual-coordinate synchronization, permission-aware browser geolocation, explicit loading/error states, and preserved the existing location API contract.
+- Fixed barber-to-barber queue transfer visibility: the recipient workspace now restores pending transfers from the durable API, shows a persistent notification with accept/reject actions, and displays a toast for newly received transfers. Socket queue/barber events and reconnects refresh the pending-transfer state so a missed event does not hide the client.
 - Deployed Dashboard commit `94724d8` to `dash.bradobrey.uz`; provisioned the server-only PM2 environment, rebuilt Nitro, restarted only `bradobrey-dashboard`, and verified public SSR smoke routes.
 
 ## 2026-10-04

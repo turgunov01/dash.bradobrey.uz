@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { QueueCompletePayload, QueueItem } from '~~/shared/schemas'
+import type { PendingQueueTransfer } from '~/composables/useBarbersApi'
 import { flattenServicesPayload } from '~/utils/services'
 
 const sessionStore = useSessionStore()
@@ -10,6 +11,9 @@ const completing = ref(false)
 const shifting = ref(false)
 const paymentModalOpen = ref(false)
 const completingItem = ref<QueueItem | null>(null)
+const transferRespondingId = ref('')
+const transferRespondingDecision = ref<'accept' | 'reject' | ''>('')
+const toast = useToast()
 
 useRealtimeQueue()
 
@@ -27,6 +31,33 @@ const { data, pending, refresh } = await useAsyncData('barber-workspace', async 
     services
   }
 })
+
+const { data: pendingTransfersData, refresh: refreshPendingTransfers } = await useAsyncData(
+  'barber-pending-transfers',
+  async () => (await barbersApi.pendingTransfers()).items || [],
+  { default: () => [] as PendingQueueTransfer[] }
+)
+
+const pendingTransfers = computed(() => pendingTransfersData.value || [])
+let transferWatchStarted = false
+let knownTransferIds = new Set<string>()
+
+watch(pendingTransfers, (transfers) => {
+  const currentIds = new Set(transfers.map(transfer => String(transfer.id)))
+  if (transferWatchStarted) {
+    transfers
+      .filter(transfer => !knownTransferIds.has(String(transfer.id)))
+      .forEach((transfer) => {
+        toast.add({
+          color: 'warning',
+          title: 'Вам передали клиента',
+          description: `${transfer.client_name || 'Клиент'} · от ${transfer.from_barber_name || 'другого барбера'}`
+        })
+      })
+  }
+  knownTransferIds = currentIds
+  transferWatchStarted = true
+}, { deep: true, immediate: true })
 
 const servicePriceMap = computed(() =>
   new Map(
@@ -112,6 +143,20 @@ async function startItem(item: any) {
   await refresh()
 }
 
+async function respondToTransfer(transfer: PendingQueueTransfer, decision: 'accept' | 'reject') {
+  if (transferRespondingId.value) return
+  transferRespondingId.value = String(transfer.id)
+  transferRespondingDecision.value = decision
+  try {
+    await barbersApi.respondToTransfer(String(transfer.id), decision)
+    await Promise.all([refreshPendingTransfers(), refresh(), sessionStore.ensureLoaded({ force: true })])
+  }
+  finally {
+    transferRespondingId.value = ''
+    transferRespondingDecision.value = ''
+  }
+}
+
 function completeItem(item: QueueItem) {
   completingItem.value = item
   paymentModalOpen.value = true
@@ -192,6 +237,50 @@ function openItem(item: any) {
 
     <template #body>
       <div class="space-y-6">
+        <div v-if="pendingTransfers.length" class="space-y-3">
+          <div
+            v-for="transfer in pendingTransfers"
+            :key="transfer.id"
+            class="rounded-[1.5rem] border border-warning-300 bg-warning-50 p-4 shadow-sm"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 text-sm font-semibold text-warning-900">
+                  <UIcon name="i-lucide-bell-ring" class="size-5 shrink-0" />
+                  Вам передали клиента
+                </div>
+                <p class="mt-2 text-sm text-warning-900">
+                  {{ transfer.client_name || 'Клиент' }} · от {{ transfer.from_barber_name || 'другого барбера' }}
+                </p>
+                <p class="mt-1 text-xs text-warning-800">
+                  Подтвердите передачу, чтобы клиент появился в вашей активной очереди.
+                </p>
+              </div>
+              <div class="flex shrink-0 gap-2">
+                <UButton
+                  color="primary"
+                  size="sm"
+                  :loading="transferRespondingId === String(transfer.id) && transferRespondingDecision === 'accept'"
+                  :disabled="!!transferRespondingId"
+                  @click="respondToTransfer(transfer, 'accept')"
+                >
+                  Принять
+                </UButton>
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :loading="transferRespondingId === String(transfer.id) && transferRespondingDecision === 'reject'"
+                  :disabled="!!transferRespondingId"
+                  @click="respondToTransfer(transfer, 'reject')"
+                >
+                  Отклонить
+                </UButton>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
           <DashboardMetricCard
             description="Текущие активные записи для авторизованного барбера."

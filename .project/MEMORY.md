@@ -51,6 +51,23 @@
 - Statistics employee detail is derived from the already loaded, permission-scoped history snapshot; explicit backend record ids are deduplicated, partial source failures are surfaced, and the modal performs no extra request.
 - Employee Quality v1 production schema and permission backfill were applied idempotently on 2026-10-11. API and Dashboard were restarted separately; unauthenticated direct verification returns 401 as expected. Authenticated ranking data requires a real user session for end-to-end verification.
 - Dashboard production deployment verified on 2026-10-11 at commit `94724d8`: the deployment-local `.env` was provisioned on `dash.bradobrey.uz`, PM2 restarted only `bradobrey-dashboard` with `--update-env`, and public smoke checks returned `/login` 200 and `/` 302. Existing untracked `.env.swo` and `node-compile-cache/` on the server were preserved.
+
+## Google Maps location picker (2026-10-11)
+
+- `app/pages/branches.vue` owns the browser-side Google Maps picker for branch geocontrol. It keeps the API as the source of saved coordinates and sends `{ latitude, longitude, radius_meters, is_enabled }` through `useBranchesApi().saveLocation()`; server-side geofence distance validation remains outside the frontend.
+- The reference dashboard implementation in `C:\project\dash.bradobrey.uz\app\pages\branches.vue` established the script-loader, fallback center (`41.3111, 69.2797`), coordinate validation, draggable marker, click selection, and permission-aware geolocation pattern. `C:\project\diamond_service_1` uses the native Flutter `google_maps_flutter` plugin and platform API-key metadata, so it is not directly reusable in Nuxt.
+- The dashboard must not call `new google.maps.Map` immediately after a script `load` event when using the async Google API. The current loader waits for the API callback and uses `google.maps.importLibrary('maps')` and `importLibrary('marker')`, with a classic-constructor fallback for older API responses. This prevents `google.maps.Map is not a constructor`.
+- The browser key is supplied through the public runtime config `NUXT_PUBLIC_GOOGLE_MAPS_API_KEY` (local `.env`, ignored by Git; PM2 forwards the public value). Keep it restricted by HTTP referrer and only the required Maps JavaScript/marker APIs; never place server secrets in client code.
+- Google Maps must own only the empty `mapPickerElement`; Vue overlays must be siblings in the wrapper. Mutating the same container with Google Maps and Vue `v-if` nodes causes `NotFoundError: insertBefore` during UModal updates. Initialize on `@after:enter` and clean up on `@after:leave`.
+- Advanced markers require `googleMapsMapId` in public runtime config; the current default is `DEMO_MAP_ID` for compatibility, while production should set `NUXT_PUBLIC_GOOGLE_MAPS_MAP_ID` to a Google Cloud Map ID. Advanced marker positions are assigned through `.position`, and dragging uses `gmp-dragend`.
+- Location event timestamps must use an explicit timezone/locale in SSR-rendered templates; direct `toLocaleString()` can cause hydration mismatches between Node and the browser.
+
+## Barber transfer realtime (2026-10-11)
+
+- Queue reassignment is a two-phase backend flow: `PATCH /api/barbers/queue/:id/reassign` creates a `transfer_pending` record, and the recipient must accept or reject it through `/api/barbers/queue/transfers/:transferId/{accept|reject}`.
+- Socket.IO `queue:update`, `barber_changed`, and `queue.barber_changed` events are wake-up signals only; they are not durable and can be missed during reconnects. The dashboard workspace therefore refetches `GET /api/barbers/queue/transfers/pending` on initial load, relevant events, and socket reconnect.
+- The recipient UI keeps pending transfers visible until an explicit accept/reject response succeeds. Do not infer incoming transfers from the ordinary queue list because `transfer_pending` entries are intentionally excluded by the backend.
+
 # Barber login geolocation control (2026-10-11)
 
 - Added branch geolocation policy editing and PII-minimized login-location event history to the existing Branches page through authenticated Nitro BFF routes. Backend migration/deployment remains a separate release step.
