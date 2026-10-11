@@ -81,3 +81,7 @@
 - Deduplicated explicit history record ids and surfaced partial statistics source failures instead of silently treating them as empty data.
 - Audited Employee Quality v1 end to end; improved safe error-code propagation and aligned Dashboard ranking validation with the backend quality tie-break rules.
 
+# 2026-10-11 — barber login geolocation control
+
+- Added branch geolocation policy controls and login-location event history to the existing Branches page, with authenticated BFF proxy routes.
+

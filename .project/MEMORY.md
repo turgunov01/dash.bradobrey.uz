@@ -51,3 +51,7 @@
 - Statistics employee detail is derived from the already loaded, permission-scoped history snapshot; explicit backend record ids are deduplicated, partial source failures are surfaced, and the modal performs no extra request.
 - Employee Quality v1 production schema and permission backfill were applied idempotently on 2026-10-11. API and Dashboard were restarted separately; unauthenticated direct verification returns 401 as expected. Authenticated ranking data requires a real user session for end-to-end verification.
 - Dashboard production deployment verified on 2026-10-11 at commit `94724d8`: the deployment-local `.env` was provisioned on `dash.bradobrey.uz`, PM2 restarted only `bradobrey-dashboard` with `--update-env`, and public smoke checks returned `/login` 200 and `/` 302. Existing untracked `.env.swo` and `node-compile-cache/` on the server were preserved.
+# Barber login geolocation control (2026-10-11)
+
+- Added branch geolocation policy editing and PII-minimized login-location event history to the existing Branches page through authenticated Nitro BFF routes. Backend migration/deployment remains a separate release step.
+

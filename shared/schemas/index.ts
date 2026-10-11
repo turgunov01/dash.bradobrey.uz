@@ -30,7 +30,8 @@ export const branchSchema = z.object({
   timezone: optionalTextSchema,
   work_hours: z.any().optional().nullable(),
   marketplace_barbershop_id: optionalTextSchema,
-  is_active: z.boolean().optional().nullable()
+  is_active: z.boolean().optional().nullable(),
+  location: z.any().optional().nullable()
 }).passthrough()
 
 export const branchFormSchema = z.object({
@@ -40,7 +41,8 @@ export const branchFormSchema = z.object({
   timezone: optionalTextSchema,
   work_hours: z.any().optional().nullable(),
   marketplace_barbershop_id: optionalTextSchema,
-  is_active: z.boolean().optional().nullable()
+  is_active: z.boolean().optional().nullable(),
+  location: z.any().optional().nullable()
 }).passthrough()
 
 export const branchUpdateSchema = branchFormSchema.partial().passthrough()
