@@ -39,6 +39,24 @@ export type BreakdownRow = {
   uniqueClients: number
 }
 
+export type EmployeeStatisticsDetail = {
+  averageCheck: number
+  averageServiceMinutes: number
+  averageWaitMinutes: number
+  cancelled: number
+  completed: number
+  completionRate: number
+  id: string
+  label: string
+  noShow: number
+  notInTime: number
+  orders: number
+  payments: Array<{ count: number, label: string, revenue: number }>
+  revenue: number
+  services: Array<{ completed: number, count: number, label: string }>
+  uniqueClients: number
+}
+
 type PaymentBreakdownRow = {
   count: number
   key: string
@@ -249,7 +267,7 @@ function getServiceIds(item: Record<string, any>) {
       ? [item.service_id]
       : []
 
-  return values
+  return [...new Set(values)]
     .map(value => normalizeText(value))
     .filter((value): value is string => Boolean(value))
 }
@@ -366,6 +384,10 @@ export function useStatisticsAnalytics() {
       barbersApi.list(directoryQuery)
     ])
 
+    const sourceErrors = [historyResult, servicesResult, barbersResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map(result => result.reason instanceof Error ? result.reason.message : 'Неизвестная ошибка источника данных')
+
     return {
       barberAccounts: barbersResult.status === 'fulfilled'
         ? extractBarberAccounts(barbersResult.value)
@@ -373,6 +395,7 @@ export function useStatisticsAnalytics() {
       historyItems: historyResult.status === 'fulfilled'
         ? extractHistoryItems(historyResult.value)
         : [] as Record<string, any>[],
+      sourceErrors,
       services: servicesResult.status === 'fulfilled'
         ? flattenServicesPayload(servicesResult.value)
         : [] as FlatServiceItem[]
@@ -464,6 +487,21 @@ export function useStatisticsAnalytics() {
       }
     }).filter(item => Boolean(item.id))
   )
+
+  const deduplicatedHistory = computed(() => {
+    const seenIds = new Set<string>()
+
+    return normalizedHistory.value.filter((item) => {
+      // The history endpoint may repeat a record across pages. Only explicit
+      // backend ids are safe to deduplicate; synthetic fallback ids can be
+      // shared by legitimate records without an upstream id.
+      const sourceId = normalizeText(item.id)
+      if (!sourceId || sourceId.includes(':')) return true
+      if (seenIds.has(sourceId)) return false
+      seenIds.add(sourceId)
+      return true
+    })
+  })
 
   const barberOptions = computed<BarberOption[]>(() => {
     const options = new Map<string, BarberOption>()
@@ -570,7 +608,7 @@ export function useStatisticsAnalytics() {
   )
 
   const scopeHistory = computed(() => {
-    return normalizedHistory.value.filter((item) => {
+    return deduplicatedHistory.value.filter((item) => {
       if (scope.value === 'branch') {
         return Boolean(branchStore.activeBranchId) && item.branchId === branchStore.activeBranchId
       }
@@ -848,6 +886,95 @@ export function useStatisticsAnalytics() {
       .sort((left, right) => right.revenue - left.revenue || right.count - left.count)
   })
 
+  const employeeDetails = computed<EmployeeStatisticsDetail[]>(() => {
+    const rows = new Map<string, {
+      completed: number
+      cancelled: number
+      noShow: number
+      notInTime: number
+      revenue: number
+      phones: Set<string>
+      serviceMinutes: number[]
+      waitMinutes: number[]
+      services: Map<string, { completed: number, count: number, label: string }>
+      payments: Map<string, { count: number, label: string, revenue: number }>
+    }>()
+
+    for (const item of filteredHistory.value) {
+      const id = item.barberId || 'unknown'
+      const current = rows.get(id) || {
+        cancelled: 0,
+        completed: 0,
+        noShow: 0,
+        notInTime: 0,
+        payments: new Map(),
+        phones: new Set(),
+        revenue: 0,
+        serviceMinutes: [] as number[],
+        services: new Map(),
+        waitMinutes: [] as number[]
+      }
+
+      if (item.clientPhone) current.phones.add(item.clientPhone)
+      if (item.isCancelled) current.cancelled += 1
+      if (item.status === 'no_show') current.noShow += 1
+      if (item.status === 'not_in_time') current.notInTime += 1
+      if (item.isCompleted) {
+        current.completed += 1
+        current.revenue += item.estimatedRevenue
+        const serviceMinutes = item.actualServiceMinutes ?? (item.estimatedServiceMinutes || null)
+        if (serviceMinutes && serviceMinutes > 0) current.serviceMinutes.push(serviceMinutes)
+        if (item.actualServiceMinutes !== null && item.estimatedServiceMinutes > 0) {
+          current.waitMinutes.push(Math.max(item.actualServiceMinutes - item.estimatedServiceMinutes, 0))
+        }
+      }
+
+      const paymentKey = normalizeText(item.paymentMethod) || 'pending'
+      const payment = current.payments.get(paymentKey) || { count: 0, label: formatPaymentMethod(paymentKey), revenue: 0 }
+      payment.count += item.isCompleted ? 1 : 0
+      payment.revenue += item.isCompleted ? item.estimatedRevenue : 0
+      current.payments.set(paymentKey, payment)
+
+      for (const serviceId of item.serviceIds) {
+        const service = serviceMap.value.get(serviceId)
+        const serviceRow = current.services.get(serviceId) || {
+          completed: 0,
+          count: 0,
+          label: normalizeText(service?.name) || `Услуга ${shortId(serviceId)}`
+        }
+        serviceRow.count += 1
+        serviceRow.completed += item.isCompleted ? 1 : 0
+        current.services.set(serviceId, serviceRow)
+      }
+
+      rows.set(id, current)
+    }
+
+    return [...rows.entries()].map(([id, row]) => {
+      const orders = filteredHistory.value.filter(item => (item.barberId || 'unknown') === id).length
+      const average = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+      const label = barberBreakdown.value.find(item => item.id === id)?.label || `Барбер ${shortId(id === 'unknown' ? null : id)}`
+
+      return {
+        averageCheck: row.completed ? row.revenue / row.completed : 0,
+        averageServiceMinutes: average(row.serviceMinutes),
+        averageWaitMinutes: average(row.waitMinutes),
+        cancelled: row.cancelled,
+        completed: row.completed,
+        completionRate: orders ? (row.completed / orders) * 100 : 0,
+        id,
+        label,
+        noShow: row.noShow,
+        notInTime: row.notInTime,
+        orders,
+        payments: [...row.payments.values()].sort((left, right) => right.count - left.count),
+        revenue: row.revenue,
+        services: [...row.services.values()].sort((left, right) => right.count - left.count),
+        uniqueClients: row.phones.size
+      }
+    }).sort((left, right) => right.revenue - left.revenue || right.orders - left.orders)
+  })
+
   const serviceBreakdown = computed<ServiceBreakdownRow[]>(() => {
     const rows = new Map<string, ServiceBreakdownRow>()
 
@@ -1025,6 +1152,13 @@ export function useStatisticsAnalytics() {
     }
   ])
 
+  const dataError = computed(() => {
+    const errors = data.value?.sourceErrors || []
+    return errors.length ? `Не все источники загрузились: ${errors.join('; ')}` : null
+  })
+
+  const hasData = computed(() => Boolean(data.value))
+
   const scopeContextLabel = computed(() => {
     if (scope.value === 'branch') {
       return branchStore.activeBranch?.name || 'Филиал не выбран'
@@ -1045,11 +1179,14 @@ export function useStatisticsAnalytics() {
     barberBreakdown,
     barberOptions,
     barberPieItems,
+    dataError,
+    employeeDetails,
     branchBreakdown,
     branchPieItems,
     clientChartData,
     clientMetrics,
     filteredHistory,
+    hasData,
     mainMetrics,
     mainStatusChartData,
     needsBarberSelection,

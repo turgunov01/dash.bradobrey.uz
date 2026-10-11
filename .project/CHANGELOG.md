@@ -72,4 +72,8 @@
 
 - Fixed Marketplace no-show settings PATCH requests leaking the internal `__skipBranchScope` query parameter on mutations. The request now preserves the authenticated API contract and sends only the allowlisted settings payload.
 - Fixed Marketplace no-show settings GET/PATCH requests to include the authenticated admin bearer token.
+- Updated production nginx cache policy for Dashboard HTML to prevent stale hashed bundles from persisting after deployments.
+- Added employee statistics drill-down modal with scoped metrics, service/payment breakdowns, accessible keyboard activation, loading/empty/error states, and no extra API request.
+- Deduplicated explicit history record ids and surfaced partial statistics source failures instead of silently treating them as empty data.
+- Audited Employee Quality v1 end to end; improved safe error-code propagation and aligned Dashboard ranking validation with the backend quality tie-break rules.
 

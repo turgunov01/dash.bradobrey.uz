@@ -277,6 +277,29 @@ test('uses API rank for ordering and keeps revenue informational', () => {
   assert.deepEqual(buildEmployeeQualitySections(changedRevenue.employees).eligible.map(row => row.employee.id), ['e1', 'e2'])
 })
 
+test('validates employee failure count as the deterministic quality tie-break', () => {
+  const first = sanitizeEmployeeQualityResponse(response([
+    {
+      eligible: true,
+      employee: { id: 'one-failure', name: 'B', branch_id: 'b1' },
+      metrics: metrics({ assessment_source_counts: { live_snapshot: 20, backfill_current_catalog: 0, unclassified: 0 }, classifiable_completed: 20, completed: 20, employee_failure_count: 1, employee_failure_rate: 1 / 21, suspicious_count: 0, suspicious_rate: 0, trusted_completed: 20 }),
+      provisional_reason: null,
+      rank: 1,
+      rank_reason: null
+    },
+    {
+      eligible: true,
+      employee: { id: 'two-failures', name: 'A', branch_id: 'b1' },
+      metrics: metrics({ assessment_source_counts: { live_snapshot: 20, backfill_current_catalog: 0, unclassified: 0 }, classifiable_completed: 20, completed: 20, employee_failure_count: 2, employee_failure_rate: 2 / 22, suspicious_count: 0, suspicious_rate: 0, trusted_completed: 20 }),
+      provisional_reason: null,
+      rank: 2,
+      rank_reason: null
+    }
+  ]))
+
+  assert.deepEqual(buildEmployeeQualitySections(first.employees).eligible.map(row => row.employee.id), ['one-failure', 'two-failures'])
+})
+
 test('separates insufficient-data employees and exposes explicit error copy', () => {
   const result = sanitizeEmployeeQualityResponse(response([{
     eligible: false,
@@ -300,4 +323,5 @@ test('separates insufficient-data employees and exposes explicit error copy', ()
   assert.equal(buildEmployeeQualitySections(result.employees).insufficient.length, 1)
   assert.match(getEmployeeQualityErrorMessage({ statusCode: 404 }), /не доступен/)
   assert.match(getEmployeeQualityErrorMessage({ statusCode: 403 }), /Нет доступа/)
+  assert.match(getEmployeeQualityErrorMessage({ statusCode: 500, data: { code: 'EMPLOYEE_QUALITY_LOAD_FAILED' } }), /журнал API/)
 })

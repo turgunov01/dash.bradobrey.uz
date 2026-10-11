@@ -26,6 +26,10 @@ const statisticsBffSource = readFileSync(
   new URL('../server/api/statistics/index.get.ts', import.meta.url),
   'utf8'
 )
+const statisticsModalSource = readFileSync(
+  new URL('../app/components/statistics/EmployeeStatisticsModal.vue', import.meta.url),
+  'utf8'
+)
 
 test('client-only statistics requests start after hydration', () => {
   assert.match(rankingSource, /immediate:\s*false/)
@@ -44,4 +48,13 @@ test('quality ranking is hidden from employee statistics but remains on branch s
 test('history and statistics BFF routes require the authenticated backend session', () => {
   assert.match(historyBffSource, /proxyBackend<unknown>\(event, '\/api\/history', 'required'\)/)
   assert.match(statisticsBffSource, /proxyBackend<unknown>\(event, '\/api\/statistics', 'required'\)/)
+})
+
+test('employee statistics supports accessible drill-down without a second API request', () => {
+  assert.match(employeeStatisticsPageSource, /openEmployeeDetails\(row\.id\)/)
+  assert.match(employeeStatisticsPageSource, /StatisticsEmployeeStatisticsModal/)
+  assert.match(statisticsModalSource, /v-model:open="open"/)
+  assert.match(statisticsModalSource, /Средний чек/)
+  assert.match(analyticsSource, /new Set\(values\)/)
+  assert.match(analyticsSource, /sourceErrors/)
 })

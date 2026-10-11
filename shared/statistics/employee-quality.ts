@@ -478,7 +478,6 @@ export function sanitizeEmployeeQualityResponse(value: unknown): EmployeeQuality
         || leftMetrics.suspicious_count - rightMetrics.suspicious_count
         || leftMetrics.suspicious_rate - rightMetrics.suspicious_rate
         || rightMetrics.trusted_completed - leftMetrics.trusted_completed
-        || leftMetrics.employee_failure_rate - rightMetrics.employee_failure_rate
         || leftMetrics.employee_failure_count - rightMetrics.employee_failure_count
         || left.employee.id.localeCompare(right.employee.id)
     })
@@ -491,7 +490,6 @@ export function sanitizeEmployeeQualityResponse(value: unknown): EmployeeQuality
       entry.metrics.suspicious_count,
       entry.metrics.suspicious_rate,
       entry.metrics.trusted_completed,
-      entry.metrics.employee_failure_rate,
       entry.metrics.employee_failure_count
     ].join('|')
     if (previousQualityKey) {
@@ -615,6 +613,7 @@ export function getEmployeeQualityErrorMessage(error: unknown) {
   const status = Number(source?.statusCode || source?.status || source?.response?.status || 0)
   const data = source?.data || source?.response?._data
   const message = normalizeText(data?.message || data?.error || source?.message)
+  const code = normalizeText(data?.code || source?.code)
 
   if ([404, 501].includes(status)) {
     return 'Серверный рейтинг качества ещё не доступен. Рейтинг по выручке вместо него не показывается.'
@@ -622,6 +621,10 @@ export function getEmployeeQualityErrorMessage(error: unknown) {
 
   if ([401, 403].includes(status)) {
     return 'Нет доступа к рейтингу качества для выбранной области.'
+  }
+
+  if (code === 'EMPLOYEE_QUALITY_LOAD_FAILED') {
+    return 'Сервер не смог рассчитать рейтинг качества. Проверьте журнал API и состояние схемы Employee Quality.'
   }
 
   return message || 'Не удалось загрузить рейтинг качества сотрудников.'

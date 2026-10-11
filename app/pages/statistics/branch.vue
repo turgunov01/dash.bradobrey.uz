@@ -6,7 +6,10 @@ const {
   barberBreakdown,
   barberOptions,
   barberPieItems,
+  dataError,
+  employeeDetails,
   filteredHistory,
+  hasData,
   needsBranchSelection,
   operationsCards,
   pending,
@@ -21,6 +24,14 @@ scope.value = 'branch'
 const rankingRef = ref<{ refresh: () => Promise<unknown> | void } | null>(null)
 const refreshing = ref(false)
 const branchScopeOptions = [{ label: 'Филиал', value: 'branch' as const }]
+const employeeModalOpen = ref(false)
+const selectedEmployeeId = ref<string | null>(null)
+const selectedEmployeeDetail = computed(() => employeeDetails.value.find(item => item.id === selectedEmployeeId.value) || null)
+
+function openEmployeeDetails(employeeId: string) {
+  selectedEmployeeId.value = employeeId
+  employeeModalOpen.value = true
+}
 
 async function refreshAll() {
   refreshing.value = true
@@ -84,6 +95,10 @@ async function refreshAll() {
         />
 
         <template v-else>
+          <UAlert v-if="dataError" color="error" icon="i-lucide-triangle-alert" title="Статистика загружена не полностью" :description="dataError" variant="soft" />
+          <div v-if="pending && !hasData" class="grid gap-4 xl:grid-cols-4 md:grid-cols-2" aria-live="polite">
+            <USkeleton v-for="index in 4" :key="index" class="h-24 rounded-2xl" />
+          </div>
           <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
             <DashboardMetricCard
               v-for="card in operationsCards"
@@ -121,10 +136,12 @@ async function refreshAll() {
                 </div>
 
                 <div class="space-y-3 max-h-[32rem] overflow-auto pr-1">
-                  <div
+                  <button
                     v-for="row in barberBreakdown"
                     :key="row.id"
-                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                    class="w-full rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3 text-left transition hover:border-charcoal-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-700"
+                    type="button"
+                    @click="openEmployeeDetails(row.id)"
                   >
                     <div class="flex items-start justify-between gap-4">
                       <div class="space-y-1">
@@ -144,7 +161,7 @@ async function refreshAll() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
               <SharedEmptyState
@@ -157,6 +174,7 @@ async function refreshAll() {
 
           </div>
         </template>
+        <StatisticsEmployeeStatisticsModal v-model:open="employeeModalOpen" :detail="selectedEmployeeDetail" />
       </div>
     </template>
   </UDashboardPanel>
