@@ -139,6 +139,7 @@ export function useDashboardNavigation() {
           },
           { icon: "i-lucide-award", label: "Ранги клиентов", to: "/dashboard/marketplace/loyalty-ranks" },
           { icon: "i-lucide-percent", label: "Кэшбэк", to: "/dashboard/marketplace/cashback" },
+          { icon: "i-lucide-user-round-x", label: "Блокировка за неявку", to: "/dashboard/marketplace/no-show-restrictions" },
           {
             icon: "i-lucide-ticket-percent",
             label: "Промокоды",

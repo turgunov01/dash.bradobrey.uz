@@ -72,7 +72,9 @@ test('shows login failures inline and returns a client error for malformed crede
 
 test('uses only the requested backend login endpoint and payload', () => {
   assert.match(loginApiSource, /\$fetch<BackendLoginResponse>\("\/api\/barbers\/login"/)
-  assert.match(loginApiSource, /baseURL,[\s\S]*?credentials: "omit"/)
+  assert.match(loginApiSource, /isLocalDashboard/)
+  assert.match(loginApiSource, /baseURL/)
+  assert.match(loginApiSource, /credentials: isLocalDashboard \? "include" : "omit"/)
   assert.match(loginApiSource, /Accept: "application\/json"/)
   assert.match(loginApiSource, /"Content-Type": "application\/json"/)
   assert.match(loginHandlerSource, /const path = '\/api\/barbers\/login'/)

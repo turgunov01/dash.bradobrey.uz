@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh -o ConnectTimeout=15 -o BatchMode=yes root@95.46.96.213 \"cd /root/dash.bradobrey.uz 2>/dev/null && pwd && git log --oneline -3 && echo '---pm2---' && pm2 list\")",
+      "Bash(git rev-list *)",
+      "Bash(git remote *)",
+      "Bash(command -v sshpass)",
+      "Bash(command -v ssh)",
+      "Bash(command -v plink)",
+      "Bash(ssh -V)",
+      "Bash(command -v setsid)",
+      "Bash(command -v expect)"
+    ]
+  }
+}

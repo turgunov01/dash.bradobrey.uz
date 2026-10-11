@@ -66,16 +66,19 @@ export function useBarbersApi() {
       const config = useRuntimeConfig();
       const baseURL = String(config.public.apiBase || "https://api.bradobrey.uz").replace(/\/+$/, "");
 
-      // Login must go directly to the canonical API. The dashboard BFF login
-      // route requires its own signing secret and can otherwise fail after
-      // the upstream API has already authenticated the user.
+      // Local development uses the same-origin Nuxt BFF route so the browser
+      // does not send a cross-origin preflight request to the production API.
+      const isLocalDashboard =
+        import.meta.client &&
+        ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+
       return $fetch<BackendLoginResponse>("/api/barbers/login", {
-        baseURL,
+        ...(isLocalDashboard ? {} : { baseURL }),
         body: {
           login: payload.login,
           password: payload.password,
         },
-        credentials: "omit",
+        credentials: isLocalDashboard ? "include" : "omit",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
