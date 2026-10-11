@@ -2,7 +2,12 @@
 import { onBeforeRouteLeave } from 'vue-router'
 import type { NoShowRestrictionSettings } from '~/composables/useNoShowRestrictionSettingsApi'
 
-definePageMeta({ alias: '/dashboard/marketplace/no-show-restrictions' })
+definePageMeta({
+  alias: [
+    '/dashboard/marketplace/no-show-restrictions',
+    '/marketplace/no-show-restrictions'
+  ]
+})
 
 type DurationKey = 'first_violation_minutes' | 'second_violation_minutes' | 'third_plus_violation_minutes'
 type DurationUnit = 'minutes' | 'hours' | 'days'
