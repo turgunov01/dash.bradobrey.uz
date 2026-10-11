@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-11
+
+- Deployed Dashboard commit `94724d8` to `dash.bradobrey.uz`; provisioned the server-only PM2 environment, rebuilt Nitro, restarted only `bradobrey-dashboard`, and verified public SSR smoke routes.
+
 ## 2026-10-04
 
 - Fixed the local login bounce after a successful backend response: all client API consumers now share one Nuxt-scoped admin-token state, the post-login profile refresh surfaces failures before showing success, and cookie security now uses protocol auto-detection by default.
