@@ -73,6 +73,10 @@ export type LocationEvent = {
   id: string
   barber_id: string
   branch_id: string
+  latitude?: number | null
+  longitude?: number | null
+  branch_latitude?: number | null
+  branch_longitude?: number | null
   barber_name?: string | null
   branch_name?: string | null
   distance_meters?: number | null

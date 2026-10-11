@@ -124,6 +124,8 @@ const locationPending = ref(false)
 const locationSubmitting = ref(false)
 const locationBranch = ref<{ id: string, name: string } | null>(null)
 const locationEvents = ref<LocationEvent[]>([])
+const mapOpen = ref(false)
+const mapEvent = ref<LocationEvent | null>(null)
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 watch(() => branchStore.activeBranchId, branchId => {
@@ -180,6 +182,29 @@ async function saveLocation() {
     locationSubmitting.value = false
   }
 }
+
+function openEventMap(event: LocationEvent) {
+  if (event.latitude == null || event.longitude == null) {
+    apiClient.notifyError(new Error('Для этого события координаты недоступны'))
+    return
+  }
+  mapEvent.value = event
+  mapOpen.value = true
+}
+
+const eventMapUrl = computed(() => {
+  const event = mapEvent.value
+  if (!event || event.latitude == null || event.longitude == null) return ''
+  const lat = Number(event.latitude)
+  const lon = Number(event.longitude)
+  const delta = 0.006
+  const branchLat = Number(event.branch_latitude)
+  const branchLon = Number(event.branch_longitude)
+  const centerLat = Number.isFinite(branchLat) ? (lat + branchLat) / 2 : lat
+  const centerLon = Number.isFinite(branchLon) ? (lon + branchLon) / 2 : lon
+  const bbox = `${centerLon - delta},${centerLat - delta},${centerLon + delta},${centerLat + delta}`
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lon}`)}`
+})
 
 const branchOptions = computed(() => [
   { label: 'Общий', value: 'all' },
@@ -415,7 +440,10 @@ const detailColumns: TableColumn<LateRow>[] = [
                 <div v-if="locationEvents.length" class="space-y-2">
                   <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
                     <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
-                    <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</span>
+                    <span class="flex items-center gap-2 text-charcoal-500">
+                      <span>{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</span>
+                      <UButton v-if="event.latitude != null && event.longitude != null" size="xs" color="primary" variant="soft" icon="i-lucide-map" aria-label="Показать место входа на карте" @click.stop="openEventMap(event)">Карта</UButton>
+                    </span>
                   </div>
                 </div>
                 <p v-else class="text-sm text-charcoal-500">Событий входа пока нет.</p>
@@ -423,6 +451,22 @@ const detailColumns: TableColumn<LateRow>[] = [
             </div>
           </template>
           <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
+        </UModal>
+
+        <UModal v-model:open="mapOpen" class="sm:max-w-4xl" title="Место входа барбера" :description="mapEvent ? `${mapEvent.barber_name || mapEvent.barber_id} · ${mapEvent.created_at ? new Date(mapEvent.created_at).toLocaleString() : ''}` : ''">
+          <template #body>
+            <div v-if="mapEvent" class="space-y-4">
+              <div class="overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
+                <iframe v-if="eventMapUrl" :src="eventMapUrl" title="Карта места входа барбера" class="h-[min(55vh,30rem)] w-full border-0" loading="lazy" />
+              </div>
+              <div class="grid gap-3 text-sm sm:grid-cols-2">
+                <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Фактический вход</p><p class="text-charcoal-600">{{ mapEvent.latitude }}, {{ mapEvent.longitude }}</p></div>
+                <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Филиал</p><p class="text-charcoal-600">{{ mapEvent.branch_latitude ?? '—' }}, {{ mapEvent.branch_longitude ?? '—' }}</p></div>
+              </div>
+              <p class="text-xs text-charcoal-500">Карта показывает координаты, полученные устройством при входе. Точка филиала отображается рядом для сравнения.</p>
+            </div>
+          </template>
+          <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="mapOpen = false">Закрыть</UButton></div></template>
         </UModal>
 
         <VerifixPenaltySettings />

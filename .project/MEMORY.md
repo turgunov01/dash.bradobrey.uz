@@ -54,4 +54,5 @@
 # Barber login geolocation control (2026-10-11)
 
 - Added branch geolocation policy editing and PII-minimized login-location event history to the existing Branches page through authenticated Nitro BFF routes. Backend migration/deployment remains a separate release step.
+- Verifix location history now has a per-event "Карта" action. The modal renders an OpenStreetMap view with the device entry point and branch coordinates; it requires coordinates returned by the protected admin location-events endpoint.
 
