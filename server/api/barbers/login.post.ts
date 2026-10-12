@@ -201,7 +201,8 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
   const path = '/api/barbers/login'
   const body = {
     login: payload.login,
-    password: payload.password
+    password: payload.password,
+    ...(payload.location ? { location: payload.location } : {})
   }
 
   logBackendLoginRequest(event, path, payload, 'primary')

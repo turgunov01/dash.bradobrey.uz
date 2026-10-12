@@ -2,7 +2,7 @@
 import type { ZodIssue } from 'zod'
 
 import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
-import { loginSchema } from '~~/shared/schemas'
+import { loginSchema, type LoginLocation } from '~~/shared/schemas'
 import { firstAllowedPath } from '~/utils/access'
 
 const apiClient = useApiClient()
@@ -26,6 +26,26 @@ const fieldErrors = reactive({
 })
 
 const loading = ref(false)
+
+function getLoginLocation(): Promise<LoginLocation | null> {
+  if (!import.meta.client || !navigator.geolocation) {
+    return Promise.resolve(null)
+  }
+
+  return new Promise(resolve => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve({
+        accuracy_meters: position.coords.accuracy,
+        client_event_id: typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        measured_at: new Date(position.timestamp).toISOString()
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 7_000 }
+    )
+  })
+}
 
 function resetFieldErrors() {
   fieldErrors.login = ''
@@ -93,6 +113,8 @@ async function submit() {
   loading.value = true
 
   try {
+    const location = await getLoginLocation()
+
     logLoginDebug('request', {
       body: {
         branch_id: parsed.data.branch_id || null,
@@ -104,7 +126,7 @@ async function submit() {
       path: '/api/barbers/login'
     })
 
-    const response = await sessionStore.login(parsed.data)
+    const response = await sessionStore.login({ ...parsed.data, location })
 
     const sessionBranchId = sessionStore.barber?.branch_id || sessionStore.user?.branch_id || parsed.data.branch_id || null
 

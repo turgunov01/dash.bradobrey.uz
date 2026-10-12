@@ -130,6 +130,15 @@ let reverseGeocodeRequestId = 0
 let nominatimLastRequestAt = 0
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
+function locationEventDate(event: LocationEvent) {
+  return event.created_at || event.createdAt || event.measured_at || event.measuredAt || null
+}
+
+function locationEventCoordinates(event: LocationEvent) {
+  if (event.latitude == null || event.longitude == null) return 'Координаты отсутствуют'
+  return `${Number(event.latitude).toFixed(6)}, ${Number(event.longitude).toFixed(6)}`
+}
+
 const form = reactive({
   id: '',
   name: '',
@@ -910,7 +919,7 @@ async function removeBranch(row: BranchRow) {
               <div v-if="locationEvents.length" class="space-y-2">
                 <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
                   <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
-                  <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(event.created_at) }}</span>
+                  <span class="text-charcoal-500">{{ locationEventCoordinates(event) }} · {{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }}</span>
                 </div>
               </div>
               <p v-else class="text-sm text-charcoal-500">Событий входа пока нет.</p>

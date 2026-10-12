@@ -80,7 +80,7 @@ test('uses only the requested backend login endpoint and payload', () => {
   assert.match(loginHandlerSource, /const path = '\/api\/barbers\/login'/)
   assert.match(loginHandlerSource, /Accept: 'application\/json'/)
   assert.match(loginHandlerSource, /'Content-Type': 'application\/json'/)
-  assert.match(loginHandlerSource, /const body = \{\s*login: payload\.login,\s*password: payload\.password\s*\}/)
+  assert.match(loginHandlerSource, /const body = \{\s*login: payload\.login,\s*password: payload\.password,\s*\.\.\.\(payload\.location \? \{ location: payload\.location \} : \{\}\)\s*\}/)
   assert.doesNotMatch(loginHandlerSource, /\/api\/barbers\/admin\/login/)
   assert.doesNotMatch(loginHandlerSource, /admin-fallback/)
 })

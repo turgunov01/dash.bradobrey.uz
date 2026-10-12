@@ -132,6 +132,15 @@ const mapOpen = ref(false)
 const mapEvent = ref<LocationEvent | null>(null)
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
+function locationEventDate(event: LocationEvent) {
+  return event.created_at || event.createdAt || event.measured_at || event.measuredAt || null
+}
+
+function locationEventCoordinates(event: LocationEvent) {
+  if (event.latitude == null || event.longitude == null) return 'Координаты отсутствуют'
+  return `${Number(event.latitude).toFixed(6)}, ${Number(event.longitude).toFixed(6)}`
+}
+
 watch(() => branchStore.activeBranchId, branchId => {
   selectedBranchId.value = branchId || 'all'
 })
@@ -452,8 +461,8 @@ const detailColumns: TableColumn<LateRow>[] = [
               <div v-for="event in locationHistoryEvents" :key="event.id" class="flex flex-col gap-3 rounded-xl border border-charcoal-200 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                   <p class="font-semibold text-charcoal-950">{{ event.barber_name || event.barber_id }}</p>
-                  <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ formatDateTime(event.created_at) }}</p>
-                  <p class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</p>
+                  <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ formatDateTime(locationEventDate(event)) }}</p>
+                  <p class="text-charcoal-500">{{ locationEventCoordinates(event) }} · {{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</p>
                 </div>
                 <UButton v-if="event.latitude != null && event.longitude != null" class="shrink-0" size="sm" color="primary" icon="i-lucide-map" @click="openEventMap(event)">Открыть карту</UButton>
                 <span v-else class="shrink-0 text-xs text-charcoal-400">Координаты отсутствуют</span>

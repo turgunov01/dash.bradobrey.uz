@@ -82,6 +82,8 @@ export type LocationEvent = {
   distance_meters?: number | null
   accuracy_meters?: number | null
   measured_at?: string | null
+  measuredAt?: string | null
+  createdAt?: string | null
   status: 'inside_radius' | 'outside_radius' | 'rejected'
   reason?: string | null
   created_at: string

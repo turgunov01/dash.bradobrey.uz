@@ -177,10 +177,20 @@ export const bannerSchema = z.object({
   created_at: optionalTextSchema
 }).passthrough()
 
+export const loginLocationSchema = z.object({
+  accuracy_meters: z.number().finite().nonnegative().optional().nullable(),
+  client_event_id: z.string().trim().max(120).optional().nullable(),
+  is_mocked: z.boolean().optional().nullable(),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  measured_at: z.string().datetime().optional().nullable()
+}).passthrough()
+
 export const loginSchema = z.object({
   login: z.string().trim().min(1, 'Введите логин'),
   password: z.string().min(1, 'Введите пароль'),
-  branch_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable()
+  branch_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
+  location: loginLocationSchema.optional().nullable()
 })
 
 export const loginResponseSchema = z.object({
@@ -355,6 +365,7 @@ export type HistoryItem = z.infer<typeof historyItemSchema>
 export type PromoCode = z.infer<typeof promoCodeSchema>
 export type BannerItem = z.infer<typeof bannerSchema>
 export type LoginPayload = z.infer<typeof loginSchema>
+export type LoginLocation = z.infer<typeof loginLocationSchema>
 export type BarberRegisterPayload = z.infer<typeof barberRegisterSchema>
 export type BarberUpdatePayload = z.infer<typeof barberUpdateSchema>
 export type QueueUpdatePayload = z.infer<typeof queueUpdateSchema>

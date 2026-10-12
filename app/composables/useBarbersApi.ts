@@ -89,6 +89,7 @@ export function useBarbersApi() {
       return $fetch<BackendLoginResponse>("/api/barbers/login", {
         ...(isLocalDashboard ? {} : { baseURL }),
         body: {
+          ...(payload.location ? { location: payload.location } : {}),
           login: payload.login,
           password: payload.password,
         },
