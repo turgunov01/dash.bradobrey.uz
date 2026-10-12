@@ -365,24 +365,51 @@ async function refreshGeolocationAvailability() {
   catch { /* Some browsers do not expose geolocation permission state. */ }
 }
 
-function useMyLocation() {
-  if (!myLocationAvailable.value || !navigator.geolocation) return
+function getCurrentBrowserLocation(): Promise<{ latitude: number, longitude: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Геолокация недоступна в этом браузере'))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        if (!validMapPoint(coords.latitude, coords.longitude)) {
+          reject(new Error('Браузер вернул некорректные координаты'))
+          return
+        }
+        resolve({ latitude: coords.latitude, longitude: coords.longitude })
+      },
+      reject,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    )
+  })
+}
+
+async function centerOnCurrentLocation(showError = true) {
+  if (!myLocationAvailable.value || !navigator.geolocation) return false
   mapPickerLoading.value = true
-  navigator.geolocation.getCurrentPosition(
-    ({ coords }) => {
-      mapPickerDraft.latitude = coords.latitude.toFixed(6)
-      mapPickerDraft.longitude = coords.longitude.toFixed(6)
-      updateMapPoint(coords.latitude, coords.longitude)
-      mapPickerLoading.value = false
-    },
-    (error) => {
-      mapPickerError.value = error.code === error.PERMISSION_DENIED
+  try {
+    const { latitude, longitude } = await getCurrentBrowserLocation()
+    mapPickerDraft.latitude = latitude.toFixed(6)
+    mapPickerDraft.longitude = longitude.toFixed(6)
+    updateMapPoint(latitude, longitude)
+    return true
+  }
+  catch (error: any) {
+    if (showError) {
+      mapPickerError.value = error?.code === 1
         ? 'Разрешите доступ к местоположению в браузере'
         : 'Не удалось получить ваше местоположение'
-      mapPickerLoading.value = false
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-  )
+    }
+    return false
+  }
+  finally {
+    mapPickerLoading.value = false
+  }
+}
+
+async function useMyLocation() {
+  await centerOnCurrentLocation(true)
 }
 
 function openMapPicker() {
@@ -462,13 +489,13 @@ async function searchMapAddress() {
 function selectMapSearchResult(result: { display_name: string, lat: string, lon: string }) {
   const latitude = Number(result.lat)
   const longitude = Number(result.lon)
-  if (!validMapPoint(latitude, longitude) || !leafletMapInstance.value) return
+  if (!validMapPoint(latitude, longitude)) return
   mapPickerDraft.latitude = latitude.toFixed(6)
   mapPickerDraft.longitude = longitude.toFixed(6)
   mapPickerDraft.address = result.display_name
   mapPickerAddress.value = result.display_name
   mapPickerSearchResults.value = []
-  leafletMapInstance.value.setView([latitude, longitude], 17)
+  leafletMapInstance.value?.setView([latitude, longitude], 17)
 }
 
 async function initializeMapPicker() {
@@ -478,9 +505,10 @@ async function initializeMapPicker() {
     const L = await import('leaflet')
     const latitude = Number(mapPickerDraft.latitude)
     const longitude = Number(mapPickerDraft.longitude)
+    const hasSavedPoint = validMapPoint(latitude, longitude)
     const center: [number, number] = [
-      Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
-      Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
+      hasSavedPoint ? latitude : mapPickerFallback.latitude,
+      hasSavedPoint ? longitude : mapPickerFallback.longitude
     ]
     leafletMapInstance.value = L.map(mapElement, { center, zoom: 16, zoomControl: true })
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -501,6 +529,12 @@ async function initializeMapPicker() {
     mapPickerDraft.longitude = mapCenter.lng.toFixed(6)
     scheduleReverseGeocode(mapCenter.lat, mapCenter.lng)
     await refreshGeolocationAvailability()
+    if (!hasSavedPoint) {
+      await centerOnCurrentLocation(false)
+      if (!myLocationAvailable.value) {
+        mapPickerError.value = 'Разрешите геолокацию, чтобы открыть карту с вашего местоположения. Сейчас показан Ташкент.'
+      }
+    }
   }
   catch (error) {
     mapPickerError.value = error instanceof Error ? error.message : 'Не удалось загрузить карту'
