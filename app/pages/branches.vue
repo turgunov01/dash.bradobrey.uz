@@ -334,21 +334,12 @@ async function resolveGoogleMapsApi() {
     const markerLibrary = await google.maps.importLibrary('marker')
     if (typeof mapsLibrary?.Map !== 'function') throw new Error('Библиотека Google Maps недоступна')
     const advancedMarker = markerLibrary?.AdvancedMarkerElement
-    const legacyMarker = google.maps.Marker
-    if (typeof advancedMarker !== 'function' && typeof legacyMarker !== 'function') {
-      throw new Error('Библиотека маркеров Google Maps недоступна')
-    }
-    return {
-      Map: mapsLibrary.Map,
-      Marker: googleMapsMapId && typeof advancedMarker === 'function' ? advancedMarker : legacyMarker,
-      advancedMarker: Boolean(googleMapsMapId && typeof advancedMarker === 'function')
-    }
+    if (!googleMapsMapId) throw new Error('Для маркера Google Maps требуется настроить Map ID')
+    if (typeof advancedMarker !== 'function') throw new Error('AdvancedMarkerElement недоступен')
+    return { Map: mapsLibrary.Map, Marker: advancedMarker, advancedMarker: true }
   }
 
-  if (typeof google.maps.Map !== 'function' || typeof google.maps.Marker !== 'function') {
-    throw new Error('Конструкторы Google Maps недоступны')
-  }
-  return { Map: google.maps.Map, Marker: google.maps.Marker, advancedMarker: false }
+  throw new Error('Google Maps не поддерживает AdvancedMarkerElement: обновите загрузчик Maps JavaScript API')
 }
 
 function loadGoogleMaps() {
