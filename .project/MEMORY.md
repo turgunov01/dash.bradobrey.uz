@@ -84,3 +84,6 @@
 - Login forwards optional `branch_id` to the external API. If the API returns `BRANCH_SELECTION_REQUIRED`, the login screen renders the authorized branch list and retries only after the employee selects one.
 - The dashboard does not treat its global admin branch selector as employee authorization; the API remains authoritative for employee branch access and active session state.
 - The barber workspace now calls the authenticated branch-switch endpoint, refreshes the bearer token/profile, and displays overall revenue, payout, services, shifts, days, minutes, and branch rows without moving historical operations.
+# Active employee branch display (2026-10-12)
+
+- The employee directory keeps `branch_id` as the permanent assignment for edit forms, but filters and displays by `active_branch_id` when the employee currently works in another branch.

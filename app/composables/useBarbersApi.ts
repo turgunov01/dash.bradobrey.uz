@@ -60,6 +60,7 @@ export function useBarbersApi() {
       return client.request<{
         items: Array<{
           branch_id: string | null;
+          active_branch_id?: string | null;
           id: string;
           is_active?: boolean | null;
           is_archived?: boolean | null;

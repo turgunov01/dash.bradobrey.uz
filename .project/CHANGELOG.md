@@ -116,3 +116,7 @@
 
 - Added the login-time active branch selection flow and forwarded the selected branch through the dashboard login compatibility path.
 - Added an authorized in-workspace branch switcher, branch-specific shift transition handling, and cross-branch work/finance summary in the barber workspace.
+# 2026-10-12
+
+- Employee directory now displays and filters a barber by the persisted active work branch without changing the permanent branch assignment used by employee editing.
+

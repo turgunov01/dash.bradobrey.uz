@@ -33,6 +33,7 @@ const canViewBranchStatistics = computed(() => {
 })
 
 type EmployeeRow = {
+  active_branch_id: string | null
   branch: string
   branch_id: string
   id: string
@@ -600,7 +601,7 @@ const { data, pending, refresh } = await useAsyncData('employees-directory', asy
 
   const responseItems = Array.isArray(response?.items) ? response.items : []
   let items = selectedBranchId
-    ? responseItems.filter(item => String(item.branch_id || '') === selectedBranchId)
+    ? responseItems.filter(item => String(item.active_branch_id || item.branch_id || '') === selectedBranchId)
     : responseItems
 
   if (selectedBranchId && !items.length && !responseItems.length) {
@@ -610,18 +611,20 @@ const { data, pending, refresh } = await useAsyncData('employees-directory', asy
       mode: 'employees'
     })
     const fallbackItems = Array.isArray(fallbackResponse?.items) ? fallbackResponse.items : []
-    items = fallbackItems.filter(item => String(item.branch_id || '') === selectedBranchId)
+    items = fallbackItems.filter(item => String(item.active_branch_id || item.branch_id || '') === selectedBranchId)
   }
 
   const rows: EmployeeRow[] = items.map((item) => {
     const branchId = String(item.branch_id || '')
+    const activeBranchId = item.active_branch_id ? String(item.active_branch_id) : null
     const login = item.login || 'Без логина'
     const role = String(item.role || 'barber')
     const permissions = Array.isArray(item.permissions) ? item.permissions : []
 
     return {
-      branch: branchMap.value.get(branchId) || 'Не указан',
+      branch: branchMap.value.get(activeBranchId || branchId) || 'Не указан',
       branch_id: branchId,
+      active_branch_id: activeBranchId,
       id: String(item.id),
       is_active: item.is_active !== false,
       is_archived: item.is_archived === true,
