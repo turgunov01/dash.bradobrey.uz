@@ -17,11 +17,13 @@ type LoginResult = {
   authenticated: boolean
   token?: string
   user: Record<string, any> | null
+  branches?: Array<Record<string, any>>
 }
 
 type LegacyLoginResponse = {
   token?: string | null
   user?: Record<string, any> | null
+  branches?: Array<Record<string, any>>
 }
 
 const dashboardLoginRoles = new Set<string>(marketplaceMerchantRoles)
@@ -204,6 +206,7 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
     password: payload.password,
     ...(payload.location ? { location: payload.location } : {})
   }
+  if (payload.branch_id) Object.assign(body, { branch_id: payload.branch_id })
 
   logBackendLoginRequest(event, path, payload, 'primary')
 
@@ -228,7 +231,8 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
 
   logBackendLoginResponse(path, response.status, response.data || {}, 'primary')
 
-  const { token, rawUser } = assertBackendLoginResponse(response.data || {})
+  const backendData = response.data || {}
+  const { token, rawUser } = assertBackendLoginResponse(backendData)
   const accessUser = assertDashboardAccessUser(rawUser)
   const user = buildDashboardLoginUser(rawUser, accessUser, payload.login)
   const role = normalizeText(user.role).toLowerCase()
@@ -245,7 +249,8 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
   return {
     authenticated: true,
     token,
-    user
+    user,
+    branches: backendData.branches || undefined
   }
 }
 

@@ -15,6 +15,7 @@ import type {
 type BackendLoginResponse = {
   token?: string;
   user?: BarberUser | null;
+  branches?: Array<{ id: string; name: string }>;
 };
 
 export type PendingQueueTransfer = {
@@ -89,6 +90,7 @@ export function useBarbersApi() {
       return $fetch<BackendLoginResponse>("/api/barbers/login", {
         ...(isLocalDashboard ? {} : { baseURL }),
         body: {
+          ...(payload.branch_id ? { branch_id: payload.branch_id } : {}),
           ...(payload.location ? { location: payload.location } : {}),
           login: payload.login,
           password: payload.password,

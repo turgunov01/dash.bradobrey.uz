@@ -16,9 +16,12 @@ const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
 
 const form = reactive({
+  branch_id: undefined as string | undefined,
   login: '',
   password: ''
 })
+
+const branchOptions = ref<Array<{ id: string; name: string }>>([])
 
 const fieldErrors = reactive({
   login: '',
@@ -102,6 +105,11 @@ function applyFieldErrors(issues: ZodIssue[]) {
 async function submit() {
   resetFieldErrors()
 
+  if (branchOptions.value.length && !form.branch_id) {
+    fieldErrors.password = 'Выберите филиал, в котором вы сегодня работаете.'
+    return
+  }
+
   const parsed = loginSchema.safeParse(form)
 
   if (!parsed.success) {
@@ -166,6 +174,12 @@ async function submit() {
     })
 
     const errorBody = error?.data || error?.response?._data
+    if (errorBody?.code === 'BRANCH_SELECTION_REQUIRED' && Array.isArray(errorBody.branches)) {
+      branchOptions.value = errorBody.branches.filter((branch: any) => branch?.id && branch?.name)
+      fieldErrors.password = 'Выберите филиал, в котором вы сегодня работаете.'
+      if (!form.branch_id && branchOptions.value.length === 1) form.branch_id = String(branchOptions.value[0]?.id)
+      return
+    }
     const apiError = errorBody?.data?.error || errorBody?.error || errorBody?.message
     fieldErrors.password = apiError === 'Employee access has been revoked'
       ? 'Доступ сотрудника отозван. Обратитесь к администратору для восстановления.'
@@ -195,6 +209,15 @@ async function submit() {
       <UFormField label="Пароль" name="password" :error="fieldErrors.password">
         <UInput v-model="form.password" autocomplete="current-password" class="w-full" placeholder="Введите пароль"
           type="password" />
+      </UFormField>
+
+      <UFormField v-if="branchOptions.length" label="Рабочий филиал" name="branch_id" :error="fieldErrors.password">
+        <USelectMenu
+          v-model="form.branch_id"
+          :items="branchOptions.map(branch => ({ label: branch.name, value: String(branch.id) }))"
+          value-key="value"
+          class="w-full"
+          placeholder="Выберите филиал" />
       </UFormField>
 
       <div class="pt-1">
