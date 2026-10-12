@@ -2,6 +2,7 @@
 
 ## 2026-10-12
 
+- Fixed the backend login-location audit gap: successful barber logins on branches without an enabled geocontrol policy now remain visible as explicit `LOCATION_NOT_CONFIGURED` audit events, and missing/invalid geolocation attempts are persisted without fabricated coordinates before enforcement rejects them. Added backend regression tests and deployed/restarted only the API process.
 - Replaced the billing-dependent Google Maps branch picker with a Leaflet + OpenStreetMap picker using a fixed center pin, explicit Nominatim search/reverse geocoding, browser geolocation, rate limiting, and the existing coordinate-save contract. New branch pickers now start from the browser location when permission is available, and address search moves the map to the selected address; Tashkent is the safe fallback.
 - Made SSR-sensitive current date/period defaults use the explicit `Asia/Tashkent` timezone across dashboard pages and workspaces, reducing server/browser hydration drift.
 - Added a strict map-container element check before Google Maps picker initialization.

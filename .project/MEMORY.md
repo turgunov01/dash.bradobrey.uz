@@ -71,4 +71,6 @@
 
 - Added branch geolocation policy editing and PII-minimized login-location event history to the existing Branches page through authenticated Nitro BFF routes. Backend migration/deployment remains a separate release step.
 - Verifix location history now has a per-event "Карта" action. The modal renders an OpenStreetMap view with the device entry point and branch coordinates; it requires coordinates returned by the protected admin location-events endpoint.
+- Production diagnosis on 2026-10-12 found the backend login path skipped `barber_login_location_events` entirely when a branch had no enabled location policy (`event: null`), so successful barber logins were invisible in the history. The API now persists an auditable `rejected` row with reason `LOCATION_NOT_CONFIGURED` while preserving the existing successful-login behavior. Missing/invalid geolocation is also persisted with null device coordinates and an explicit reason before a required-location rejection; no coordinates are fabricated.
+- Production verification on 2026-10-12: Tashkent-day query returned 131 location rows (1 inside, 1 outside, 129 rejected, mostly historical `LOCATION_NOT_CONFIGURED`); the authenticated API returned HTTP 200 with rows; API health returned 200. API PM2 was restarted independently from the Dashboard.
 
