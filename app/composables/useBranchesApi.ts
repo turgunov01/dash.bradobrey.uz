@@ -77,6 +77,7 @@ export type LocationEvent = {
   longitude?: number | null
   branch_latitude?: number | null
   branch_longitude?: number | null
+  radius_meters?: number | null
   barber_name?: string | null
   branch_name?: string | null
   distance_meters?: number | null
