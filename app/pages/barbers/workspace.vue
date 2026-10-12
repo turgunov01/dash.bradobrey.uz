@@ -31,6 +31,7 @@ const availableBranches = computed(() => {
 })
 const selectedBranchId = computed(() => String((sessionStore.barber as any)?.active_branch_id || sessionStore.barber?.branch_id || ''))
 const workStatistics = computed(() => (data.value?.me?.barber as any)?.statistics || { totals: {}, branches: [] })
+const workFinance = computed(() => workStatistics.value.finance || { totals: {} })
 
 async function switchBranch(branchId: string) {
   if (!branchId || branchId === selectedBranchId.value || switchingBranch.value) return
@@ -346,8 +347,9 @@ function openItem(item: any) {
               <h2 class="barbershop-heading text-2xl text-charcoal-950">Общая статистика по всем филиалам</h2>
             </div>
           </template>
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <DashboardMetricCard label="Заработок" :value="formatMoney(workStatistics.totals.revenue || 0)" />
+            <DashboardMetricCard label="К выплате" :value="formatMoney(workFinance.totals.payout || 0)" />
             <DashboardMetricCard label="Услуги" :value="workStatistics.totals.services || 0" />
             <DashboardMetricCard label="Смены" :value="workStatistics.totals.shifts || 0" />
             <DashboardMetricCard label="Дни" :value="workStatistics.totals.worked_days || 0" />
