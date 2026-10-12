@@ -128,6 +128,7 @@ const eventMapOpen = ref(false)
 const eventMapElement = ref<HTMLElement | null>(null)
 const eventMapInstance = ref<any>(null)
 const eventMapEvent = ref<LocationEvent | null>(null)
+const eventMapLoading = ref(false)
 const mapPickerDraft = reactive({ address: '', latitude: '', longitude: '' })
 let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null
 let reverseGeocodeRequestId = 0
@@ -147,6 +148,8 @@ function validEventCoordinates(event: LocationEvent) {
 function locationEventStatusLabel(event: LocationEvent) {
   return event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён'
 }
+
+const outsideRadiusEvents = computed(() => locationEvents.value.filter(event => event.status === 'outside_radius'))
 
 const form = reactive({
   id: '',
@@ -349,6 +352,7 @@ async function openEventMap(event: LocationEvent) {
     return
   }
   eventMapEvent.value = event
+  eventMapLoading.value = true
   locationOpen.value = false
   eventMapOpen.value = true
 }
@@ -369,41 +373,57 @@ function createEventPopup(event: LocationEvent) {
 async function initializeEventMap() {
   const event = eventMapEvent.value
   if (eventMapInstance.value || !event || !eventMapElement.value || !validEventCoordinates(event)) return
-  const L = await import('leaflet')
-  const latitude = Number(event.latitude)
-  const longitude = Number(event.longitude)
-  const map = L.map(eventMapElement.value, { center: [latitude, longitude], zoom: 17, zoomControl: true })
-  eventMapInstance.value = map
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
-  }).addTo(map)
-  const employeeMarker = L.marker([latitude, longitude], { zIndexOffset: 1000 })
-    .bindPopup(createEventPopup(event))
-    .addTo(map)
-  employeeMarker.openPopup()
+  try {
+    const L = await import('leaflet')
+    const latitude = Number(event.latitude)
+    const longitude = Number(event.longitude)
+    const map = L.map(eventMapElement.value, { center: [latitude, longitude], zoom: 17, zoomControl: true })
+    eventMapInstance.value = map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map)
+    const markerColor = event.status === 'outside_radius' ? '#dc2626' : event.status === 'inside_radius' ? '#16a34a' : '#64748b'
+    const employeeMarker = L.marker([latitude, longitude], {
+      zIndexOffset: 1000,
+      icon: L.divIcon({
+        className: 'geocontrol-event-marker',
+        html: `<span style="display:block;width:22px;height:22px;border:4px solid white;border-radius:9999px;background:${markerColor};box-shadow:0 2px 8px rgb(0 0 0 / 35%)"></span>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      })
+    }).bindPopup(createEventPopup(event)).addTo(map)
+    employeeMarker.openPopup()
 
-  const branchLatitude = Number(locationForm.latitude || event.branch_latitude)
-  const branchLongitude = Number(locationForm.longitude || event.branch_longitude)
-  const radius = Number(locationForm.radius_meters || event.radius_meters)
-  if (validMapPoint(branchLatitude, branchLongitude)) {
-    L.marker([branchLatitude, branchLongitude]).bindPopup('Контрольная точка филиала').addTo(map)
-    if (Number.isFinite(radius) && radius > 0) {
-      L.circle([branchLatitude, branchLongitude], {
-        radius,
-        color: '#d97706',
-        fillColor: '#f59e0b',
-        fillOpacity: 0.16,
-        weight: 2
-      }).bindPopup(`Разрешённый радиус: ${Math.round(radius)} м`).addTo(map)
+    const branchLatitude = Number(locationForm.latitude || event.branch_latitude)
+    const branchLongitude = Number(locationForm.longitude || event.branch_longitude)
+    const radius = Number(locationForm.radius_meters || event.radius_meters)
+    if (validMapPoint(branchLatitude, branchLongitude)) {
+      L.marker([branchLatitude, branchLongitude]).bindPopup('Контрольная точка филиала').addTo(map)
+      if (Number.isFinite(radius) && radius > 0) {
+        L.circle([branchLatitude, branchLongitude], {
+          radius,
+          color: '#d97706',
+          fillColor: '#f59e0b',
+          fillOpacity: 0.16,
+          weight: 2
+        }).bindPopup(`Разрешённый радиус: ${Math.round(radius)} м`).addTo(map)
+      }
     }
+    requestAnimationFrame(() => map.invalidateSize())
   }
-  requestAnimationFrame(() => map.invalidateSize())
+  catch {
+    apiClient.notifyError(new Error('Не удалось загрузить карту'))
+  }
+  finally {
+    eventMapLoading.value = false
+  }
 }
 
 function destroyEventMap() {
   eventMapInstance.value?.remove()
   eventMapInstance.value = null
+  eventMapLoading.value = false
 }
 
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
@@ -988,6 +1008,7 @@ async function removeBranch(row: BranchRow) {
             <div class="flex justify-end"><UButton :loading="locationSubmitting" icon="i-lucide-save" @click="saveLocation">Сохранить локацию</UButton></div>
             <div class="border-t border-charcoal-200 pt-4">
               <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
+              <UAlert v-if="outsideRadiusEvents.length" class="mb-3" color="error" variant="soft" icon="i-lucide-triangle-alert" title="Обнаружен вход вне радиуса" :description="`${outsideRadiusEvents.length} ${outsideRadiusEvents.length === 1 ? 'событие требует' : 'события требуют'} внимания. Нажмите на сотрудника, чтобы открыть карту.`" />
               <div v-if="locationEvents.length" class="space-y-2">
                 <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!validEventCoordinates(event)" @click="openEventMap(event)">
                   <span>{{ event.barber_name || event.barber_id }} · {{ locationEventStatusLabel(event) }}</span>
@@ -1006,6 +1027,7 @@ async function removeBranch(row: BranchRow) {
           <div v-if="eventMapEvent" class="space-y-4">
             <div class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
               <div ref="eventMapElement" class="absolute inset-0" />
+              <div v-if="eventMapLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
             </div>
             <div class="grid gap-3 text-sm sm:grid-cols-3">
               <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ eventMapEvent.barber_name || eventMapEvent.barber_id }}</p></div>
