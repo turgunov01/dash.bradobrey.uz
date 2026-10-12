@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { employeeRolePermissionPresets, type EmployeePermission } from '~~/shared/auth/employees'
-import { formatMoney } from '~/utils/format'
+import { currentDateInputValue, formatMoney } from '~/utils/format'
 import { calculateMinutePenalty } from '~/utils/penalty'
 
 type Option = { label: string; value: string }
@@ -49,7 +49,7 @@ const sourceFilter = ref(ALL)
 const statusFilter = ref(ALL)
 const modalOpen = ref(false)
 const submitting = ref(false)
-const form = reactive({ branch_id: '', recipient_id: '', amount: '', penalty_at: new Date().toISOString().slice(0, 10), comment: '' })
+const form = reactive({ branch_id: '', recipient_id: '', amount: '', penalty_at: currentDateInputValue(), comment: '' })
 
 const branchOptions = computed<Option[]>(() => [
   { label: 'Все филиалы', value: ALL },
@@ -100,7 +100,12 @@ function displayDateTime(value: unknown) {
   if (!result) return '—'
   const parsed = new Date(result)
   if (Number.isNaN(parsed.getTime())) return result
-  return `${parsed.toLocaleDateString('ru-RU')} ${parsed.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+  const formatter = new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Asia/Tashkent'
+  })
+  return formatter.format(parsed)
 }
 function extract(value: any): any[] { return Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : Array.isArray(value?.data) ? value.data : [] }
 function rowAmount(item: any) {
@@ -168,7 +173,7 @@ function openCreate() {
     : ''
   form.recipient_id = employeeOptions.value[0]?.value || ''
   form.amount = ''
-  form.penalty_at = new Date().toISOString().slice(0, 10)
+  form.penalty_at = currentDateInputValue()
   form.comment = ''
   modalOpen.value = true
 }

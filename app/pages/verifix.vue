@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { calculateMinutePenalty } from '~/utils/penalty'
-import { formatDateTime, formatMoney } from '~/utils/format'
+import { currentDateInputValue, formatDateTime, formatMoney } from '~/utils/format'
 import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -108,16 +108,17 @@ function isLoginEvent(event: VerifixEvent) {
 }
 
 function formatDate(value: Date) {
-  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(value)
+  return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Tashkent', year: 'numeric' }).format(value)
 }
 
 function formatTime(value: Date) {
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(value)
+  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', hourCycle: 'h23', minute: '2-digit', timeZone: 'Asia/Tashkent' }).format(value)
 }
 
-const now = new Date()
-const fromDate = ref(dateInputValue(new Date(now.getFullYear(), now.getMonth(), 1)))
-const toDate = ref(dateInputValue(now))
+const toDateValue = currentDateInputValue()
+const [currentYear, currentMonth] = toDateValue.split('-').map(Number)
+const fromDate = ref(`${currentYear}-${String(currentMonth).padStart(2, '0')}-01`)
+const toDate = ref(toDateValue)
 const selectedBranchId = ref<string>(branchStore.activeBranchId || 'all')
 const locationOpen = ref(false)
 const locationPending = ref(false)

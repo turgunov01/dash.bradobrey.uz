@@ -8,7 +8,7 @@ import {
   getBranchBarbershopId,
   normalizeBranchText
 } from '~/utils/branchDisplay'
-import { formatCount, formatDateTime, formatMoney } from '~/utils/format'
+import { currentPeriodKey, formatCount, formatDateTime, formatMoney } from '~/utils/format'
 import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 import { flattenServicesPayload } from '~/utils/services'
 import type { VerifixSchedule } from '~/composables/useVerifixApi'
@@ -230,14 +230,6 @@ const branchMap = computed(() =>
     formatBranchAttachmentLabel(branch, marketplaceBarbershopNames.value)
   ]))
 )
-
-function currentPeriodKey() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-
-  return `${year}-${month}`
-}
 
 function currentPeriodRange() {
   const [yearPart, monthPart] = currentPeriodKey().split('-')

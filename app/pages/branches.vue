@@ -401,7 +401,7 @@ function loadGoogleMaps() {
 
 async function waitForMapPickerElement() {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (mapPickerElement.value) return mapPickerElement.value
+    if (mapPickerElement.value instanceof HTMLElement) return mapPickerElement.value
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
   }
   throw new Error('Map container was not rendered')

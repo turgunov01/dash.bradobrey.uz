@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-import { formatCount, formatMoney } from '~/utils/format'
+import { currentDateInputValue, currentPeriodKey, formatCount, formatMoney } from '~/utils/format'
 
 type Option = {
   label: string
@@ -33,14 +33,6 @@ const branchStore = useBranchStore()
 const apiClient = useApiClient()
 
 await branchStore.ensureLoaded()
-
-function currentPeriodKey() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-
-  return `${year}-${month}`
-}
 
 function normalizeText(value: unknown) {
   if (value === undefined || value === null) return null
@@ -184,7 +176,7 @@ const purchaseColumns: TableColumn<PurchaseRow>[] = [
 function resetPurchaseForm() {
   purchaseForm.branch_id = branchStore.activeBranchId || branchOptions.value[0]?.value || ''
   purchaseForm.position_id = positionOptions.value[0]?.value || ''
-  purchaseForm.purchased_at = new Date().toISOString().slice(0, 10)
+  purchaseForm.purchased_at = currentDateInputValue()
   purchaseForm.quantity = 1
   purchaseForm.status = 'ordered'
   purchaseForm.supplier = ''
@@ -214,7 +206,7 @@ function openEditPurchase(row: PurchaseRow) {
   editingPurchaseId.value = row.id
   purchaseForm.branch_id = row.branch_id || branchStore.activeBranchId || ''
   purchaseForm.position_id = row.position_id || ''
-  purchaseForm.purchased_at = row.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)
+  purchaseForm.purchased_at = row.created_at?.slice(0, 10) || currentDateInputValue()
   purchaseForm.quantity = row.quantity
   purchaseForm.status = row.status || 'draft'
   purchaseForm.supplier = row.supplier || ''

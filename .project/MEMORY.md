@@ -63,6 +63,7 @@
 - Location event timestamps must use an explicit timezone/locale in SSR-rendered templates; direct `toLocaleString()` can cause hydration mismatches between Node and the browser.
 
 - Production smoke test on 2026-10-12 reached the configured Google Maps JavaScript endpoint, but Google returned `ApiNotActivatedMapError` for the active browser key. This is a Google Cloud configuration blocker, not a dashboard transport/SSR failure. After enabling Maps JavaScript API, re-run the branch picker smoke test; the loader now times out, cleans up callbacks, and permits retry after failed initialization.
+- The related `IntersectionObserver.observe(...): parameter 1 is not of type Element` seen in the same browser session is emitted by Google Maps `main.js` while its API initialization is rejected; the Dashboard has no direct IntersectionObserver usage. The picker now additionally requires `mapPickerElement` to be an actual `HTMLElement` before initialization. Treat this as a secondary symptom until the browser key's Maps JavaScript API is enabled.
 - Branches and Verifix location-event timestamps now use the shared `formatDateTime()` helper with `Asia/Tashkent`; do not use bare `Date#toLocaleString()` in SSR-rendered templates.
 
 ## Barber transfer realtime (2026-10-11)

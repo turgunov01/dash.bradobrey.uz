@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { employeeRolePermissionPresets, type EmployeePermission } from '~~/shared/auth/employees'
-import { formatMoney } from '~/utils/format'
+import { currentDateInputValue, formatMoney } from '~/utils/format'
 
 type Option = { label: string; value: string }
 const ALL_OPTION_VALUE = '__all__'
@@ -48,9 +48,7 @@ function extractItems(value: unknown): Record<string, any>[] {
 }
 
 function currentDate() {
-  const date = new Date()
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+  return currentDateInputValue()
 }
 
 function dateOnly(value: unknown) {

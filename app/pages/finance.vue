@@ -3,7 +3,7 @@ import { calculateMinutePenalty } from '~/utils/penalty'
 import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
-import { formatCount, formatMoney } from '~/utils/format'
+import { currentPeriodKey, formatCount, formatMoney } from '~/utils/format'
 import { flattenServicesPayload, type FlatServiceItem } from '~/utils/services'
 import type { VerifixEvent } from '~/composables/useVerifixApi'
 
@@ -51,14 +51,6 @@ const { data: penaltySettings, error: penaltySettingsError, refresh: refreshPena
 const apiClient = useApiClient()
 
 await branchStore.ensureLoaded()
-
-function currentPeriodKey() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-
-  return `${year}-${month}`
-}
 
 function normalizeNumber(value: unknown, fallback = 0) {
   const amount = Number(value)
@@ -136,9 +128,11 @@ function getPeriodRange(key: string) {
   const [yearPart = '', monthPart = ''] = key.split('-')
   const yearRaw = Number(yearPart)
   const monthRaw = Number(monthPart)
-  const now = new Date()
-  const year = Number.isInteger(yearRaw) && yearRaw > 0 ? yearRaw : now.getFullYear()
-  const month = Number.isInteger(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : now.getMonth() + 1
+  const fallbackPeriod = currentPeriodKey()
+  const fallbackYear = Number(fallbackPeriod.slice(0, 4))
+  const fallbackMonth = Number(fallbackPeriod.slice(5, 7))
+  const year = Number.isInteger(yearRaw) && yearRaw > 0 ? yearRaw : fallbackYear
+  const month = Number.isInteger(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : fallbackMonth
   const monthKey = String(month).padStart(2, '0')
   const lastDay = new Date(year, month, 0).getDate()
 

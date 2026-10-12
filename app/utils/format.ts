@@ -16,6 +16,33 @@ export function formatDateTime(value?: string | null) {
   }).format(date)
 }
 
+const DASHBOARD_TIME_ZONE = 'Asia/Tashkent'
+
+function datePartsInTimeZone(value = new Date(), timeZone = DASHBOARD_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric'
+  }).formatToParts(value)
+
+  return {
+    day: parts.find(part => part.type === 'day')?.value || '01',
+    month: parts.find(part => part.type === 'month')?.value || '01',
+    year: parts.find(part => part.type === 'year')?.value || '2000'
+  }
+}
+
+export function currentDateInputValue(timeZone = DASHBOARD_TIME_ZONE) {
+  const { day, month, year } = datePartsInTimeZone(new Date(), timeZone)
+  return `${year}-${month}-${day}`
+}
+
+export function currentPeriodKey(timeZone = DASHBOARD_TIME_ZONE) {
+  const { month, year } = datePartsInTimeZone(new Date(), timeZone)
+  return `${year}-${month}`
+}
+
 export function formatMoney(value?: number | string | null, currency = 'UZS') {
   const amount = Number(value || 0)
 

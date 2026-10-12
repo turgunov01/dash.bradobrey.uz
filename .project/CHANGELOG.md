@@ -2,6 +2,10 @@
 
 ## 2026-10-12
 
+- Made SSR-sensitive current date/period defaults use the explicit `Asia/Tashkent` timezone across dashboard pages and workspaces, reducing server/browser hydration drift.
+- Added a strict map-container element check before Google Maps picker initialization.
+- Documented that the remaining `ApiNotActivatedMapError` and related observer exception require Google Cloud Maps JavaScript API activation for the configured browser key.
+
 - Fixed SSR hydration drift in branch and Verifix location-event timestamps by formatting dates with the explicit `Asia/Tashkent` timezone. Google Maps initialization remains blocked until `Maps JavaScript API` is enabled for the configured browser key; the picker reports that configuration error and can be retried after the key is corrected.
 
 ## 2026-10-11
