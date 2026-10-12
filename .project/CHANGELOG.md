@@ -2,6 +2,7 @@
 
 ## 2026-10-12
 
+- Replaced the billing-dependent Google Maps branch picker with a Leaflet + OpenStreetMap picker using a fixed center pin, explicit Nominatim search/reverse geocoding, browser geolocation, rate limiting, and the existing coordinate-save contract.
 - Made SSR-sensitive current date/period defaults use the explicit `Asia/Tashkent` timezone across dashboard pages and workspaces, reducing server/browser hydration drift.
 - Added a strict map-container element check before Google Maps picker initialization.
 - Documented that the remaining `ApiNotActivatedMapError` and related observer exception require Google Cloud Maps JavaScript API activation for the configured browser key.

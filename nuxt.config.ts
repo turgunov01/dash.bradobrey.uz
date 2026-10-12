@@ -166,8 +166,6 @@ export default defineNuxtConfig({
       // explicit NUXT_* name for production runtime overrides, while also
       // accepting VAPID_PUBLIC_KEY in deployments that share the API env.
       vapidPublicKey: env.NUXT_PUBLIC_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY || '',
-      googleMapsApiKey: env.NUXT_PUBLIC_GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY || '',
-      googleMapsMapId: env.NUXT_PUBLIC_GOOGLE_MAPS_MAP_ID || env.GOOGLE_MAPS_MAP_ID || ''
     }
   },
 

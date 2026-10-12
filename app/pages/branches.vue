@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { VerifixSchedule } from '~/composables/useVerifixApi'
 import type { BranchLocation, LocationEvent } from '~/composables/useBranchesApi'
 import { formatDateTime } from '~/utils/format'
+import 'leaflet/dist/leaflet.css'
 
 import type { Branch } from '~~/shared/schemas'
 import { branchFormSchema, branchSchema } from '~~/shared/schemas'
@@ -118,11 +119,15 @@ const mapPickerElement = ref<HTMLElement | null>(null)
 const mapPickerLoading = ref(false)
 const mapPickerError = ref('')
 const myLocationAvailable = ref(false)
-const googleMapInstance = ref<any>(null)
-const googleMapMarker = ref<any>(null)
-const googleMapMarkerIsAdvanced = ref(false)
-let googleMapsLoader: Promise<any> | null = null
-const mapPickerDraft = reactive({ latitude: '', longitude: '' })
+const mapPickerSearching = ref(false)
+const mapPickerAddress = ref('')
+const mapPickerSearchQuery = ref('')
+const mapPickerSearchResults = ref<Array<{ display_name: string, lat: string, lon: string }>>([])
+const leafletMapInstance = ref<any>(null)
+const mapPickerDraft = reactive({ address: '', latitude: '', longitude: '' })
+let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null
+let reverseGeocodeRequestId = 0
+let nominatimLastRequestAt = 0
 const locationForm = reactive({ latitude: '', longitude: '', radius_meters: 1000, is_enabled: false })
 
 const form = reactive({
@@ -321,75 +326,6 @@ async function saveLocation() {
 }
 
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
-const publicRuntimeConfig = useRuntimeConfig().public
-const googleMapsApiKey = String(publicRuntimeConfig.googleMapsApiKey || '').trim()
-const googleMapsMapId = String(publicRuntimeConfig.googleMapsMapId || '').trim()
-
-async function resolveGoogleMapsApi() {
-  const google = (window as any).google
-  if (!google?.maps) throw new Error('Google Maps загружена без Maps JavaScript API')
-
-  if (typeof google.maps.importLibrary === 'function') {
-    const mapsLibrary = await google.maps.importLibrary('maps')
-    const markerLibrary = await google.maps.importLibrary('marker')
-    if (typeof mapsLibrary?.Map !== 'function') throw new Error('Библиотека Google Maps недоступна')
-    const advancedMarker = markerLibrary?.AdvancedMarkerElement
-    if (!googleMapsMapId) throw new Error('Для маркера Google Maps требуется настроить Map ID')
-    if (typeof advancedMarker !== 'function') throw new Error('AdvancedMarkerElement недоступен')
-    return { Map: mapsLibrary.Map, Marker: advancedMarker, advancedMarker: true }
-  }
-
-  throw new Error('Google Maps не поддерживает AdvancedMarkerElement: обновите загрузчик Maps JavaScript API')
-}
-
-function loadGoogleMaps() {
-  if (typeof window !== 'undefined' && (window as any).google?.maps) return resolveGoogleMapsApi()
-  if (googleMapsLoader) return googleMapsLoader
-  if (!googleMapsApiKey) return Promise.reject(new Error('Google Maps API key is not configured'))
-
-  googleMapsLoader = new Promise((resolve, reject) => {
-    const callbackName = `__bradobreyGoogleMapsLoaded_${Date.now()}`
-    const previousAuthFailure = (window as any).gm_authFailure
-    let settled = false
-    let timeout = 0
-    const cleanup = () => {
-      window.clearTimeout(timeout)
-      delete (window as any)[callbackName]
-      if ((window as any).gm_authFailure === authFailure) {
-        if (previousAuthFailure) (window as any).gm_authFailure = previousAuthFailure
-        else delete (window as any).gm_authFailure
-      }
-    }
-    const finish = (callback: (value: any) => void, value: any) => {
-      if (settled) return
-      settled = true
-      cleanup()
-      callback(value)
-    }
-    const authFailure = () => {
-      previousAuthFailure?.()
-      finish(reject, new Error('Google Maps отклонила API-ключ. Проверьте Maps JavaScript API и ограничения домена.'))
-    }
-    ;(window as any).gm_authFailure = authFailure
-    ;(window as any)[callbackName] = () => {
-      resolveGoogleMapsApi().then(value => finish(resolve, value), error => finish(reject, error))
-    }
-    timeout = window.setTimeout(() => {
-      finish(reject, new Error('Google Maps не ответила. Проверьте активацию Maps JavaScript API, billing и ограничения домена.'))
-    }, 15000)
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&v=weekly&loading=async&libraries=marker&callback=${callbackName}`
-    script.async = true
-    script.defer = true
-    script.onerror = () => finish(reject, new Error('Не удалось загрузить Google Maps. Проверьте сеть и CSP.'))
-    document.head.appendChild(script)
-  })
-  googleMapsLoader.catch(() => {
-    googleMapsLoader = null
-  })
-  return googleMapsLoader
-}
-
 async function waitForMapPickerElement() {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     if (mapPickerElement.value instanceof HTMLElement) return mapPickerElement.value
@@ -405,40 +341,18 @@ function validMapPoint(latitude: unknown, longitude: unknown) {
 }
 
 function updateMapPoint(latitude: number, longitude: number, pan = true) {
-  if (!googleMapInstance.value || !googleMapMarker.value) return
-  const point = { lat: latitude, lng: longitude }
-  if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.position = point
-  else googleMapMarker.value.setPosition(point)
-  if (pan) googleMapInstance.value.panTo(point)
-}
-
-function readMarkerPoint(event: any) {
-  const position = event?.latLng || event?.target?.position || googleMapMarker.value?.position
-  if (!position) return null
-  const latitude = typeof position.lat === 'function' ? position.lat() : Number(position.lat)
-  const longitude = typeof position.lng === 'function' ? position.lng() : Number(position.lng)
-  return validMapPoint(latitude, longitude) ? { latitude, longitude } : null
-}
-
-function applyMarkerPoint(event: any) {
-  const point = readMarkerPoint(event)
-  if (!point) return
-  mapPickerDraft.latitude = point.latitude.toFixed(6)
-  mapPickerDraft.longitude = point.longitude.toFixed(6)
-  updateMapPoint(point.latitude, point.longitude, false)
+  if (!leafletMapInstance.value) return
+  if (pan) leafletMapInstance.value.panTo([latitude, longitude])
 }
 
 function destroyMapPicker() {
-  if (googleMapMarker.value) {
-    try {
-      if (googleMapMarkerIsAdvanced.value) googleMapMarker.value.map = null
-      else googleMapMarker.value.setMap?.(null)
-    }
-    catch { /* Google can throw while detaching a marker after a failed load. */ }
-  }
-  googleMapMarker.value = null
-  googleMapMarkerIsAdvanced.value = false
-  googleMapInstance.value = null
+  if (reverseGeocodeTimer) clearTimeout(reverseGeocodeTimer)
+  reverseGeocodeTimer = null
+  reverseGeocodeRequestId += 1
+  leafletMapInstance.value?.remove()
+  leafletMapInstance.value = null
+  mapPickerSearchResults.value = []
+  mapPickerSearching.value = false
 }
 
 async function refreshGeolocationAvailability() {
@@ -472,11 +386,15 @@ function useMyLocation() {
 }
 
 function openMapPicker() {
+  mapPickerSearchQuery.value = ''
+  mapPickerSearchResults.value = []
+  mapPickerAddress.value = ''
+  mapPickerError.value = ''
   mapPickerDraft.latitude = locationForm.latitude
   mapPickerDraft.longitude = locationForm.longitude
+  mapPickerDraft.address = ''
   mapPickerOpen.value = true
   mapPickerLoading.value = true
-  mapPickerError.value = ''
 }
 
 function applyMapPicker() {
@@ -486,39 +404,106 @@ function applyMapPicker() {
   mapPickerOpen.value = false
 }
 
+async function waitForNominatimSlot() {
+  const delay = Math.max(0, 1100 - (Date.now() - nominatimLastRequestAt))
+  if (delay) await new Promise(resolve => setTimeout(resolve, delay))
+  nominatimLastRequestAt = Date.now()
+}
+
+async function nominatimRequest(path: string, params: Record<string, string>) {
+  await waitForNominatimSlot()
+  const query = new URLSearchParams({ format: 'jsonv2', 'accept-language': 'ru', ...params })
+  const response = await fetch(`https://nominatim.openstreetmap.org/${path}?${query.toString()}`, {
+    headers: { Accept: 'application/json' }
+  })
+  if (!response.ok) throw new Error(`Геокодер недоступен (${response.status})`)
+  return response.json()
+}
+
+function scheduleReverseGeocode(latitude: number, longitude: number) {
+  if (reverseGeocodeTimer) clearTimeout(reverseGeocodeTimer)
+  const requestId = ++reverseGeocodeRequestId
+  reverseGeocodeTimer = setTimeout(async () => {
+    try {
+      const result = await nominatimRequest('reverse', { lat: String(latitude), lon: String(longitude), zoom: '18' })
+      if (requestId !== reverseGeocodeRequestId) return
+      const address = typeof result?.display_name === 'string' ? result.display_name : ''
+      mapPickerAddress.value = address
+      mapPickerDraft.address = address
+      if (!address) mapPickerError.value = 'Адрес для выбранной точки не найден. Координаты можно подтвердить.'
+    }
+    catch {
+      if (requestId === reverseGeocodeRequestId) mapPickerError.value = 'Не удалось определить адрес. Координаты можно подтвердить без адреса.'
+    }
+  }, Math.max(0, 1100 - (Date.now() - nominatimLastRequestAt)))
+}
+
+async function searchMapAddress() {
+  const query = mapPickerSearchQuery.value.trim()
+  if (query.length < 3) {
+    mapPickerError.value = 'Введите минимум 3 символа для поиска адреса'
+    return
+  }
+  mapPickerSearching.value = true
+  mapPickerError.value = ''
+  try {
+    const results = await nominatimRequest('search', { q: query, limit: '5', countrycodes: 'uz' })
+    mapPickerSearchResults.value = Array.isArray(results) ? results : []
+    if (!mapPickerSearchResults.value.length) mapPickerError.value = 'Адрес не найден'
+  }
+  catch {
+    mapPickerError.value = 'Поиск адреса временно недоступен. Попробуйте позже.'
+  }
+  finally {
+    mapPickerSearching.value = false
+  }
+}
+
+function selectMapSearchResult(result: { display_name: string, lat: string, lon: string }) {
+  const latitude = Number(result.lat)
+  const longitude = Number(result.lon)
+  if (!validMapPoint(latitude, longitude) || !leafletMapInstance.value) return
+  mapPickerDraft.latitude = latitude.toFixed(6)
+  mapPickerDraft.longitude = longitude.toFixed(6)
+  mapPickerDraft.address = result.display_name
+  mapPickerAddress.value = result.display_name
+  mapPickerSearchResults.value = []
+  leafletMapInstance.value.setView([latitude, longitude], 17)
+}
+
 async function initializeMapPicker() {
-  if (googleMapInstance.value || !mapPickerOpen.value) return
+  if (leafletMapInstance.value || !mapPickerOpen.value) return
   try {
     const mapElement = await waitForMapPickerElement()
-    const { Map, Marker, advancedMarker } = await loadGoogleMaps()
+    const L = await import('leaflet')
     const latitude = Number(mapPickerDraft.latitude)
     const longitude = Number(mapPickerDraft.longitude)
-    const center = {
-      lat: Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
-      lng: Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
-    }
-    googleMapInstance.value = new Map(mapElement, {
-      center,
-      zoom: 16,
-      streetViewControl: false,
-      mapTypeControl: false,
-      fullscreenControl: true,
-      ...(googleMapsMapId ? { mapId: googleMapsMapId } : {})
+    const center: [number, number] = [
+      Number.isFinite(latitude) ? latitude : mapPickerFallback.latitude,
+      Number.isFinite(longitude) ? longitude : mapPickerFallback.longitude
+    ]
+    leafletMapInstance.value = L.map(mapElement, { center, zoom: 16, zoomControl: true })
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(leafletMapInstance.value)
+    leafletMapInstance.value.on('moveend', () => {
+      const mapCenter = leafletMapInstance.value.getCenter()
+      mapPickerDraft.latitude = mapCenter.lat.toFixed(6)
+      mapPickerDraft.longitude = mapCenter.lng.toFixed(6)
+      mapPickerError.value = ''
+      scheduleReverseGeocode(mapCenter.lat, mapCenter.lng)
     })
-    googleMapMarker.value = new Marker({
-      ...(advancedMarker ? { gmpDraggable: true } : { draggable: true }),
-      map: googleMapInstance.value,
-      position: center,
-      title: 'Локация филиала'
-    })
-    googleMapMarkerIsAdvanced.value = advancedMarker
-    googleMapInstance.value.addListener('click', applyMarkerPoint)
-    if (advancedMarker) googleMapMarker.value.addEventListener('gmp-dragend', applyMarkerPoint)
-    else googleMapMarker.value.addListener('dragend', applyMarkerPoint)
+    leafletMapInstance.value.on('click', (event: any) => leafletMapInstance.value.panTo(event.latlng))
+    leafletMapInstance.value.invalidateSize()
+    const mapCenter = leafletMapInstance.value.getCenter()
+    mapPickerDraft.latitude = mapCenter.lat.toFixed(6)
+    mapPickerDraft.longitude = mapCenter.lng.toFixed(6)
+    scheduleReverseGeocode(mapCenter.lat, mapCenter.lng)
     await refreshGeolocationAvailability()
   }
   catch (error) {
-    mapPickerError.value = error instanceof Error ? error.message : 'Не удалось загрузить Google Maps'
+    mapPickerError.value = error instanceof Error ? error.message : 'Не удалось загрузить карту'
   }
   finally {
     mapPickerLoading.value = false
@@ -527,7 +512,7 @@ async function initializeMapPicker() {
 
 watch([() => locationForm.latitude, () => locationForm.longitude], ([latitude, longitude]) => {
   if (!validMapPoint(latitude, longitude)) return
-  updateMapPoint(Number(latitude), Number(longitude))
+  if (leafletMapInstance.value) updateMapPoint(Number(latitude), Number(longitude))
 })
 
 async function openSchedules(row: BranchRow) {
@@ -903,10 +888,23 @@ async function removeBranch(row: BranchRow) {
 
       <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:enter="initializeMapPicker" @after:leave="destroyMapPicker">
         <template #body>
+          <form class="mb-3 flex gap-2" @submit.prevent="searchMapAddress">
+            <UInput v-model="mapPickerSearchQuery" class="min-w-0 flex-1" placeholder="Введите адрес для поиска" aria-label="Поиск адреса" />
+            <UButton type="submit" icon="i-lucide-search" :loading="mapPickerSearching">Найти</UButton>
+          </form>
+          <div v-if="mapPickerSearchResults.length" class="mb-3 max-h-44 overflow-auto rounded-xl border border-charcoal-200 bg-white">
+            <button v-for="result in mapPickerSearchResults" :key="`${result.lat}:${result.lon}`" type="button" class="block w-full border-b border-charcoal-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-charcoal-50" @click="selectMapSearchResult(result)">
+              {{ result.display_name }}
+            </button>
+          </div>
           <div class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
             <div ref="mapPickerElement" class="absolute inset-0"></div>
+            <div class="pointer-events-none absolute left-1/2 top-1/2 z-[400] -translate-x-1/2 -translate-y-full" aria-hidden="true">
+              <div class="h-8 w-8 rounded-full border-4 border-white bg-primary-600 shadow-lg"></div>
+              <div class="mx-auto h-3 w-3 -translate-y-1 rounded-full bg-primary-600"></div>
+            </div>
             <div v-if="mapPickerLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
-            <div v-if="mapPickerError" class="absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm text-red-700">{{ mapPickerError }}</div>
+            <div v-if="mapPickerError" class="absolute inset-x-3 bottom-3 z-10 rounded-lg bg-white/95 p-3 text-center text-sm text-red-700 shadow">{{ mapPickerError }}</div>
           </div>
           <div class="mt-3 flex flex-wrap justify-end gap-2">
             <UButton v-if="myLocationAvailable" icon="i-lucide-locate-fixed" color="neutral" variant="soft" @click="useMyLocation">Моё местоположение</UButton>
@@ -915,7 +913,8 @@ async function removeBranch(row: BranchRow) {
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Широта:</span> {{ mapPickerDraft.latitude || '—' }}</div>
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ mapPickerDraft.longitude || '—' }}</div>
           </div>
-          <p class="mt-3 text-xs text-charcoal-500">Кликните по Google Maps, чтобы переместить метку. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
+          <p class="mt-3 rounded-lg bg-charcoal-50 p-3 text-sm text-charcoal-700"><span class="font-semibold">Адрес:</span> {{ mapPickerAddress || 'Адрес определяется после перемещения карты' }}</p>
+          <p class="mt-3 text-xs text-charcoal-500">Перемещайте карту под центральной меткой или используйте поиск. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
