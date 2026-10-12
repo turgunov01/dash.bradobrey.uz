@@ -142,7 +142,7 @@ function locationEventDate(event: LocationEvent) {
 function validEventCoordinates(event: LocationEvent) {
   const latitude = Number(event.latitude)
   const longitude = Number(event.longitude)
-  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+  return validMapPoint(latitude, longitude)
 }
 
 function locationEventStatusLabel(event: LocationEvent) {
@@ -347,12 +347,8 @@ async function saveLocation() {
 }
 
 async function openEventMap(event: LocationEvent) {
-  if (!validEventCoordinates(event)) {
-    apiClient.notifyError(new Error('Для этого события координаты недоступны'))
-    return
-  }
   eventMapEvent.value = event
-  eventMapLoading.value = true
+  eventMapLoading.value = validEventCoordinates(event)
   locationOpen.value = false
   eventMapOpen.value = true
 }
@@ -438,7 +434,7 @@ async function waitForMapPickerElement() {
 function validMapPoint(latitude: unknown, longitude: unknown) {
   const lat = Number(latitude)
   const lng = Number(longitude)
-  return Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180
+  return Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0)
 }
 
 function updateMapPoint(latitude: number, longitude: number, pan = true) {
@@ -1010,7 +1006,7 @@ async function removeBranch(row: BranchRow) {
               <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
               <UAlert v-if="outsideRadiusEvents.length" class="mb-3" color="error" variant="soft" icon="i-lucide-triangle-alert" title="Обнаружен вход вне радиуса" :description="`${outsideRadiusEvents.length} ${outsideRadiusEvents.length === 1 ? 'событие требует' : 'события требуют'} внимания. Нажмите на сотрудника, чтобы открыть карту.`" />
               <div v-if="locationEvents.length" class="space-y-2">
-                <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!validEventCoordinates(event)" @click="openEventMap(event)">
+                <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80" @click="openEventMap(event)">
                   <span>{{ event.barber_name || event.barber_id }} · {{ locationEventStatusLabel(event) }}</span>
                   <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }} · {{ validEventCoordinates(event) ? 'Открыть карту' : 'Координаты отсутствуют' }}</span>
                 </button>
@@ -1025,7 +1021,8 @@ async function removeBranch(row: BranchRow) {
       <UModal v-model:open="eventMapOpen" class="sm:max-w-4xl" title="Место входа сотрудника" :description="eventMapEvent ? `${eventMapEvent.barber_name || eventMapEvent.barber_id} · ${formatDateTime(locationEventDate(eventMapEvent))}` : ''" @after:enter="initializeEventMap" @after:leave="destroyEventMap">
         <template #body>
           <div v-if="eventMapEvent" class="space-y-4">
-            <div class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
+            <UAlert v-if="!validEventCoordinates(eventMapEvent)" color="warning" variant="soft" icon="i-lucide-map-pin-off" title="Координаты события отсутствуют" description="Для этого входа карта и метка недоступны: в данных события нет корректного местоположения сотрудника." />
+            <div v-else class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
               <div ref="eventMapElement" class="absolute inset-0" />
               <div v-if="eventMapLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
             </div>
@@ -1034,6 +1031,7 @@ async function removeBranch(row: BranchRow) {
               <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(locationEventDate(eventMapEvent)) }}</p></div>
               <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ locationEventStatusLabel(eventMapEvent) }}</p></div>
             </div>
+            <UAlert v-if="!validMapPoint(locationForm.latitude, locationForm.longitude) && !validMapPoint(eventMapEvent.branch_latitude, eventMapEvent.branch_longitude)" color="neutral" variant="soft" icon="i-lucide-circle-help" title="Точка филиала не настроена" description="Контрольная точка и окружность разрешённого радиуса появятся после сохранения корректных координат филиала." />
             <p class="text-xs text-charcoal-500">Метка показывает фактическое место входа. Контрольная точка и разрешённый радиус отображаются, если они настроены.</p>
           </div>
         </template>

@@ -105,3 +105,8 @@
 - Hardened the browser Maps loader with explicit Maps/marker constructor fallback, timeout cleanup, retry after failed loads, and actionable API-key errors.
 - Production smoke testing confirmed the current Google Cloud key reaches the Maps JavaScript endpoint but the project returns `ApiNotActivatedMapError`; the Maps JavaScript API must be enabled in Google Cloud before the picker can render.
 
+# 2026-10-12 — geocontrol map edge cases
+
+- Added an explicit outside-radius alert in the Branches geocontrol history and limited the map loader overlay to Leaflet initialization.
+- Treat `0,0` as an unset branch/event coordinate pair. Events without valid coordinates now open a clear warning instead of an empty map; an unset branch point explains why the radius circle is unavailable.
+
