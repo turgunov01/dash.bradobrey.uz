@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { calculateMinutePenalty } from '~/utils/penalty'
-import { formatMoney } from '~/utils/format'
+import { formatDateTime, formatMoney } from '~/utils/format'
 import { useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -451,7 +451,7 @@ const detailColumns: TableColumn<LateRow>[] = [
               <div v-for="event in locationHistoryEvents" :key="event.id" class="flex flex-col gap-3 rounded-xl border border-charcoal-200 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                   <p class="font-semibold text-charcoal-950">{{ event.barber_name || event.barber_id }}</p>
-                  <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</p>
+                  <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ formatDateTime(event.created_at) }}</p>
                   <p class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</p>
                 </div>
                 <UButton v-if="event.latitude != null && event.longitude != null" class="shrink-0" size="sm" color="primary" icon="i-lucide-map" @click="openEventMap(event)">Открыть карту</UButton>
@@ -480,7 +480,7 @@ const detailColumns: TableColumn<LateRow>[] = [
                   <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
                     <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
                     <span class="flex items-center gap-2 text-charcoal-500">
-                      <span>{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</span>
+                      <span>{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(event.created_at) }}</span>
                       <UButton v-if="event.latitude != null && event.longitude != null" size="xs" color="primary" variant="soft" icon="i-lucide-map" aria-label="Показать место входа на карте" @click.stop="openEventMap(event)">Карта</UButton>
                     </span>
                   </div>
@@ -492,7 +492,7 @@ const detailColumns: TableColumn<LateRow>[] = [
           <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
         </UModal>
 
-        <UModal v-model:open="mapOpen" class="sm:max-w-4xl" title="Место входа барбера" :description="mapEvent ? `${mapEvent.barber_name || mapEvent.barber_id} · ${mapEvent.created_at ? new Date(mapEvent.created_at).toLocaleString() : ''}` : ''">
+        <UModal v-model:open="mapOpen" class="sm:max-w-4xl" title="Место входа барбера" :description="mapEvent ? `${mapEvent.barber_name || mapEvent.barber_id} · ${formatDateTime(mapEvent.created_at)}` : ''">
           <template #body>
             <div v-if="mapEvent" class="space-y-4">
               <div class="overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">

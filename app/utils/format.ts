@@ -11,7 +11,8 @@ export function formatDateTime(value?: string | null) {
 
   return new Intl.DateTimeFormat('ru-RU', {
     dateStyle: 'medium',
-    timeStyle: 'short'
+    timeStyle: 'short',
+    timeZone: 'Asia/Tashkent'
   }).format(date)
 }
 

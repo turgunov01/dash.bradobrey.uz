@@ -2,6 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import type { VerifixSchedule } from '~/composables/useVerifixApi'
 import type { BranchLocation, LocationEvent } from '~/composables/useBranchesApi'
+import { formatDateTime } from '~/utils/format'
 
 import type { Branch } from '~~/shared/schemas'
 import { branchFormSchema, branchSchema } from '~~/shared/schemas'
@@ -888,7 +889,7 @@ async function removeBranch(row: BranchRow) {
               <div v-if="locationEvents.length" class="space-y-2">
                 <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
                   <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
-                  <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ event.created_at ? new Date(event.created_at).toLocaleString() : '—' }}</span>
+                  <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(event.created_at) }}</span>
                 </div>
               </div>
               <p v-else class="text-sm text-charcoal-500">Событий входа пока нет.</p>

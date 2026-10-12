@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-12
+
+- Fixed SSR hydration drift in branch and Verifix location-event timestamps by formatting dates with the explicit `Asia/Tashkent` timezone. Google Maps initialization remains blocked until `Maps JavaScript API` is enabled for the configured browser key; the picker reports that configuration error and can be retried after the key is corrected.
+
 ## 2026-10-11
 
 - Fixed the Google Maps picker DOM/lifecycle regression: Google now receives an isolated map host, initialization waits for the modal enter transition, cleanup runs after leave, and location-event timestamps use a deterministic Tashkent timezone for SSR hydration. Migrated to `AdvancedMarkerElement`, `loading=async`, and public Map ID configuration.
