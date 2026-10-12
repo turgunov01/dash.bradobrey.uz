@@ -109,4 +109,5 @@
 
 - Added an explicit outside-radius alert in the Branches geocontrol history and limited the map loader overlay to Leaflet initialization.
 - Treat `0,0` as an unset branch/event coordinate pair. Events without valid coordinates now open a clear warning instead of an empty map; an unset branch point explains why the radius circle is unavailable.
+- Made the missing-coordinate notices persistent inline blocks in both the geocontrol form and event map dialog, including events that still have a valid employee point but no branch control point.
 
