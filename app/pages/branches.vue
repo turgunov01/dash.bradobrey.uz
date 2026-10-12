@@ -931,9 +931,9 @@ async function removeBranch(row: BranchRow) {
               {{ result.display_name }}
             </button>
           </div>
-          <div class="relative h-[min(60vh,28rem)] min-h-[20rem] overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
+          <div class="relative h-[min(60vh,28rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
             <div ref="mapPickerElement" class="absolute inset-0"></div>
-            <div class="pointer-events-none absolute left-1/2 top-1/2 z-[400] -translate-x-1/2 -translate-y-full" aria-hidden="true">
+            <div class="pointer-events-none absolute left-1/2 top-1/2 z-400 -translate-x-1/2 -translate-y-full" aria-hidden="true">
               <div class="h-8 w-8 rounded-full border-4 border-white bg-primary-600 shadow-lg"></div>
               <div class="mx-auto h-3 w-3 -translate-y-1 rounded-full bg-primary-600"></div>
             </div>
