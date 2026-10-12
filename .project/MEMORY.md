@@ -77,4 +77,10 @@
 - Verifix geocontrol event cards now hide raw coordinates and open a browser-only Leaflet/OpenStreetMap map on click. The employee event marker is centered and opens a safe popup with employee, event time, and status; the branch marker and configured radius circle are loaded from the branch location policy when available. Invalid or missing employee coordinates open the map dialog with a clear absence message.
 - The Branches geocontrol history surfaces an outside-radius alert and keeps the Leaflet loader visible only during map initialization. `0,0` is treated as an unset coordinate pair; missing event coordinates show a dedicated warning, while missing branch coordinates explain that the branch marker/radius cannot be rendered until a valid point is saved.
 - Missing-coordinate notices are rendered as inline blocks in the Branches geocontrol form and event map dialog, so they remain visible even when an event has a valid employee point but the branch control point is absent.
+- On 2026-10-12, the dashboard artifact was rebuilt after the active-branch changes and production PM2 restart was verified online. The production source checkout remains intentionally dirty in unrelated files; deployment used targeted file merges.
 
+# Employee active branch selection (2026-10-12)
+
+- Login forwards optional `branch_id` to the external API. If the API returns `BRANCH_SELECTION_REQUIRED`, the login screen renders the authorized branch list and retries only after the employee selects one.
+- The dashboard does not treat its global admin branch selector as employee authorization; the API remains authoritative for employee branch access and active session state.
+- The barber workspace now calls the authenticated branch-switch endpoint, refreshes the bearer token/profile, and displays overall revenue, payout, services, shifts, days, minutes, and branch rows without moving historical operations.

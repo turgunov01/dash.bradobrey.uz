@@ -111,3 +111,8 @@
 - Treat `0,0` as an unset branch/event coordinate pair. Events without valid coordinates now open a clear warning instead of an empty map; an unset branch point explains why the radius circle is unavailable.
 - Made the missing-coordinate notices persistent inline blocks in both the geocontrol form and event map dialog, including events that still have a valid employee point but no branch control point.
 
+- 2026-10-12: Rebuilt the Dashboard production artifact after the geocontrol and employee active-branch fixes. Typecheck, 48 unit tests, and production build passed; production PM2 restart completed successfully.
+# 2026-10-12
+
+- Added the login-time active branch selection flow and forwarded the selected branch through the dashboard login compatibility path.
+- Added an authorized in-workspace branch switcher, branch-specific shift transition handling, and cross-branch work/finance summary in the barber workspace.
