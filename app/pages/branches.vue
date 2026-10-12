@@ -124,6 +124,10 @@ const mapPickerAddress = ref('')
 const mapPickerSearchQuery = ref('')
 const mapPickerSearchResults = ref<Array<{ display_name: string, lat: string, lon: string }>>([])
 const leafletMapInstance = ref<any>(null)
+const eventMapOpen = ref(false)
+const eventMapElement = ref<HTMLElement | null>(null)
+const eventMapInstance = ref<any>(null)
+const eventMapEvent = ref<LocationEvent | null>(null)
 const mapPickerDraft = reactive({ address: '', latitude: '', longitude: '' })
 let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null
 let reverseGeocodeRequestId = 0
@@ -134,9 +138,14 @@ function locationEventDate(event: LocationEvent) {
   return event.created_at || event.createdAt || event.measured_at || event.measuredAt || null
 }
 
-function locationEventCoordinates(event: LocationEvent) {
-  if (event.latitude == null || event.longitude == null) return 'Координаты отсутствуют'
-  return `${Number(event.latitude).toFixed(6)}, ${Number(event.longitude).toFixed(6)}`
+function validEventCoordinates(event: LocationEvent) {
+  const latitude = Number(event.latitude)
+  const longitude = Number(event.longitude)
+  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+}
+
+function locationEventStatusLabel(event: LocationEvent) {
+  return event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён'
 }
 
 const form = reactive({
@@ -332,6 +341,69 @@ async function saveLocation() {
   finally {
     locationSubmitting.value = false
   }
+}
+
+async function openEventMap(event: LocationEvent) {
+  if (!validEventCoordinates(event)) {
+    apiClient.notifyError(new Error('Для этого события координаты недоступны'))
+    return
+  }
+  eventMapEvent.value = event
+  locationOpen.value = false
+  eventMapOpen.value = true
+}
+
+function createEventPopup(event: LocationEvent) {
+  const content = document.createElement('div')
+  content.className = 'space-y-1 text-sm'
+  const title = document.createElement('strong')
+  title.textContent = event.barber_name || event.barber_id
+  const date = document.createElement('div')
+  date.textContent = `Событие: ${formatDateTime(locationEventDate(event))}`
+  const status = document.createElement('div')
+  status.textContent = `Статус: ${locationEventStatusLabel(event)}`
+  content.append(title, date, status)
+  return content
+}
+
+async function initializeEventMap() {
+  const event = eventMapEvent.value
+  if (eventMapInstance.value || !event || !eventMapElement.value || !validEventCoordinates(event)) return
+  const L = await import('leaflet')
+  const latitude = Number(event.latitude)
+  const longitude = Number(event.longitude)
+  const map = L.map(eventMapElement.value, { center: [latitude, longitude], zoom: 17, zoomControl: true })
+  eventMapInstance.value = map
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map)
+  const employeeMarker = L.marker([latitude, longitude], { zIndexOffset: 1000 })
+    .bindPopup(createEventPopup(event))
+    .addTo(map)
+  employeeMarker.openPopup()
+
+  const branchLatitude = Number(locationForm.latitude || event.branch_latitude)
+  const branchLongitude = Number(locationForm.longitude || event.branch_longitude)
+  const radius = Number(locationForm.radius_meters || event.radius_meters)
+  if (validMapPoint(branchLatitude, branchLongitude)) {
+    L.marker([branchLatitude, branchLongitude]).bindPopup('Контрольная точка филиала').addTo(map)
+    if (Number.isFinite(radius) && radius > 0) {
+      L.circle([branchLatitude, branchLongitude], {
+        radius,
+        color: '#d97706',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.16,
+        weight: 2
+      }).bindPopup(`Разрешённый радиус: ${Math.round(radius)} м`).addTo(map)
+    }
+  }
+  requestAnimationFrame(() => map.invalidateSize())
+}
+
+function destroyEventMap() {
+  eventMapInstance.value?.remove()
+  eventMapInstance.value = null
 }
 
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
@@ -917,16 +989,33 @@ async function removeBranch(row: BranchRow) {
             <div class="border-t border-charcoal-200 pt-4">
               <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
               <div v-if="locationEvents.length" class="space-y-2">
-                <div v-for="event in locationEvents" :key="event.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-sm">
-                  <span>{{ event.barber_name || event.barber_id }} · {{ event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён' }}</span>
-                  <span class="text-charcoal-500">{{ locationEventCoordinates(event) }} · {{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }}</span>
-                </div>
+                <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!validEventCoordinates(event)" @click="openEventMap(event)">
+                  <span>{{ event.barber_name || event.barber_id }} · {{ locationEventStatusLabel(event) }}</span>
+                  <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }} · {{ validEventCoordinates(event) ? 'Открыть карту' : 'Координаты отсутствуют' }}</span>
+                </button>
               </div>
               <p v-else class="text-sm text-charcoal-500">Событий входа пока нет.</p>
             </div>
           </div>
         </template>
         <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
+      </UModal>
+
+      <UModal v-model:open="eventMapOpen" class="sm:max-w-4xl" title="Место входа сотрудника" :description="eventMapEvent ? `${eventMapEvent.barber_name || eventMapEvent.barber_id} · ${formatDateTime(locationEventDate(eventMapEvent))}` : ''" @after:enter="initializeEventMap" @after:leave="destroyEventMap">
+        <template #body>
+          <div v-if="eventMapEvent" class="space-y-4">
+            <div class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
+              <div ref="eventMapElement" class="absolute inset-0" />
+            </div>
+            <div class="grid gap-3 text-sm sm:grid-cols-3">
+              <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ eventMapEvent.barber_name || eventMapEvent.barber_id }}</p></div>
+              <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(locationEventDate(eventMapEvent)) }}</p></div>
+              <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ locationEventStatusLabel(eventMapEvent) }}</p></div>
+            </div>
+            <p class="text-xs text-charcoal-500">Метка показывает фактическое место входа. Контрольная точка и разрешённый радиус отображаются, если они настроены.</p>
+          </div>
+        </template>
+        <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="eventMapOpen = false">Закрыть</UButton></div></template>
       </UModal>
 
       <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:enter="initializeMapPicker" @after:leave="destroyMapPicker">
