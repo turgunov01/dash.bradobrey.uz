@@ -2,6 +2,7 @@
 import type { QueueCompletePayload, QueueItem } from '~~/shared/schemas'
 import type { PendingQueueTransfer } from '~/composables/useBarbersApi'
 import { flattenServicesPayload } from '~/utils/services'
+import { formatMoney } from '~/utils/format'
 
 const sessionStore = useSessionStore()
 const barbersApi = useBarbersApi()
@@ -9,6 +10,7 @@ const kioskApi = useKioskApi()
 const breakMinutes = ref(10)
 const completing = ref(false)
 const shifting = ref(false)
+const switchingBranch = ref(false)
 const paymentModalOpen = ref(false)
 const completingItem = ref<QueueItem | null>(null)
 const transferRespondingId = ref('')
@@ -18,6 +20,35 @@ const toast = useToast()
 useRealtimeQueue()
 
 await sessionStore.ensureLoaded()
+
+const availableBranches = computed(() => {
+  const user = sessionStore.user as any
+  const barber = sessionStore.barber as any
+  const branches = user?.branches || barber?.branches || []
+  return Array.isArray(branches)
+    ? branches.map((branch: any) => ({ label: branch.name || String(branch.id), value: String(branch.id) }))
+    : []
+})
+const selectedBranchId = computed(() => String((sessionStore.barber as any)?.active_branch_id || sessionStore.barber?.branch_id || ''))
+const workStatistics = computed(() => (data.value?.me?.barber as any)?.statistics || { totals: {}, branches: [] })
+
+async function switchBranch(branchId: string) {
+  if (!branchId || branchId === selectedBranchId.value || switchingBranch.value) return
+  switchingBranch.value = true
+
+  try {
+    const response = await barbersApi.switchBranch(branchId)
+    if (response?.token) useAdminToken().set(response.token)
+    useBranchStore().setActiveBranch(branchId)
+    await Promise.all([
+      sessionStore.ensureLoaded({ force: true, token: response?.token || undefined }),
+      refresh()
+    ])
+  }
+  finally {
+    switchingBranch.value = false
+  }
+}
 
 const { data, pending, refresh } = await useAsyncData('barber-workspace', async () => {
   const [me, services] = await Promise.all([
@@ -308,6 +339,38 @@ function openItem(item: any) {
           />
         </div>
 
+        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <template #header>
+            <div class="space-y-1">
+              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">История работы</p>
+              <h2 class="barbershop-heading text-2xl text-charcoal-950">Общая статистика по всем филиалам</h2>
+            </div>
+          </template>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <DashboardMetricCard label="Заработок" :value="formatMoney(workStatistics.totals.revenue || 0)" />
+            <DashboardMetricCard label="Услуги" :value="workStatistics.totals.services || 0" />
+            <DashboardMetricCard label="Смены" :value="workStatistics.totals.shifts || 0" />
+            <DashboardMetricCard label="Дни" :value="workStatistics.totals.worked_days || 0" />
+            <DashboardMetricCard label="Время" :value="`${workStatistics.totals.worked_minutes || 0} мин`" />
+          </div>
+          <div v-if="workStatistics.branches?.length" class="mt-5 overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+              <thead class="border-b border-charcoal-200 text-charcoal-500">
+                <tr><th class="px-3 py-2">Филиал</th><th class="px-3 py-2">Заработок</th><th class="px-3 py-2">Услуги</th><th class="px-3 py-2">Смены</th><th class="px-3 py-2">Время</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="branch in workStatistics.branches" :key="branch.branch_id || 'unknown'" class="border-b border-charcoal-100 last:border-0">
+                  <td class="px-3 py-2 font-medium">{{ branch.branch_name }}</td>
+                  <td class="px-3 py-2">{{ formatMoney(branch.revenue || 0) }}</td>
+                  <td class="px-3 py-2">{{ branch.services || 0 }}</td>
+                  <td class="px-3 py-2">{{ branch.shifts || 0 }}</td>
+                  <td class="px-3 py-2">{{ branch.worked_minutes || 0 }} мин</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </UCard>
+
         <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
             <template #header>
@@ -331,6 +394,19 @@ function openItem(item: any) {
                   <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Специализация</p>
                   <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ sessionStore.barber?.specialization || 'Общие услуги' }}</p>
                 </div>
+              </div>
+
+              <div v-if="availableBranches.length > 1" class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+                <UFormField label="Текущий филиал" name="active_branch_id">
+                  <USelectMenu
+                    :model-value="selectedBranchId"
+                    :items="availableBranches"
+                    value-key="value"
+                    :loading="switchingBranch"
+                    class="w-full"
+                    @update:model-value="switchBranch"
+                  />
+                </UFormField>
               </div>
 
               <div class="space-y-3 rounded-[1.5rem] border border-charcoal-200 bg-white/80 p-4">

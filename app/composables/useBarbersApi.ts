@@ -123,6 +123,12 @@ export function useBarbersApi() {
         silent: options.silent,
       });
     },
+    switchBranch(branch_id: string) {
+      return client.request<BackendLoginResponse & { barber?: BarberProfile | null }>("/api/barbers/me/branch", {
+        body: { branch_id },
+        method: "POST",
+      });
+    },
     pendingTransfers() {
       return client.request<{ items: PendingQueueTransfer[] }>('/api/barbers/queue/transfers/pending', {
         method: 'GET',
