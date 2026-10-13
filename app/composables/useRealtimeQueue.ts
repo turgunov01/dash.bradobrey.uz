@@ -15,6 +15,7 @@ export function useRealtimeQueue() {
   const nuxtApp = useNuxtApp()
   const branchStore = useBranchStore()
   const sessionStore = useSessionStore()
+  const adminToken = useAdminToken()
   const runtimeConfig = useRuntimeConfig()
 
   const isConnected = useState('realtime-connected', () => false)
@@ -44,7 +45,11 @@ export function useRealtimeQueue() {
 
     const socket = io(runtimeConfig.public.apiBase, {
       autoConnect: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: () => {
+        const header = adminToken.authHeader.value
+        return header ? { token: header.slice(7) } : {}
+      }
     })
 
     socketRef.value = socket
