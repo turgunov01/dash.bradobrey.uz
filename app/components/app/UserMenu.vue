@@ -8,12 +8,19 @@ defineProps<{
 const sessionStore = useSessionStore()
 const branchStore = useBranchStore()
 const { isConnected } = useRealtimeQueue()
+const accountLabel = computed(() => {
+  const role = String(sessionStore.user?.role || '').trim().toLowerCase()
+  if (sessionStore.user?.name) return sessionStore.user.name
+  return ['admin', 'admin_network', 'admin_branch', 'super-manager'].includes(role)
+    ? 'Администратор'
+    : 'Барбер без имени'
+})
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
       type: 'label',
-      label: sessionStore.user?.name || 'Гостевой барбер'
+      label: accountLabel.value
     }
   ],
   [
@@ -46,7 +53,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
   <UDropdownMenu :content="{ align: 'center', collisionPadding: 12 }" :items="items"
     :ui="{ content: collapsed ? 'w-48' : 'w-(--reka-dropdown-menu-trigger-width)' }">
     <UButton :block="!collapsed" :class="[!collapsed && 'py-2.5']" :icon="collapsed ? 'i-lucide-user-round' : undefined"
-      :label="collapsed ? undefined : (sessionStore.user?.name || 'Сессия барбера')" :square="collapsed" color="neutral"
+      :label="collapsed ? undefined : accountLabel" :square="collapsed" color="neutral"
       trailing-icon="i-lucide-chevrons-up-down" variant="ghost" />
   </UDropdownMenu>
 </template>
