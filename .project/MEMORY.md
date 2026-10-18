@@ -102,3 +102,7 @@
 
 - The production `admin` account's five explicit permissions came from the one-time API employee-quality backfill. The dashboard intentionally treats a non-empty permission array as an authoritative per-user override; clearing only this account's rows lets its existing `admin` role resolve to the full 26-permission preset. Permissions are read from `/api/barbers/me`, not JWT claims. A currently loaded browser tab may need a reload or fresh login to refresh the Pinia session snapshot.
 - Production API returned the target admin with zero explicit rows, and the dashboard RBAC regression suite confirms empty-permission admins receive the complete preset. Database backup and API-side deployment details are recorded in the API project's `.project/MEMORY.md`.
+
+# Owner workflow preference (2026-10-19)
+
+- Make requested project changes in the local repositories and push Git changes when requested/appropriate. Do not deploy, pull/overlay source on production, build there, restart production processes, or otherwise modify production until the owner explicitly authorizes a production deployment in that request.
