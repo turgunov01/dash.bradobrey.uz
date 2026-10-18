@@ -285,14 +285,29 @@ async function initializeEventMap() {
       maxZoom: 19
     }).addTo(map)
 
-    const employeeMarker = L.marker([latitude, longitude], { zIndexOffset: 1000 })
+    const employeeMarker = L.marker([latitude, longitude], {
+      zIndexOffset: 1000,
+      icon: L.divIcon({
+        className: 'geocontrol-event-marker',
+        html: '<span style="display:block;width:22px;height:22px;border:4px solid white;border-radius:9999px;background:#dc2626;box-shadow:0 2px 8px rgb(0 0 0 / 35%)"></span>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      })
+    })
       .bindPopup(createEventPopup(event))
       .addTo(map)
     employeeMarker.openPopup()
 
     const { branchLatitude, branchLongitude, radius } = eventMapLocation(event)
     if (hasValidCoordinates(branchLatitude, branchLongitude)) {
-      L.marker([branchLatitude, branchLongitude])
+      L.marker([branchLatitude, branchLongitude], {
+        icon: L.divIcon({
+          className: 'geocontrol-branch-marker',
+          html: '<span style="display:block;width:18px;height:18px;border:3px solid white;border-radius:9999px;background:#2563eb;box-shadow:0 2px 8px rgb(0 0 0 / 35%)"></span>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        })
+      })
         .bindPopup('Контрольная точка филиала')
         .addTo(map)
       if (Number.isFinite(radius) && radius > 0) {

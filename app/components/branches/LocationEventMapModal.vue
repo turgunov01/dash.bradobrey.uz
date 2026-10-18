@@ -78,7 +78,14 @@ async function initializeMap() {
     const branchLon = Number(branchLongitude.value)
     const allowedRadius = Number(radius.value)
     if (validPoint(branchLat, branchLon)) {
-      L.marker([branchLat, branchLon]).bindPopup('Контрольная точка филиала').addTo(map)
+      L.marker([branchLat, branchLon], {
+        icon: L.divIcon({
+          className: 'geocontrol-branch-marker',
+          html: '<span style="display:block;width:18px;height:18px;border:3px solid white;border-radius:9999px;background:#2563eb;box-shadow:0 2px 8px rgb(0 0 0 / 35%)"></span>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        })
+      }).bindPopup('Контрольная точка филиала').addTo(map)
       if (Number.isFinite(allowedRadius) && allowedRadius > 0) {
         L.circle([branchLat, branchLon], {
           radius: allowedRadius,
