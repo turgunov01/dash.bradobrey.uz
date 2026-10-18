@@ -1,4 +1,6 @@
-type NotificationItem = { id: string, title: string, body: string, order_id?: string | null, read_at?: string | null, created_at: string, data?: Record<string, any> }
+import { detectPushDeviceKind, getPushCapability, type PushDeviceKind } from '~/utils/pushCapabilities'
+
+type NotificationItem = { id: string, type?: string, title: string, body: string, order_id?: string | null, branch_id?: string | null, read_at?: string | null, created_at: string, data?: Record<string, any> }
 
 function getNotificationBody(item: NotificationItem) {
   // Keep old notifications readable after removing the ID from new messages.
@@ -22,19 +24,74 @@ export function useNotifications() {
   const config = useRuntimeConfig()
   const pushPermission = ref<NotificationPermission | 'unsupported'>('default')
   const pushEnabled = ref(false)
-  const pushSupported = computed(() => import.meta.client && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)
-  async function refreshPushState() {
-    if (!pushSupported.value) {
-      pushEnabled.value = false
-      return false
+  const pushSupported = ref(false)
+  const pushServiceAvailable = ref<boolean | null>(null)
+  const pushSupportReason = ref('')
+  const pushStatusMessage = ref('')
+  const pushChecking = ref(false)
+  const deviceKind = ref<PushDeviceKind>('computer')
+  const currentPushEndpoint = ref('')
+  const deviceResolved = ref(false)
+  const deviceLabel = computed(() => deviceKind.value === 'phone' ? 'телефоне' : deviceKind.value === 'tablet' ? 'планшете' : 'компьютере')
+
+  function getBrowserPushEnvironment() {
+    const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean, platform?: string } }).userAgentData
+    const environment = {
+      secureContext: window.isSecureContext === true,
+      serviceWorker: 'serviceWorker' in navigator,
+      notifications: 'Notification' in window,
+      pushManager: 'PushManager' in window,
+      vapidPublicKey: Boolean(String(config.public.vapidPublicKey || '').trim()),
+      userAgentMobile: uaData?.mobile,
+      platform: uaData?.platform || navigator.platform,
+      userAgent: navigator.userAgent,
+      maxTouchPoints: navigator.maxTouchPoints || 0,
+      screenWidth: window.screen?.width || 0,
+      screenHeight: window.screen?.height || 0,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches || false
     }
+    deviceKind.value = detectPushDeviceKind(environment)
+    deviceResolved.value = true
+    return environment
+  }
+
+  async function refreshPushState() {
+    if (!import.meta.client) return false
+    pushChecking.value = true
+    pushStatusMessage.value = ''
     try {
+      const capability = getPushCapability(getBrowserPushEnvironment())
+      pushSupported.value = capability.supported
+      pushSupportReason.value = capability.reason
+      pushPermission.value = 'Notification' in window ? Notification.permission : 'unsupported'
+      if (!capability.supported) {
+        pushServiceAvailable.value = false
+        currentPushEndpoint.value = ''
+        pushEnabled.value = false
+        return false
+      }
+
       const registration = await navigator.serviceWorker.getRegistration()
       const subscription = await registration?.pushManager.getSubscription()
-      pushEnabled.value = Boolean(subscription)
+      currentPushEndpoint.value = subscription?.endpoint || ''
+      const status = await api.request<{ available?: boolean, registered?: boolean }>('/api/notifications/push-subscription/status', {
+        method: 'POST',
+        body: currentPushEndpoint.value ? { endpoint: currentPushEndpoint.value } : {},
+        silent: true
+      })
+      pushServiceAvailable.value = status?.available === true
+      pushEnabled.value = status?.registered === true && pushPermission.value === 'granted'
+      if (!pushServiceAvailable.value) pushStatusMessage.value = 'Push-сервис на сервере не настроен или временно недоступен.'
+      else if (pushPermission.value === 'granted' && !currentPushEndpoint.value) pushStatusMessage.value = 'Разрешение выдано, но подписка браузера отсутствует.'
+      else if (pushPermission.value === 'granted' && !pushEnabled.value) pushStatusMessage.value = 'Разрешение выдано, но это устройство ещё не зарегистрировано на сервере.'
     }
     catch {
+      pushServiceAvailable.value = false
       pushEnabled.value = false
+      pushStatusMessage.value = 'Не удалось проверить push-сервис и регистрацию устройства. Проверьте соединение и войдите в dashboard повторно.'
+    }
+    finally {
+      pushChecking.value = false
     }
     return pushEnabled.value
   }
@@ -74,39 +131,59 @@ export function useNotifications() {
     }
   }
   async function enablePush() {
-    if (!pushSupported.value) {
-      pushPermission.value = 'unsupported'
+    if (!import.meta.client) return false
+    const capability = getPushCapability(getBrowserPushEnvironment())
+    pushSupported.value = capability.supported
+    pushSupportReason.value = capability.reason
+    if (!capability.supported) {
+      toast.add({ color: 'warning', title: 'Push недоступен', description: capability.reason })
+      return false
+    }
+    if (pushServiceAvailable.value !== true) {
+      toast.add({ color: 'warning', title: 'Push-сервис недоступен', description: pushStatusMessage.value || 'Сервер push-уведомлений не подтвердил готовность.' })
+      return false
+    }
+    if (Notification.permission === 'denied') {
+      pushPermission.value = 'denied'
+      toast.add({ color: 'warning', title: 'Разрешение запрещено', description: 'Разрешите уведомления в настройках этого браузера, затем повторите подключение.' })
       return false
     }
 
-    pushPermission.value = await Notification.requestPermission()
-    if (pushPermission.value !== 'granted') return false
+    try {
+      pushPermission.value = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
+      if (pushPermission.value !== 'granted') {
+        toast.add({ color: 'warning', title: 'Уведомления не разрешены', description: 'Разрешите уведомления для dashboard в запросе браузера.' })
+        return false
+      }
 
-    const publicKey = String(config.public.vapidPublicKey || '').trim()
-    if (!publicKey) {
-      toast.add({ color: 'warning', title: 'Push не настроен', description: 'На сервере не задан публичный VAPID-ключ.' })
+      const publicKey = String(config.public.vapidPublicKey || '').trim()
+      await navigator.serviceWorker.register('/sw.js')
+      const registration = await navigator.serviceWorker.ready
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidKey(publicKey)
+        })
+      }
+      currentPushEndpoint.value = subscription.endpoint
+      const registrationResult = await api.request<{ success?: boolean }>('/api/notifications/push-subscription', {
+        method: 'POST',
+        body: subscription.toJSON(),
+        silent: true
+      })
+      if (registrationResult?.success !== true) throw new Error('Сервер не подтвердил регистрацию устройства')
+      const registered = await refreshPushState()
+      if (!registered) throw new Error('Сервер не подтвердил активную регистрацию этого устройства')
+      toast.add({ color: 'success', title: 'Уведомления включены', description: `Push-уведомления подключены в этом браузере на ${deviceLabel.value}.` })
+      return true
+    }
+    catch (error) {
+      pushEnabled.value = false
+      pushStatusMessage.value = 'Не удалось зарегистрировать это устройство на сервере.'
+      api.notifyError(error)
       return false
     }
-
-    // `register()` may resolve while the worker is still installing. Push
-    // subscriptions can only be created by an active worker, so wait for the
-    // browser's ready registration before accessing PushManager.
-    await navigator.serviceWorker.register('/sw.js')
-    const registration = await navigator.serviceWorker.ready
-    const existing = await registration.pushManager.getSubscription()
-    if (existing) await existing.unsubscribe()
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: decodeVapidKey(publicKey)
-    })
-    await api.request('/api/notifications/push-subscription', {
-      method: 'POST',
-      body: subscription.toJSON(),
-      silent: false
-    })
-    pushEnabled.value = true
-    toast.add({ color: 'success', title: 'Уведомления включены', description: 'Подозрительные заказы будут приходить на это устройство.' })
-    return true
   }
   async function disablePush() {
     if (!pushSupported.value) return false
@@ -120,9 +197,10 @@ export function useNotifications() {
           silent: false
         })
         await subscription.unsubscribe()
+        if (currentPushEndpoint.value === subscription.endpoint) currentPushEndpoint.value = ''
       }
       pushEnabled.value = false
-      toast.add({ color: 'success', title: 'Уведомления выключены', description: 'Этот телефон больше не будет получать push-уведомления.' })
+      toast.add({ color: 'success', title: 'Уведомления выключены', description: `Push-уведомления отключены на этом ${deviceLabel.value}.` })
       return true
     }
     catch (error) {
@@ -131,40 +209,33 @@ export function useNotifications() {
     }
   }
   async function sendTestPush() {
+    if (pushServiceAvailable.value !== true || !pushEnabled.value || !currentPushEndpoint.value) {
+      toast.add({ color: 'warning', title: 'Устройство не зарегистрировано', description: 'Сначала включите push-уведомления на этом устройстве и дождитесь подтверждения регистрации.' })
+      return false
+    }
     const requestTest = () => api.request<{ found?: number, sent?: number, failed?: number, removed?: number }>('/api/notifications/test-push', {
       method: 'POST',
-      // A 410 is an expected recovery signal: the API removes the expired
-      // subscription, then we register the current browser and retry below.
-      // Do not show a transient error toast for that first attempt.
+      body: { endpoint: currentPushEndpoint.value },
       silent: true
     })
-    let result
     try {
-      result = await requestTest()
+      const result = await requestTest()
+      if (!result?.sent) throw new Error('Тест не доставлен на это устройство')
+      toast.add({ color: 'success', title: 'Тест отправлен', description: `Уведомление отправлено на этот браузер (${result.sent}).` })
+      return true
     } catch (error: any) {
       const status = Number(error?.statusCode || error?.status || error?.response?.status || 0)
-      if (status !== 410) {
+      if (status === 404 || status === 410) {
+        pushEnabled.value = false
+        pushStatusMessage.value = 'Подписка этого устройства отсутствует или устарела. Подключите уведомления заново.'
+        toast.add({ color: 'warning', title: 'Нужно подключить устройство', description: 'Нажмите «Включить на этом устройстве», затем повторите тест.' })
+      } else {
         api.notifyError(error)
-        return
       }
-
-      // The API removed an expired endpoint (for example after VAPID rotation).
-      // Re-register this browser once, then retry the test delivery.
-      const reRegistered = await enablePush()
-      if (!reRegistered) {
-        toast.add({ color: 'warning', title: 'Нужно включить уведомления', description: 'Нажмите «Включить уведомления на телефон», затем повторите тест.' })
-        return
-      }
-      try {
-        result = await requestTest()
-      } catch (retryError) {
-        api.notifyError(retryError)
-        return
-      }
+      await refreshPushState()
+      return false
     }
-    toast.add({ color: 'success', title: 'Тест отправлен', description: `Устройств найдено: ${result?.found || 0}. Доставлено: ${result?.sent || 0}.` })
   }
-  if (import.meta.client && pushSupported.value) pushPermission.value = Notification.permission
-  if (import.meta.client && pushSupported.value) refreshPushState()
-  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, openDetails, enablePush, disablePush, refreshPushState, sendTestPush, pushPermission, pushEnabled, pushSupported }
+  if (import.meta.client) void refreshPushState()
+  return { items, unreadCount, refresh, markRead, markAllRead, checkToday, open, openDetails, enablePush, disablePush, refreshPushState, sendTestPush, pushPermission, pushEnabled, pushSupported, pushServiceAvailable, pushSupportReason, pushStatusMessage, pushChecking, deviceKind, deviceLabel, deviceResolved }
 }

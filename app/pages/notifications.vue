@@ -1,5 +1,9 @@
 <script setup lang="ts">
-const { items, unreadCount, refresh, markAllRead, checkToday, open, openDetails, enablePush, sendTestPush, pushPermission, pushSupported } = useNotifications()
+import type { BranchLocation, LocationEvent } from '~/composables/useBranchesApi'
+import { findLocationWarningEvent, getLocationWarningReference } from '~/utils/locationNotifications'
+
+const { items, unreadCount, refresh, markAllRead, checkToday, open, openDetails, enablePush, sendTestPush, refreshPushState, pushPermission, pushEnabled, pushSupported, pushServiceAvailable, pushSupportReason, pushStatusMessage, pushChecking, deviceKind, deviceLabel, deviceResolved } = useNotifications()
+const branchesApi = useBranchesApi()
 const checking = ref(false)
 const checkMessage = ref('')
 const enablingPush = ref(false)
@@ -7,6 +11,13 @@ const sendingTestPush = ref(false)
 const activeFilter = ref<'all' | 'unread'>('all')
 const search = ref('')
 const router = useRouter()
+const locationModalOpen = ref(false)
+const locationEvent = ref<LocationEvent | null>(null)
+const locationBranch = ref<BranchLocation | null>(null)
+const locationLoading = ref(false)
+const locationError = ref('')
+const locationFallbackDate = ref<string | null>(null)
+let locationRequestId = 0
 
 const filteredItems = computed(() => {
   const query = search.value.trim().toLocaleLowerCase('ru')
@@ -18,6 +29,7 @@ const filteredItems = computed(() => {
 
 onMounted(() => {
   void refresh()
+  void refreshPushState()
 })
 
 function displayNotificationBody(body: string) {
@@ -32,7 +44,7 @@ function formatNotificationDate(value: string) {
   }).format(new Date(value))
 }
 
-async function enablePhoneNotifications() {
+async function enableCurrentDeviceNotifications() {
   enablingPush.value = true
   try {
     await enablePush()
@@ -40,6 +52,24 @@ async function enablePhoneNotifications() {
     enablingPush.value = false
   }
 }
+
+const pushSectionTitle = computed(() => {
+  if (!deviceResolved.value) return 'Push-уведомления в браузере'
+  if (deviceKind.value === 'computer') return 'Push-уведомления на компьютере'
+  if (deviceKind.value === 'tablet') return 'Push-уведомления на планшете'
+  return 'Push-уведомления на телефоне'
+})
+
+const pushSectionDescription = computed(() => {
+  if (!deviceResolved.value || pushChecking.value) return 'Проверяем возможности браузера и регистрацию текущего устройства.'
+  if (!pushSupported.value) return pushSupportReason.value
+  if (pushServiceAvailable.value !== true) return pushStatusMessage.value || 'Проверяем доступность сервера push-уведомлений.'
+  if (pushPermission.value === 'denied') return 'Разрешение запрещено. Разрешите уведомления в настройках браузера и обновите страницу.'
+  if (pushEnabled.value) return `Устройство зарегистрировано. Push-уведомления включены в этом браузере на ${deviceLabel.value}.`
+  if (pushPermission.value === 'granted') return pushStatusMessage.value || 'Разрешение выдано, но текущий браузер ещё не зарегистрирован на сервере.'
+  if (deviceKind.value === 'computer') return 'Вы используете компьютер. Push-уведомления доступны в этом браузере, если он поддерживает их.'
+  return `Подключите push-уведомления в браузере на этом ${deviceLabel.value}.`
+})
 
 async function sendTestNotification() {
   sendingTestPush.value = true
@@ -70,6 +100,49 @@ function goBack() {
   }
 
   void router.push('/')
+}
+
+async function openNotification(item: (typeof items.value)[number]) {
+  open(item)
+  const reference = getLocationWarningReference(item)
+  if (!reference && item.type !== 'barber_location_warning') return
+
+  const requestId = ++locationRequestId
+  locationEvent.value = null
+  locationBranch.value = null
+  locationFallbackDate.value = item.created_at || null
+  locationError.value = ''
+  locationLoading.value = true
+  locationModalOpen.value = true
+
+  if (!reference) {
+    locationLoading.value = false
+    locationError.value = 'В уведомлении отсутствует идентификатор события.'
+    return
+  }
+
+  try {
+    const response = await branchesApi.locationEvents({ event_id: reference.eventId, limit: 1 })
+    if (requestId !== locationRequestId) return
+    const event = findLocationWarningEvent(response?.items || [], reference)
+    if (!event) {
+      locationError.value = 'Событие не найдено или недоступно для вашего филиала.'
+      return
+    }
+    locationEvent.value = event
+    try {
+      const branch = await branchesApi.getLocation(event.branch_id)
+      if (requestId === locationRequestId) locationBranch.value = branch?.location || null
+    }
+    catch { /* Event snapshots still provide the branch point when available. */ }
+  }
+  catch {
+    if (requestId !== locationRequestId) return
+    locationError.value = 'Не удалось получить событие. Проверьте подключение и права доступа к филиалу.'
+  }
+  finally {
+    if (requestId === locationRequestId) locationLoading.value = false
+  }
 }
 </script>
 
@@ -129,16 +202,16 @@ function goBack() {
         <section class="grid gap-3 sm:grid-cols-2" aria-label="Настройки push-уведомлений">
           <div class="flex flex-col justify-between gap-4 rounded-2xl border border-charcoal-200 bg-white p-4 sm:flex-row sm:items-center">
             <div class="flex items-start gap-3">
-              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-charcoal-50 text-charcoal-600"><UIcon name="i-lucide-smartphone" class="size-5" /></span>
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-charcoal-50 text-charcoal-600"><UIcon :name="deviceKind === 'computer' ? 'i-lucide-monitor' : deviceKind === 'tablet' ? 'i-lucide-tablet' : 'i-lucide-smartphone'" class="size-5" /></span>
               <div>
-                <p class="font-medium text-charcoal-950">Уведомления на телефон</p>
-                <p class="mt-1 text-xs leading-5 text-charcoal-500">Получайте важные события, даже когда панель закрыта.</p>
+                <p class="font-medium text-charcoal-950">{{ pushSectionTitle }}</p>
+                <p class="mt-1 text-xs leading-5 text-charcoal-500">{{ pushSectionDescription }}</p>
               </div>
             </div>
-            <UButton v-if="pushSupported" class="shrink-0" color="primary" variant="outline" size="sm" :loading="enablingPush" @click="enablePhoneNotifications">
-              {{ pushPermission === 'granted' ? 'Настроить' : 'Включить' }}
+            <UButton v-if="pushSupported && pushServiceAvailable === true && pushPermission !== 'denied'" class="shrink-0" color="primary" variant="outline" size="sm" :loading="enablingPush" :disabled="pushChecking" @click="enableCurrentDeviceNotifications">
+              {{ pushEnabled ? 'Перерегистрировать' : pushPermission === 'granted' ? 'Зарегистрировать' : 'Включить здесь' }}
             </UButton>
-            <span v-else class="text-xs text-charcoal-500">Не поддерживается браузером</span>
+            <span v-else-if="deviceResolved && !pushSupported" class="text-xs text-charcoal-500">Недоступно</span>
           </div>
 
           <div class="flex flex-col justify-between gap-4 rounded-2xl border border-charcoal-200 bg-white p-4 sm:flex-row sm:items-center">
@@ -149,7 +222,7 @@ function goBack() {
                 <p class="mt-1 text-xs leading-5 text-charcoal-500">Отправьте тест, чтобы убедиться, что push работает.</p>
               </div>
             </div>
-            <UButton class="shrink-0" color="neutral" variant="outline" size="sm" :loading="sendingTestPush" @click="sendTestNotification">Тестовое уведомление</UButton>
+              <UButton v-if="pushSupported && pushServiceAvailable === true" class="shrink-0" color="neutral" variant="outline" size="sm" :loading="sendingTestPush" :disabled="pushPermission !== 'granted' || pushChecking" @click="sendTestNotification">Тест на этом устройстве</UButton>
           </div>
         </section>
 
@@ -170,9 +243,9 @@ function goBack() {
               :class="item.read_at ? 'opacity-70' : ''"
               role="button"
               tabindex="0"
-              @click="open(item)"
-              @keydown.enter="open(item)"
-              @keydown.space.prevent="open(item)"
+              @click="openNotification(item)"
+              @keydown.enter="openNotification(item)"
+              @keydown.space.prevent="openNotification(item)"
             >
               <span class="relative mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl" :class="item.read_at ? 'bg-charcoal-100 text-charcoal-500' : 'bg-red-50 text-red-700'">
                 <UIcon name="i-lucide-triangle-alert" class="size-5" />
@@ -197,6 +270,14 @@ function goBack() {
         </section>
         <p class="pb-2 text-center text-xs text-charcoal-400">Показаны последние {{ items.length }} уведомлений</p>
       </div>
+      <BranchesLocationEventMapModal
+        v-model:open="locationModalOpen"
+        :event="locationEvent"
+        :branch-location="locationBranch"
+        :fallback-date="locationFallbackDate"
+        :loading="locationLoading"
+        :error="locationError"
+      />
     </template>
   </UDashboardPanel>
 </template>

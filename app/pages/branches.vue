@@ -125,10 +125,7 @@ const mapPickerSearchQuery = ref('')
 const mapPickerSearchResults = ref<Array<{ display_name: string, lat: string, lon: string }>>([])
 const leafletMapInstance = ref<any>(null)
 const eventMapOpen = ref(false)
-const eventMapElement = ref<HTMLElement | null>(null)
-const eventMapInstance = ref<any>(null)
 const eventMapEvent = ref<LocationEvent | null>(null)
-const eventMapLoading = ref(false)
 const mapPickerDraft = reactive({ address: '', latitude: '', longitude: '' })
 let reverseGeocodeTimer: ReturnType<typeof setTimeout> | null = null
 let reverseGeocodeRequestId = 0
@@ -149,10 +146,15 @@ function locationEventStatusLabel(event: LocationEvent) {
   return event.status === 'inside_radius' ? 'в радиусе' : event.status === 'outside_radius' ? 'вне радиуса' : 'отклонён'
 }
 
-const eventMapEventCoordinatesAvailable = computed(() => eventMapEvent.value ? validEventCoordinates(eventMapEvent.value) : false)
-const eventMapBranchLocationAvailable = computed(() => eventMapEvent.value
-  ? validMapPoint(locationForm.latitude, locationForm.longitude) || validMapPoint(eventMapEvent.value.branch_latitude, eventMapEvent.value.branch_longitude)
-  : false)
+const eventMapBranchLocation = computed<BranchLocation | null>(() => validMapPoint(locationForm.latitude, locationForm.longitude) && locationBranch.value
+  ? {
+      branch_id: locationBranch.value.id,
+      latitude: Number(locationForm.latitude),
+      longitude: Number(locationForm.longitude),
+      radius_meters: Number(locationForm.radius_meters),
+      is_enabled: locationForm.is_enabled
+    }
+  : null)
 
 const outsideRadiusEvents = computed(() => locationEvents.value.filter(event => event.status === 'outside_radius'))
 
@@ -354,78 +356,8 @@ async function saveLocation() {
 
 async function openEventMap(event: LocationEvent) {
   eventMapEvent.value = event
-  eventMapLoading.value = validEventCoordinates(event)
   locationOpen.value = false
   eventMapOpen.value = true
-}
-
-function createEventPopup(event: LocationEvent) {
-  const content = document.createElement('div')
-  content.className = 'space-y-1 text-sm'
-  const title = document.createElement('strong')
-  title.textContent = event.barber_name || event.barber_id
-  const date = document.createElement('div')
-  date.textContent = `Событие: ${formatDateTime(locationEventDate(event))}`
-  const status = document.createElement('div')
-  status.textContent = `Статус: ${locationEventStatusLabel(event)}`
-  content.append(title, date, status)
-  return content
-}
-
-async function initializeEventMap() {
-  const event = eventMapEvent.value
-  if (eventMapInstance.value || !event || !eventMapElement.value || !validEventCoordinates(event)) return
-  try {
-    const L = await import('leaflet')
-    const latitude = Number(event.latitude)
-    const longitude = Number(event.longitude)
-    const map = L.map(eventMapElement.value, { center: [latitude, longitude], zoom: 17, zoomControl: true })
-    eventMapInstance.value = map
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
-    }).addTo(map)
-    const markerColor = event.status === 'outside_radius' ? '#dc2626' : event.status === 'inside_radius' ? '#16a34a' : '#64748b'
-    const employeeMarker = L.marker([latitude, longitude], {
-      zIndexOffset: 1000,
-      icon: L.divIcon({
-        className: 'geocontrol-event-marker',
-        html: `<span style="display:block;width:22px;height:22px;border:4px solid white;border-radius:9999px;background:${markerColor};box-shadow:0 2px 8px rgb(0 0 0 / 35%)"></span>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      })
-    }).bindPopup(createEventPopup(event)).addTo(map)
-    employeeMarker.openPopup()
-
-    const branchLatitude = Number(locationForm.latitude || event.branch_latitude)
-    const branchLongitude = Number(locationForm.longitude || event.branch_longitude)
-    const radius = Number(locationForm.radius_meters || event.radius_meters)
-    if (validMapPoint(branchLatitude, branchLongitude)) {
-      L.marker([branchLatitude, branchLongitude]).bindPopup('Контрольная точка филиала').addTo(map)
-      if (Number.isFinite(radius) && radius > 0) {
-        L.circle([branchLatitude, branchLongitude], {
-          radius,
-          color: '#d97706',
-          fillColor: '#f59e0b',
-          fillOpacity: 0.16,
-          weight: 2
-        }).bindPopup(`Разрешённый радиус: ${Math.round(radius)} м`).addTo(map)
-      }
-    }
-    requestAnimationFrame(() => map.invalidateSize())
-  }
-  catch {
-    apiClient.notifyError(new Error('Не удалось загрузить карту'))
-  }
-  finally {
-    eventMapLoading.value = false
-  }
-}
-
-function destroyEventMap() {
-  eventMapInstance.value?.remove()
-  eventMapInstance.value = null
-  eventMapLoading.value = false
 }
 
 const mapPickerFallback = { latitude: 41.3111, longitude: 69.2797 }
@@ -1028,31 +960,7 @@ async function removeBranch(row: BranchRow) {
         <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="locationOpen = false">Закрыть</UButton></div></template>
       </UModal>
 
-      <UModal v-model:open="eventMapOpen" class="sm:max-w-4xl" title="Место входа сотрудника" :description="eventMapEvent ? `${eventMapEvent.barber_name || eventMapEvent.barber_id} · ${formatDateTime(locationEventDate(eventMapEvent))}` : ''" @after:enter="initializeEventMap" @after:leave="destroyEventMap">
-        <template #body>
-          <div v-if="eventMapEvent" class="space-y-4">
-            <div v-if="!eventMapEventCoordinatesAvailable" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <p class="font-semibold">Координаты события отсутствуют</p>
-              <p class="mt-1">Для этого входа карта и метка недоступны: в данных события нет корректного местоположения сотрудника.</p>
-            </div>
-            <div v-else class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
-              <div ref="eventMapElement" class="absolute inset-0" />
-              <div v-if="eventMapLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
-            </div>
-            <div class="grid gap-3 text-sm sm:grid-cols-3">
-              <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ eventMapEvent.barber_name || eventMapEvent.barber_id }}</p></div>
-              <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(locationEventDate(eventMapEvent)) }}</p></div>
-              <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ locationEventStatusLabel(eventMapEvent) }}</p></div>
-            </div>
-            <div v-if="!eventMapBranchLocationAvailable" class="rounded-xl border border-charcoal-200 bg-charcoal-50 p-3 text-sm text-charcoal-700">
-              <p class="font-semibold text-charcoal-950">Точка филиала не настроена</p>
-              <p class="mt-1">Контрольная точка и окружность разрешённого радиуса появятся после сохранения корректных координат филиала.</p>
-            </div>
-            <p class="text-xs text-charcoal-500">Метка показывает фактическое место входа. Контрольная точка и разрешённый радиус отображаются, если они настроены.</p>
-          </div>
-        </template>
-        <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="eventMapOpen = false">Закрыть</UButton></div></template>
-      </UModal>
+      <BranchesLocationEventMapModal v-model:open="eventMapOpen" :event="eventMapEvent" :branch-location="eventMapBranchLocation" />
 
       <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:enter="initializeMapPicker" @after:leave="destroyMapPicker">
         <template #body>

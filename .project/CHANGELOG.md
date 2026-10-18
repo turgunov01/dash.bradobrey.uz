@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-19
+
+- Fixed location-warning notifications that could not open their event because a historical notification's branch ID did not match the event's authoritative branch. The Dashboard now requests by exact event ID, relies on the authenticated API for branch scope, and loads branch geocontrol from the returned event. If the event is unavailable, the modal still shows the notification timestamp and clarifies it is not the event time.
+
 ## 2026-10-12
 
 - Улучшена карта «Геоконтроля входа»: события в истории стали кликабельными, координаты убраны из карточек, а интерактивная Leaflet-карта показывает фактическую метку сотрудника, popup с данными события и контрольную точку с радиусом при доступной настройке филиала.
@@ -119,4 +123,14 @@
 # 2026-10-12
 
 - Employee directory now displays and filters a barber by the persisted active work branch without changing the permanent branch assignment used by employee editing.
+
+# 2026-10-18 — notification geolocation details
+
+- Geolocation warning notifications now open the shared employee entry-location modal using their exact event and branch IDs. The modal loads branch policy through the authenticated API and keeps the notifications list and filters mounted while open.
+- Extracted the existing Leaflet event modal from `/branches` into a reusable component; missing event coordinates render an explicit message.
+
+# 2026-10-19 — device-aware browser push
+
+- Detect phone, tablet, or computer using browser device hints together with touch and pointer capabilities. Check secure context, Service Worker, Notifications API, Push API, and the configured VAPID key before exposing enable controls.
+- Show current-browser registration only after the authenticated backend confirms the subscription. Keep an existing browser subscription during re-registration and send test notifications to that browser endpoint only.
 

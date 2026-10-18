@@ -5,6 +5,12 @@ const {
   pushEnabled,
   pushPermission,
   pushSupported,
+  pushServiceAvailable,
+  pushSupportReason,
+  pushStatusMessage,
+  pushChecking,
+  deviceKind,
+  deviceLabel,
   refreshPushState,
   sendTestPush
 } = useNotifications()
@@ -13,6 +19,19 @@ const processing = ref(false)
 const testing = ref(false)
 
 onMounted(() => refreshPushState())
+
+const deviceTitle = computed(() => deviceKind.value === 'computer'
+  ? 'Уведомления на компьютере'
+  : deviceKind.value === 'tablet' ? 'Уведомления на планшете' : 'Уведомления на телефоне')
+const deviceStatus = computed(() => {
+  if (pushChecking.value) return 'Проверяем возможности браузера и регистрацию текущего устройства.'
+  if (!pushSupported.value) return pushSupportReason.value
+  if (pushServiceAvailable.value !== true) return pushStatusMessage.value || 'Проверяем доступность сервера push-уведомлений.'
+  if (pushPermission.value === 'denied') return 'Разрешение запрещено в настройках браузера. Разрешите уведомления и обновите страницу.'
+  if (pushEnabled.value) return `Текущий браузер зарегистрирован на ${deviceLabel.value}.`
+  if (pushPermission.value === 'granted') return pushStatusMessage.value || 'Разрешение выдано, но устройство не зарегистрировано на сервере.'
+  return `Подключите push-уведомления в браузере на этом ${deviceLabel.value}.`
+})
 
 async function enableNotifications() {
   processing.value = true
@@ -56,7 +75,7 @@ async function testNotifications() {
       <div class="max-w-3xl space-y-6">
         <div>
           <h1 class="text-2xl font-semibold text-charcoal-950">Уведомления</h1>
-          <p class="mt-1 text-sm text-charcoal-500">Подключение push-уведомлений для этого мобильного телефона.</p>
+          <p class="mt-1 text-sm text-charcoal-500">Проверка и подключение push-уведомлений для текущего устройства.</p>
         </div>
 
         <UCard>
@@ -66,20 +85,20 @@ async function testNotifications() {
                 <UIcon :name="pushEnabled ? 'i-lucide-bell-ring' : 'i-lucide-bell-off'" class="size-5" />
               </span>
               <div>
-                <p class="font-medium text-charcoal-950">{{ pushEnabled ? 'Уведомления подключены' : 'Уведомления выключены' }}</p>
+                <p class="font-medium text-charcoal-950">{{ pushEnabled ? deviceTitle + ' подключены' : deviceTitle }}</p>
                 <p class="mt-1 text-sm text-charcoal-500">
-                  {{ pushSupported ? (pushPermission === 'denied' ? 'Разрешение запрещено в настройках браузера.' : 'Настройка действует только для текущего устройства.') : 'Этот браузер не поддерживает push-уведомления.' }}
+                  {{ deviceStatus }}
                 </p>
               </div>
             </div>
             <div class="flex flex-wrap gap-2">
-              <UButton v-if="pushSupported" color="primary" :loading="processing" icon="i-lucide-bell-ring" @click="enableNotifications">
-                {{ pushEnabled ? 'Перерегистрировать' : 'Включить уведомления' }}
+              <UButton v-if="pushSupported && pushServiceAvailable === true && pushPermission !== 'denied'" color="primary" :loading="processing" :disabled="pushChecking" icon="i-lucide-bell-ring" @click="enableNotifications">
+                {{ pushEnabled ? 'Перерегистрировать' : pushPermission === 'granted' ? 'Зарегистрировать устройство' : 'Включить уведомления здесь' }}
               </UButton>
-              <UButton v-if="pushSupported && pushEnabled" color="neutral" variant="outline" :loading="processing" icon="i-lucide-bell-off" @click="disableNotifications">
+              <UButton v-if="pushSupported && pushServiceAvailable === true && pushEnabled" color="neutral" variant="outline" :loading="processing" icon="i-lucide-bell-off" @click="disableNotifications">
                 Выключить
               </UButton>
-              <UButton v-if="pushSupported && pushEnabled" color="neutral" variant="outline" :loading="testing" icon="i-lucide-send" @click="testNotifications">
+              <UButton v-if="pushSupported && pushServiceAvailable === true" color="neutral" variant="outline" :loading="testing" :disabled="pushPermission !== 'granted' || pushChecking" icon="i-lucide-send" @click="testNotifications">
                 Проверить
               </UButton>
             </div>
@@ -90,8 +109,8 @@ async function testNotifications() {
           icon="i-lucide-info"
           color="primary"
           variant="soft"
-          title="Как подключить телефон"
-          description="На Android разрешите уведомления в Chrome. На iPhone сначала добавьте dashboard на экран «Домой», затем откройте его с иконки и включите уведомления здесь."
+          title="О регистрации устройства"
+          description="Настройка и тест относятся только к этому браузеру. Другой браузер, компьютер или телефон регистрируется отдельно; ранее подключённые устройства продолжают получать общие уведомления."
         />
       </div>
     </template>
