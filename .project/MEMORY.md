@@ -87,3 +87,10 @@
 # Active employee branch display (2026-10-12)
 
 - The employee directory keeps `branch_id` as the permanent assignment for edit forms, but filters and displays by `active_branch_id` when the employee currently works in another branch.
+
+# Verifix branch schedule list audit (2026-10-18)
+
+- `app/pages/branches.vue` branch schedule dialog fetches all rows for the branch, filters active rows locally, and renders each row independently. Seeing a generic branch schedule and a barber-specific override for the same weekday is expected under the displayed fallback rule; the list currently does not group/annotate the override relationship beyond the raw scope label.
+- “Применить на все дни недели” replaces only generic branch rows; employee-specific schedules remain active and visible alongside the new defaults.
+- Follow-up fix on 2026-10-18: branch and personal schedule forms reject end times not later than start times; overnight shifts are not supported by the current form contract. The six active Chimgan Monday–Saturday personal entries were corrected to 10:00–20:00 in production; Sunday and branch defaults were preserved.
+- Related cross-layer audit and correction record: `C:\project\api.bradobrey.uz\audit-reports\verifix-schedule-duplicates\20261018-current-state.md`. The production Dashboard had pre-existing dirty employee/login files; they were preserved during the source overlay and build.

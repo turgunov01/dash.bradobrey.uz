@@ -580,7 +580,7 @@ async function confirmDelete() {
                 <UInput v-model="scheduleForm.start_time" type="time" />
               </UFormField>
 
-              <UFormField label="Конец смены">
+              <UFormField label="Конец смены" description="Укажите время позже начала смены; ночные смены не поддерживаются.">
                 <UInput v-model="scheduleForm.end_time" type="time" />
               </UFormField>
 
@@ -599,7 +599,7 @@ async function confirmDelete() {
               >
                 Отменить редактирование
               </UButton>
-              <UButton color="primary" :disabled="!scheduleForm.start_time" :loading="scheduleSubmitting" @click="saveSchedule">
+              <UButton color="primary" :disabled="!scheduleForm.start_time || (!!scheduleForm.end_time && scheduleForm.end_time <= scheduleForm.start_time)" :loading="scheduleSubmitting" @click="saveSchedule">
                 {{ scheduleEditingId ? 'Сохранить изменения' : 'Добавить график' }}
               </UButton>
             </div>

@@ -232,6 +232,7 @@ async function saveBulkSchedule() {
 }
 async function applyScheduleToWeek() {
   if (!scheduleBranch.value || scheduleSubmitting.value) return
+  if (scheduleForm.end_time <= scheduleForm.start_time) return
   scheduleSubmitting.value = true
   try {
     await verifixApi.bulkSchedules({
@@ -1147,7 +1148,7 @@ async function removeBranch(row: BranchRow) {
           </div>
         </template>
         <template #footer>
-          <UButton :loading="bulkScheduleSubmitting" :disabled="!allScheduleBranches.length || !bulkScheduleForm.start_time || !bulkScheduleForm.end_time || bulkScheduleForm.start_time === bulkScheduleForm.end_time || !Number.isInteger(bulkScheduleForm.grace_minutes) || bulkScheduleForm.grace_minutes < 0" @click="saveBulkSchedule">Применить ко всем филиалам на всю неделю</UButton>
+          <UButton :loading="bulkScheduleSubmitting" :disabled="!allScheduleBranches.length || !bulkScheduleForm.start_time || !bulkScheduleForm.end_time || bulkScheduleForm.end_time <= bulkScheduleForm.start_time || !Number.isInteger(bulkScheduleForm.grace_minutes) || bulkScheduleForm.grace_minutes < 0" @click="saveBulkSchedule">Применить ко всем филиалам на всю неделю</UButton>
         </template>
       </UModal>
 
@@ -1173,7 +1174,7 @@ async function removeBranch(row: BranchRow) {
               <UFormField label="Начало смены" required>
                 <UInput v-model="scheduleForm.start_time" type="time" />
               </UFormField>
-              <UFormField label="Конец смены">
+              <UFormField label="Конец смены" description="Укажите время позже начала смены; ночные смены не поддерживаются.">
                 <UInput v-model="scheduleForm.end_time" type="time" />
               </UFormField>
               <UFormField label="Допуск, минут">
@@ -1182,11 +1183,11 @@ async function removeBranch(row: BranchRow) {
             </div>
 
             <div class="flex flex-wrap justify-end gap-3">
-              <UButton v-if="!scheduleForm.barber_id" variant="outline" :disabled="!scheduleForm.start_time || !scheduleForm.end_time" :loading="scheduleSubmitting" @click="applyScheduleToWeek">Применить на все дни недели</UButton>
+              <UButton v-if="!scheduleForm.barber_id" variant="outline" :disabled="!scheduleForm.start_time || !scheduleForm.end_time || scheduleForm.end_time <= scheduleForm.start_time" :loading="scheduleSubmitting" @click="applyScheduleToWeek">Применить на все дни недели</UButton>
               <UButton v-if="scheduleEditingId" color="neutral" variant="ghost" :disabled="scheduleSubmitting" @click="resetScheduleForm">
                 Отменить редактирование
               </UButton>
-              <UButton color="primary" :disabled="!scheduleForm.start_time" :loading="scheduleSubmitting" @click="saveSchedule">
+              <UButton color="primary" :disabled="!scheduleForm.start_time || (!!scheduleForm.end_time && scheduleForm.end_time <= scheduleForm.start_time)" :loading="scheduleSubmitting" @click="saveSchedule">
                 {{ scheduleEditingId ? 'Сохранить изменения' : 'Добавить график' }}
               </UButton>
             </div>

@@ -1115,8 +1115,8 @@ async function savePersonalSchedule(barberId: string, branchId: string, enabled:
   if (!workDays.length) {
     throw new Error('Выберите хотя бы один рабочий день или отключите индивидуальный график.')
   }
-  if (workDays.some(day => !day.start_time || !day.end_time || day.start_time === day.end_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
-    throw new Error('Проверьте время смены и допуск для каждого рабочего дня.')
+  if (workDays.some(day => !day.start_time || !day.end_time || day.end_time <= day.start_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
+    throw new Error('Проверьте время смены: окончание должно быть позже начала. Ночные смены не поддерживаются.')
   }
 
   const schedulesByDay = new Map<number, VerifixSchedule[]>()
@@ -1216,8 +1216,8 @@ async function submitEmployee() {
   }
   if (personalScheduleEnabled.value) {
     const workDays = personalScheduleDays.value.filter(day => day.enabled)
-    if (!workDays.length || workDays.some(day => !day.start_time || !day.end_time || day.start_time === day.end_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
-      apiClient.notifyError(new Error('Проверьте персональный график'), 'Выберите рабочие дни, задайте время смены и укажите неотрицательный допуск.')
+    if (!workDays.length || workDays.some(day => !day.start_time || !day.end_time || day.end_time <= day.start_time || !Number.isInteger(Number(day.grace_minutes)) || day.grace_minutes < 0)) {
+      apiClient.notifyError(new Error('Проверьте персональный график'), 'Выберите рабочие дни, укажите окончание позже начала смены и задайте неотрицательный допуск. Ночные смены не поддерживаются.')
       return
     }
   }
