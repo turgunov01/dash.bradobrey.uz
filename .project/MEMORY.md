@@ -97,3 +97,8 @@
 - “Применить на все дни недели” replaces only generic branch rows; employee-specific schedules remain active and visible alongside the new defaults.
 - Follow-up fix on 2026-10-18: branch and personal schedule forms reject end times not later than start times; overnight shifts are not supported by the current form contract. The six active Chimgan Monday–Saturday personal entries were corrected to 10:00–20:00 in production; Sunday and branch defaults were preserved.
 - Related cross-layer audit and correction record: `C:\project\api.bradobrey.uz\audit-reports\verifix-schedule-duplicates\20261018-current-state.md`. The production Dashboard had pre-existing dirty employee/login files; they were preserved during the source overlay and build.
+
+# Production admin permission restoration (2026-10-19)
+
+- The production `admin` account's five explicit permissions came from the one-time API employee-quality backfill. The dashboard intentionally treats a non-empty permission array as an authoritative per-user override; clearing only this account's rows lets its existing `admin` role resolve to the full 26-permission preset. Permissions are read from `/api/barbers/me`, not JWT claims. A currently loaded browser tab may need a reload or fresh login to refresh the Pinia session snapshot.
+- Production API returned the target admin with zero explicit rows, and the dashboard RBAC regression suite confirms empty-permission admins receive the complete preset. Database backup and API-side deployment details are recorded in the API project's `.project/MEMORY.md`.
