@@ -13,6 +13,7 @@ const {
   needsBranchSelection,
   operationsCards,
   pending,
+  rangeError,
   refresh,
   scope,
   scopeContextLabel,
@@ -68,6 +69,7 @@ async function refreshAll() {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :range-error="rangeError"
           :scope-options="branchScopeOptions"
           subtitle="Период применяется одновременно к операционной статистике и рейтингу качества филиала."
           title="Показатели филиала"

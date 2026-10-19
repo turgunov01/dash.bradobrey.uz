@@ -106,3 +106,11 @@
 # Owner workflow preference (2026-10-19)
 
 - Make requested project changes in the local repositories and push Git changes when requested/appropriate. Do not deploy, pull/overlay source on production, build there, restart production processes, or otherwise modify production until the owner explicitly authorizes a production deployment in that request.
+
+# Statistics audit (2026-10-19)
+
+- Statistics history requests are date-scoped to the selected dashboard period and loaded through bounded `limit/offset` pages; `all=true` must not be used for dashboard analytics.
+- History date-only boundaries use `Asia/Tashkent` half-open intervals. The API returns `clients.first_visit_date` so period-scoped loading preserves new/repeat client classification.
+- `rejected`, `cancelled`, `no_show`, and `not_in_time` are refusal/cancellation states. Reversed UI date ranges are invalid and must be shown inline.
+- The history page renders partial-source errors and loading skeletons; API history/statistics 500 responses use generic codes and keep provider/database details in logs.
+- Full report: `C:\project\bradobrey-audit-report\2026-10-19-statistics\AUDIT_REPORT.md`. Staging/production runtime checks remain blocked; no deployment was performed.

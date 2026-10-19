@@ -8,6 +8,7 @@ defineProps<{
   barberOptions: BarberOption[]
   contextLabel: string
   count: number
+  rangeError?: string | null
   scopeOptions: Array<{ label: string, value: StatisticsScope }>
   subtitle: string
   title: string
@@ -48,6 +49,8 @@ const uiStore = useUiStore()
         </div>
       </div>
     </template>
+
+    <UAlert v-if="rangeError" class="mb-4" color="error" icon="i-lucide-calendar-x-2" :description="rangeError" title="Некорректный период" variant="soft" />
 
     <div class="grid gap-4 xl:grid-cols-[0.26fr_0.26fr_0.18fr_0.3fr]">
       <UFormField label="Дата начала">

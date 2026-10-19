@@ -143,7 +143,7 @@ function destroyMap() {
         <p class="text-charcoal-600">{{ formatDateTime(fallbackDate) }}</p>
         <p class="mt-1 text-xs text-charcoal-500">Это время создания уведомления. Данные события входа сейчас недоступны.</p>
       </div>
-      <UAlert v-else color="warning" variant="soft" icon="i-lucide-map-pin-off" title="Событие недоступно" description="Проверьте уведомление и права доступа к филиалу." />
+      <UAlert v-if="!event && !loading && !error && !fallbackDate" color="warning" variant="soft" icon="i-lucide-map-pin-off" title="Событие недоступно" description="Проверьте уведомление и права доступа к филиалу." />
     </template>
     <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="open = false">Закрыть</UButton></div></template>
   </UModal>

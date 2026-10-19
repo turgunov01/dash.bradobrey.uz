@@ -14,6 +14,7 @@ const {
   needsBarberSelection,
   operationsCards,
   pending,
+  rangeError,
   refresh,
   scope,
   scopeContextLabel,
@@ -55,6 +56,7 @@ function openEmployeeDetails(employeeId: string) {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :range-error="rangeError"
           :scope-options="scopeOptions"
           subtitle="Показатели сотрудников считаются по завершённым записям и прайсу услуг в выбранном периоде и области."
           title="Аналитика по сотрудникам"

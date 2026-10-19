@@ -52,6 +52,11 @@ test('shared event modal displays event metadata and uses only event coordinates
   assert.match(notificationsPage, /:branch-location="locationBranch"/)
 })
 
+test('event unavailable warning is hidden when the event is loaded', () => {
+  assert.match(eventModal, /!event && !loading && !error && !fallbackDate/)
+  assert.doesNotMatch(eventModal, /<UAlert v-else color="warning"[^>]*title="Событие недоступно"/)
+})
+
 test('branches page continues using the same location event modal', () => {
   assert.match(branchesPage, /<BranchesLocationEventMapModal v-model:open="eventMapOpen"/)
   assert.match(branchesPage, /function openEventMap\(event: LocationEvent\)/)

@@ -9,7 +9,9 @@ const {
   branchPieItems,
   clientChartData,
   clientMetrics,
+  dataError,
   filteredHistory,
+  hasData,
   mainMetrics,
   mainStatusChartData,
   needsBranchSelection,
@@ -18,6 +20,7 @@ const {
   paymentBreakdown,
   paymentPieItems,
   pending,
+  rangeError,
   refresh,
   scope,
   scopeContextLabel,
@@ -57,6 +60,7 @@ const {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :range-error="rangeError"
           :scope-options="scopeOptions"
           subtitle="Выручка считается по сумме заказа или оплате, а если сумма недоступна — по прайсу услуг. Начальный период — текущий месяц."
           title="Бизнес-аналитика по истории записей"
@@ -77,6 +81,10 @@ const {
         />
 
         <template v-else>
+          <UAlert v-if="dataError" color="error" icon="i-lucide-triangle-alert" title="Статистика загружена не полностью" :description="dataError" variant="soft" />
+          <div v-if="pending && !hasData" class="grid gap-4 xl:grid-cols-4 md:grid-cols-2" aria-live="polite">
+            <USkeleton v-for="index in 4" :key="index" class="h-24 rounded-2xl" />
+          </div>
           <div class="grid gap-4 md:grid-cols-2">
             <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
               <div class="flex flex-col gap-6">

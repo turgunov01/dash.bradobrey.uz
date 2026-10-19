@@ -23,7 +23,7 @@ export function useHistoryApi() {
       return newItems
     }
 
-    const firstResponse = await request({ ...query, all: true })
+    const firstResponse = await request({ ...query, limit: pageSize, offset: 0 })
     const firstPageItems = extractItems(firstResponse)
     addItems(firstPageItems)
     const firstTotal = extractTotal(firstResponse)

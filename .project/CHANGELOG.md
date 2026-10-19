@@ -134,3 +134,9 @@
 - Detect phone, tablet, or computer using browser device hints together with touch and pointer capabilities. Check secure context, Service Worker, Notifications API, Push API, and the configured VAPID key before exposing enable controls.
 - Show current-browser registration only after the authenticated backend confirms the subscription. Keep an existing browser subscription during re-registration and send test notifications to that browser endpoint only.
 
+# 2026-10-19 — statistics audit fixes
+
+- Scoped dashboard history loading to the selected date range with bounded pagination and refresh on period/active-branch changes.
+- Preserved new/repeat client accuracy with server-provided `first_visit_date`, counted `rejected` as refusal, surfaced history errors/loading, and validated reversed date ranges.
+- Added regression coverage and recorded the audit at `C:\project\bradobrey-audit-report\2026-10-19-statistics\AUDIT_REPORT.md`.
+

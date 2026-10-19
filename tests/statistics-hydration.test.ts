@@ -10,6 +10,10 @@ const employeeStatisticsPageSource = readFileSync(
   new URL('../app/pages/statistics/employees.vue', import.meta.url),
   'utf8'
 )
+const historyStatisticsPageSource = readFileSync(
+  new URL('../app/pages/statistics/history.vue', import.meta.url),
+  'utf8'
+)
 const branchStatisticsPageSource = readFileSync(
   new URL('../app/pages/statistics/branch.vue', import.meta.url),
   'utf8'
@@ -28,6 +32,10 @@ const statisticsBffSource = readFileSync(
 )
 const statisticsModalSource = readFileSync(
   new URL('../app/components/statistics/EmployeeStatisticsModal.vue', import.meta.url),
+  'utf8'
+)
+const historyApiSource = readFileSync(
+  new URL('../app/composables/useHistoryApi.ts', import.meta.url),
   'utf8'
 )
 
@@ -57,4 +65,24 @@ test('employee statistics supports accessible drill-down without a second API re
   assert.match(statisticsModalSource, /Средний чек/)
   assert.match(analyticsSource, /new Set\(values\)/)
   assert.match(analyticsSource, /sourceErrors/)
+})
+
+test('statistics history loads bounded date pages and refreshes when the slice changes', () => {
+  assert.match(historyApiSource, /limit: pageSize, offset: 0/)
+  assert.doesNotMatch(historyApiSource, /all:\s*true/)
+  assert.match(analyticsSource, /end_date: uiStore\.statisticsRange\.end/)
+  assert.match(analyticsSource, /start_date: uiStore\.statisticsRange\.start/)
+  assert.match(analyticsSource, /branchStore\.activeBranchId/)
+})
+
+test('statistics keeps rejected entries in refusal metrics and preserves client first-visit context', () => {
+  assert.match(analyticsSource, /\['cancelled', 'rejected', 'no_show', 'not_in_time'\]/)
+  assert.match(analyticsSource, /clientFirstVisitTimestamp/)
+  assert.match(analyticsSource, /first_visit_date/)
+})
+
+test('history page exposes partial-source failures and initial loading state', () => {
+  assert.match(historyStatisticsPageSource, /dataError/)
+  assert.match(historyStatisticsPageSource, /pending && !hasData/)
+  assert.match(historyStatisticsPageSource, /USkeleton/)
 })

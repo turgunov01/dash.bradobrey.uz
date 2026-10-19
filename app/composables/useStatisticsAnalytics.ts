@@ -98,6 +98,7 @@ type NormalizedHistoryEntry = {
   branchId: string | null
   branchName: string
   clientPhone: string | null
+  clientFirstVisitTimestamp: number | null
   createdAt: string | null
   createdTimestamp: number | null
   estimatedRevenue: number
@@ -235,7 +236,7 @@ function isCompletedStatus(status: string) {
 }
 
 function isCancelledStatus(status: string) {
-  return ['cancelled', 'no_show', 'not_in_time'].includes(status)
+  return ['cancelled', 'rejected', 'no_show', 'not_in_time'].includes(status)
 }
 
 function getBranchId(item: Record<string, any>) {
@@ -258,6 +259,10 @@ function getClientPhone(item: Record<string, any>) {
     || item.client?.phone_number
     || item.customer?.phone
   )
+}
+
+function getClientFirstVisitTimestamp(item: Record<string, any>) {
+  return normalizeTimestamp(normalizeText(item.client?.first_visit_date))
 }
 
 function getServiceIds(item: Record<string, any>) {
@@ -377,9 +382,13 @@ export function useStatisticsAnalytics() {
     const directoryQuery: Record<string, unknown> = permissions.has('statistics.read.global')
       ? { __skipBranchScope: true }
       : { ...(branchId ? { branch_id: branchId } : {}) }
+    const historyDateQuery = {
+      end_date: uiStore.statisticsRange.end,
+      start_date: uiStore.statisticsRange.start
+    }
 
     const [historyResult, servicesResult, barbersResult] = await Promise.allSettled([
-      historyApi.listAll(historyQuery),
+      historyApi.listAll({ ...historyQuery, ...historyDateQuery }),
       kioskApi.services({ ...directoryQuery, active: true, grouped: true }),
       barbersApi.list(directoryQuery)
     ])
@@ -409,9 +418,18 @@ export function useStatisticsAnalytics() {
 
   // Client-only data must start after hydration, otherwise loading icons,
   // disabled attributes and conditional content differ from the SSR output.
+  let mounted = false
   onMounted(() => {
+    mounted = true
     void refresh()
   })
+
+  watch(
+    () => [uiStore.statisticsRange.start, uiStore.statisticsRange.end, branchStore.activeBranchId],
+    () => {
+      if (mounted && data.value) void refresh()
+    }
+  )
 
   const serviceMap = computed<Map<string, FlatServiceItem>>(() =>
     new Map<string, FlatServiceItem>(
@@ -437,6 +455,7 @@ export function useStatisticsAnalytics() {
       const barberId = getBarberId(item)
       const barberName = getBarberName(item)
       const clientPhone = getClientPhone(item)
+      const clientFirstVisitTimestamp = getClientFirstVisitTimestamp(item)
       const serviceIds = getServiceIds(item)
       const status = normalizeStatus(item.status)
       const estimatedRevenue = getHistoryAmount(item, servicePriceMap.value)
@@ -471,6 +490,7 @@ export function useStatisticsAnalytics() {
           ? branchMap.value.get(branchId)?.name || `Филиал ${shortId(branchId)}`
           : 'Филиал не указан',
         clientPhone,
+        clientFirstVisitTimestamp,
         createdAt,
         createdTimestamp,
         estimatedRevenue,
@@ -585,10 +605,16 @@ export function useStatisticsAnalytics() {
       }
     }
 
-    return {
-      end: start.getTime() + 86399999,
-      start: end.getTime()
-    }
+    return null
+  })
+
+  const rangeError = computed(() => {
+    const start = parseRangeDate(uiStore.statisticsRange.start)
+    const end = parseRangeDate(uiStore.statisticsRange.end)
+
+    return start && end && start.getTime() > end.getTime()
+      ? 'Дата окончания не может быть раньше даты начала.'
+      : null
   })
 
   const selectedPeriodDays = computed(() => {
@@ -668,9 +694,10 @@ export function useStatisticsAnalytics() {
       }
 
       const currentFirstSeen = firstSeenByPhone.get(item.clientPhone)
+      const firstVisitTimestamp = item.clientFirstVisitTimestamp ?? item.primaryTimestamp
 
-      if (currentFirstSeen === undefined || item.primaryTimestamp < currentFirstSeen) {
-        firstSeenByPhone.set(item.clientPhone, item.primaryTimestamp)
+      if (firstVisitTimestamp !== null && (currentFirstSeen === undefined || firstVisitTimestamp < currentFirstSeen)) {
+        firstSeenByPhone.set(item.clientPhone, firstVisitTimestamp)
       }
     }
 
@@ -1195,6 +1222,7 @@ export function useStatisticsAnalytics() {
     paymentBreakdown,
     paymentPieItems,
     pending,
+    rangeError,
     refresh,
     scope,
     scopeContextLabel,
