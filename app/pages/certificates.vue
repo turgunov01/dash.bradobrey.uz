@@ -42,6 +42,13 @@ function formatMetadataPreview(value: Record<string, unknown> | null) {
   return serialized.length > 90 ? `${serialized.slice(0, 90)}...` : serialized
 }
 
+function toExpiryIso(dateValue: string) {
+  if (!dateValue) return null
+
+  const date = new Date(`${dateValue}T23:59:59.999+05:00`)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
 function extractCertificateRows(response: unknown): CertificateRow[] {
   if (!response || typeof response !== 'object') return []
 
@@ -164,7 +171,7 @@ function openCreateModal(row?: CertificateRow) {
   if (row) {
     editingId.value = row.id
     form.code = row.code
-    form.expires_at = row.expires_at ? row.expires_at.slice(0, 16) : ''
+    form.expires_at = row.expires_at ? row.expires_at.slice(0, 10) : ''
     form.service_ids = [...row.service_ids]
     form.metadata = row.metadata ? JSON.stringify(row.metadata, null, 2) : '{}'
   } else {
@@ -184,7 +191,7 @@ async function submitCertificate() {
 
   const payload: CertificateCreatePayload = {
     code: form.code,
-    expires_at: form.expires_at || null,
+    expires_at: toExpiryIso(form.expires_at),
     metadata: parsedMetadata,
     service_ids: form.service_ids
   }
@@ -367,8 +374,8 @@ async function lookupCertificate() {
             value-key="value" portal="body" />
         </UFormField>
 
-        <UFormField label="Действует до (ISO)">
-          <UInput v-model="form.expires_at" placeholder="2027-03-19T05:00" />
+        <UFormField label="Действует до">
+          <UInput v-model="form.expires_at" type="date" />
         </UFormField>
 
         <UFormField label="Метаданные (JSON)">
