@@ -90,7 +90,6 @@ export const employeeQualityProvisionalReasons = [
   'employee_inactive',
   'insufficient_classifiable_completed',
   'insufficient_classification_coverage',
-  'mixed_data',
   'no_authoritative_snapshot',
   'no_completed_orders'
 ] as const
@@ -438,13 +437,24 @@ export function sanitizeEmployeeQualityResponse(value: unknown): EmployeeQuality
     const isAdministrativeExclusion = reason === 'employee_archived' || reason === 'employee_inactive'
     const hasMinimumVolume = entry.metrics.classifiable_completed >= minimumClassifiableCompleted
     const hasMinimumCoverage = entry.metrics.classification_coverage >= minimumClassificationCoverage
-    const hasAuthoritativeEvidence = entry.metrics.assessment_source === 'live_snapshot'
-      && entry.metrics.data_confidence === 'authoritative'
-      && entry.metrics.assessment_source_counts.live_snapshot === entry.metrics.classifiable_completed
-      && entry.metrics.assessment_source_counts.backfill_current_catalog === 0
+    const sourceCounts = entry.metrics.assessment_source_counts
+    const liveSnapshotCount = sourceCounts.live_snapshot ?? 0
+    const backfillCount = sourceCounts.backfill_current_catalog ?? 0
+    const sourcesReconcile = liveSnapshotCount + backfillCount
+      === entry.metrics.classifiable_completed
+    const hasAuthoritativeEvidence = entry.metrics.data_confidence === 'authoritative'
+      && entry.metrics.assessment_source === 'live_snapshot'
+      && backfillCount === 0
+      && liveSnapshotCount === entry.metrics.classifiable_completed
+      && sourcesReconcile
+    const hasMixedEvidence = entry.metrics.data_confidence === 'mixed'
+      && entry.metrics.assessment_source === 'mixed'
+      && liveSnapshotCount > 0
+      && sourcesReconcile
+    const hasUsableEvidence = hasAuthoritativeEvidence || hasMixedEvidence
     const shouldBeEligible = entry.metrics.classifiable_completed >= minimumClassifiableCompleted
       && entry.metrics.classification_coverage >= minimumClassificationCoverage
-      && hasAuthoritativeEvidence
+      && hasUsableEvidence
 
     if (entry.eligible && (!shouldBeEligible || reason)) {
       throw new Error('Employee eligibility is inconsistent with rules and data confidence.')
@@ -459,7 +469,7 @@ export function sanitizeEmployeeQualityResponse(value: unknown): EmployeeQuality
         || (reason === 'no_completed_orders' && entry.metrics.completed === 0)
         || (reason === 'insufficient_classifiable_completed' && !hasMinimumVolume)
         || (reason === 'insufficient_classification_coverage' && !hasMinimumCoverage)
-        || (['approximate_data', 'mixed_data', 'no_authoritative_snapshot'].includes(reason) && !hasAuthoritativeEvidence)
+        || (['approximate_data', 'no_authoritative_snapshot'].includes(reason) && !hasUsableEvidence)
 
       if (!reasonIsConsistent || (shouldBeEligible && !isAdministrativeExclusion)) {
         throw new Error('Employee provisional_reason is inconsistent with eligibility evidence.')

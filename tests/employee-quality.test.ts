@@ -143,6 +143,70 @@ test('sanitizes the aggregate to PII-free fields and preserves source/pagination
   assert.equal(result.rules.suspicious_duration_ratio, 0.5)
 })
 
+test('accepts a mixed source when the reconciled classifiable coverage meets v1 policy', () => {
+  const result = sanitizeEmployeeQualityResponse(response([{
+    eligible: true,
+    employee: { id: 'abbos', name: 'Аббос', branch_id: 'b1' },
+    metrics: metrics({
+      assessment_source: 'mixed',
+      assessment_source_counts: { live_snapshot: 100, backfill_current_catalog: 56, unclassified: 0 },
+      classifiable_completed: 156,
+      completed: 156,
+      data_confidence: 'mixed',
+      employee_failure_count: 0,
+      employee_failure_rate: 0,
+      suspicious_count: 0,
+      suspicious_rate: 0,
+      trusted_completed: 156
+    }),
+    provisional_reason: null,
+    rank: 1,
+    rank_reason: null
+  }]))
+
+  assert.equal(result.employees[0]!.eligible, true)
+  assert.equal(result.employees[0]!.rank, 1)
+  assert.equal(buildEmployeeQualitySections(result.employees).eligible[0]!.employee.id, 'abbos')
+})
+
+test('keeps mixed employees without enough volume or coverage out of the official section', () => {
+  const makeEntry = (id: string, completed: number, classifiable: number, reason: string) => ({
+    eligible: false,
+    employee: { id, name: id, branch_id: 'b1' },
+    metrics: metrics({
+      assessment_source: 'mixed',
+      assessment_source_counts: {
+        live_snapshot: Math.ceil(classifiable / 2),
+        backfill_current_catalog: Math.floor(classifiable / 2),
+        unclassified: completed - classifiable
+      },
+      classification_coverage: completed ? classifiable / completed : 0,
+      classifiable_completed: classifiable,
+      completed,
+      data_confidence: 'mixed',
+      employee_failure_count: 0,
+      employee_failure_rate: 0,
+      suspicious_count: 0,
+      suspicious_rate: 0,
+      trusted_completed: classifiable
+    }),
+    provisional_reason: reason,
+    rank: null,
+    rank_reason: null
+  })
+
+  const result = sanitizeEmployeeQualityResponse(response([
+    makeEntry('mixed-nine', 9, 9, 'insufficient_classifiable_completed'),
+    makeEntry('mixed-coverage', 100, 89, 'insufficient_classification_coverage')
+  ]))
+
+  assert.equal(buildEmployeeQualitySections(result.employees).eligible.length, 0)
+  assert.deepEqual(result.employees.map(entry => entry.provisional_reason), [
+    'insufficient_classifiable_completed',
+    'insufficient_classification_coverage'
+  ])
+})
+
 test('fails closed when aggregate invariants or eligibility are inconsistent', () => {
   assert.throws(() => sanitizeEmployeeQualityResponse(response([{
     eligible: true,

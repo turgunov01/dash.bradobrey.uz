@@ -140,3 +140,8 @@
 - Preserved new/repeat client accuracy with server-provided `first_visit_date`, counted `rejected` as refusal, surfaced history errors/loading, and validated reversed date ranges.
 - Added regression coverage and recorded the audit at `C:\project\bradobrey-audit-report\2026-10-19-statistics\AUDIT_REPORT.md`.
 
+# 2026-10-19
+
+- Fixed Employee Quality v1 eligibility so a mixed period with sufficient reconciled classifiable data can receive an official rank. The backend now uses the published 10-completion/90%-coverage thresholds, keeps approximate-only periods provisional, and the Dashboard validator follows the same rule instead of requiring every completion to be a live authoritative snapshot.
+- Added regressions for the 156-completion mixed-source case, eligibility/coverage boundaries, strict suspicious-duration classification, stable ties, revenue independence, and API/Dashboard contract parity.
+

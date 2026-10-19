@@ -126,7 +126,6 @@ function provisionalReason(value: string | null) {
     employee_inactive: 'Сотрудник неактивен и не входит в активный рейтинг',
     insufficient_classifiable_completed: 'Недостаточно классифицируемых завершённых заказов',
     insufficient_classification_coverage: 'Недостаточная полнота данных',
-    mixed_data: 'Период содержит смешанные авторитетные и приблизительные данные',
     no_completed_orders: 'В выбранном периоде нет завершённых заказов',
     no_authoritative_snapshot: 'Нет авторитетных снимков длительности'
   }

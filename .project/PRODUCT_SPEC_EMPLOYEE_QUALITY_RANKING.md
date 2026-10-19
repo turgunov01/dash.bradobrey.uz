@@ -180,14 +180,14 @@ The cutover policy must distinguish genuinely captured snapshots from reconstruc
 - assessments created from live completion data use `assessment_source=live_snapshot` and are authoritative;
 - legacy backfill is idempotent and uses `assessment_source=backfill_current_catalog` plus `data_confidence=approximate`;
 - pre-migration terminal outcomes receive `actor_type=unknown` and remain neutral; responsibility must never be inferred from `barber_id`;
-- approximate legacy assessments may be displayed during shadow analysis but do not receive an official rank under `employee-quality-v1` unless a separately approved backfill formula version is activated.
+- approximate-only legacy assessments may be displayed during shadow analysis but do not receive an official rank under `employee-quality-v1`; a mixed period is evaluated by its reconciled classifiable sample and coverage, not rejected solely because one source is approximate.
 
 Period-level confidence is aggregated, not represented by one arbitrary source value:
 
 - return `assessment_source_counts` for `live_snapshot`, `backfill_current_catalog`, and `unclassified`;
 - return `data_confidence=authoritative|mixed|approximate`;
-- official v1 eligibility uses authoritative classifiable completions only;
-- mixed/approximate data is visible but provisional unless an approved historical formula version defines otherwise.
+- official v1 eligibility requires at least 10 classifiable completions and at least 90% classification coverage, with `data_confidence=authoritative|mixed`;
+- `data_confidence=approximate` remains provisional, while `mixed` is eligible when the quantitative thresholds are met and the classifiable sample contains live evidence; mixed is never treated as an automatic exclusion.
 
 ### 7.3 Outcome attribution
 
@@ -375,7 +375,7 @@ The existing revenue list may remain temporarily during shadow rollout only if i
 24. If `trusted_completed + employee_failure_count = 0`, `employee_failure_rate` is returned as `0`; the employee still cannot benefit because suspicious keys and eligibility are evaluated first.
 25. The authenticated server action determines `actor_type` and the allowed `reason_code`; a client cannot relabel an employee action as customer, manager, or system.
 26. A review requires `statistics.quality.review`, cannot be performed by the assessed employee, requires a reason, rejects stale versions with `409`, and is idempotent for an identical retry.
-27. Mixed source periods expose complete `assessment_source_counts`; approximate/backfilled rows do not satisfy authoritative v1 eligibility.
+27. Mixed source periods expose complete `assessment_source_counts`; approximate-only periods remain provisional, while mixed periods with classifiable live evidence can satisfy v1 eligibility when the reconciled classifiable sample and coverage meet the published thresholds.
 28. Both `/statistics/employees` and `/statistics/branch` stop presenting the revenue Top-list as a quality ranking.
 29. Employee detail, History, Notifications, and Statistics return the same classification for the same immutable order snapshot.
 30. Delayed completion, post-start service edits, stale `in_progress` orders, and attempted branch hopping are covered by abuse/data-quality tests and cannot silently improve rank.
