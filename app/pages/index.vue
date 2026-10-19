@@ -69,8 +69,8 @@ const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${curr
     }).catch(() => ({ services: [] })),
     statisticsApi.global({
       __skipBranchScope: true,
-      start_date: monthStartAt,
-      end_date: monthEndAt
+      start_date: currentMonthRange.start,
+      end_date: currentMonthRange.end
     }).catch(() => null)
   ])
   const statistics = summarizeHistoryMetrics(

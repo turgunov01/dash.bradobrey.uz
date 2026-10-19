@@ -38,6 +38,10 @@ const historyApiSource = readFileSync(
   new URL('../app/composables/useHistoryApi.ts', import.meta.url),
   'utf8'
 )
+const overviewPageSource = readFileSync(
+  new URL('../app/pages/index.vue', import.meta.url),
+  'utf8'
+)
 
 test('client-only statistics requests start after hydration', () => {
   assert.match(rankingSource, /immediate:\s*false/)
@@ -73,6 +77,17 @@ test('statistics history loads bounded date pages and refreshes when the slice c
   assert.match(analyticsSource, /end_date: uiStore\.statisticsRange\.end/)
   assert.match(analyticsSource, /start_date: uiStore\.statisticsRange\.start/)
   assert.match(analyticsSource, /branchStore\.activeBranchId/)
+})
+
+test('overview statistics sends calendar dates instead of timestamps', () => {
+  assert.match(
+    overviewPageSource,
+    /statisticsApi\.global\(\{[\s\S]*start_date: currentMonthRange\.start,[\s\S]*end_date: currentMonthRange\.end/
+  )
+  assert.doesNotMatch(
+    overviewPageSource,
+    /statisticsApi\.global\(\{[\s\S]*start_date: monthStartAt,[\s\S]*end_date: monthEndAt/
+  )
 })
 
 test('statistics keeps rejected entries in refusal metrics and preserves client first-visit context', () => {

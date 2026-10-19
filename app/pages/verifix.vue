@@ -545,7 +545,7 @@ const detailColumns: TableColumn<LateRow>[] = [
               <UInput v-model="toDate" type="date" size="lg" class="min-w-0 flex-1" :min="fromDate" :ui="{ base: 'px-4' }" />
             </label>
             <label class="space-y-2">
-              <span class="text-xs font-semibold uppercase tracking-[0.1em] text-charcoal-500">Филиал</span>
+              <span class="text-xs font-semibold uppercase tracking-widest text-charcoal-500">Филиал</span>
               <USelectMenu v-model="selectedBranchId" :items="branchOptions" value-key="value" size="lg" class="w-full" placeholder="Выберите филиал" portal="body" />
             </label>
           </div>
@@ -640,7 +640,7 @@ const detailColumns: TableColumn<LateRow>[] = [
                     </span>
                   </span>
                 </span>
-                <span class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[22rem]">
+                <span class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-88">
                   <span class="rounded-xl bg-charcoal-50 px-3 py-2 text-center">
                     <strong class="block text-sm text-charcoal-950">{{ employee.lateDays }}</strong>
                     <span class="text-[11px] text-charcoal-500">дней</span>
