@@ -10,6 +10,7 @@ const enablingPush = ref(false)
 const sendingTestPush = ref(false)
 const activeFilter = ref<'all' | 'unread'>('all')
 const search = ref('')
+const searchOpen = ref(false)
 const router = useRouter()
 const locationModalOpen = ref(false)
 const locationEvent = ref<LocationEvent | null>(null)
@@ -27,8 +28,14 @@ const filteredItems = computed(() => {
   })
 })
 
+// Notifications come from shared state; show skeletons until the first refresh settles.
+const listLoading = ref(true)
+const isListInitialLoading = computed(() => listLoading.value && !items.value.length)
+
 onMounted(() => {
-  void refresh()
+  void refresh().finally(() => {
+    listLoading.value = false
+  })
   void refreshPushState()
 })
 
@@ -174,68 +181,95 @@ async function openNotification(item: (typeof items.value)[number]) {
 
     <template #body>
       <div class="mx-auto w-full max-w-6xl space-y-6">
-        <section class="flex flex-col gap-5 rounded-3xl border border-charcoal-200 bg-gradient-to-br from-white via-white to-primary/5 p-5 shadow-sm sm:p-7 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex items-start gap-4">
-            <span class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <UIcon name="i-lucide-bell-ring" class="size-6" />
-            </span>
-            <div>
-              <div class="flex flex-wrap items-center gap-2">
-                <h1 class="text-2xl font-semibold tracking-tight text-charcoal-950">Уведомления</h1>
-                <UBadge color="error" variant="soft">{{ unreadCount }} непрочитанных</UBadge>
-              </div>
-              <p class="mt-1 max-w-xl text-sm leading-6 text-charcoal-500">Важные события и подозрительные заказы в одном месте.</p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="barbershop-heading text-2xl text-charcoal-950 sm:text-3xl">Уведомления</h1>
+              <USkeleton v-if="isListInitialLoading" class="h-6 w-32 rounded-md" />
+              <UBadge v-else-if="unreadCount" color="error" variant="soft">{{ unreadCount }} непрочитанных</UBadge>
             </div>
+            <p class="mt-1 text-sm text-charcoal-500">Важные события и подозрительные заказы в одном месте.</p>
           </div>
 
-          <div class="flex flex-wrap gap-2 lg:justify-end">
-            <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" @click="refresh()">Обновить</UButton>
-            <UButton color="neutral" variant="outline" icon="i-lucide-check-check" :disabled="!unreadCount" @click="markAllRead">Прочитать все</UButton>
-            <UButton color="primary" icon="i-lucide-search-check" :loading="checking" @click="runTodayCheck">Проверить заказы</UButton>
-          </div>
-        </section>
+          <div class="flex items-center gap-2">
+            <!-- Push setup lives in a floating panel instead of taking page space. -->
+            <UPopover :content="{ align: 'end', sideOffset: 8 }">
+              <UTooltip text="Push-уведомления">
+                <UChip :show="pushEnabled" color="success" size="md">
+                  <UButton aria-label="Push-уведомления" color="neutral" icon="i-lucide-bell-cog" square variant="ghost" />
+                </UChip>
+              </UTooltip>
 
-        <p v-if="checkMessage" class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-charcoal-700" role="status">
+              <template #content>
+                <div class="w-80 space-y-3 p-3" aria-label="Настройки push-уведомлений">
+                  <p class="text-sm font-semibold text-charcoal-950">Push-уведомления</p>
+                  <div class="flex items-start gap-3">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-charcoal-50 text-charcoal-600"><UIcon :name="deviceKind === 'computer' ? 'i-lucide-monitor' : deviceKind === 'tablet' ? 'i-lucide-tablet' : 'i-lucide-smartphone'" class="size-4.5" /></span>
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-charcoal-950">{{ pushSectionTitle }}</p>
+                      <p class="mt-0.5 text-xs leading-5 text-charcoal-500">{{ pushSectionDescription }}</p>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <UButton v-if="pushSupported && pushServiceAvailable === true && pushPermission !== 'denied'" color="primary" variant="outline" size="sm" :loading="enablingPush" :disabled="pushChecking" @click="enableCurrentDeviceNotifications">
+                      {{ pushEnabled ? 'Перерегистрировать' : pushPermission === 'granted' ? 'Зарегистрировать' : 'Включить здесь' }}
+                    </UButton>
+                    <UButton v-if="pushSupported && pushServiceAvailable === true" color="neutral" variant="outline" size="sm" icon="i-lucide-send" :loading="sendingTestPush" :disabled="pushPermission !== 'granted' || pushChecking" @click="sendTestNotification">
+                      Тест
+                    </UButton>
+                    <span v-else-if="deviceResolved && !pushSupported" class="text-xs text-charcoal-500">Недоступно на этом устройстве</span>
+                  </div>
+                </div>
+              </template>
+            </UPopover>
+
+            <span class="mx-1 h-6 w-px bg-charcoal-200" aria-hidden="true" />
+
+            <UTooltip text="Обновить">
+              <UButton aria-label="Обновить" color="neutral" icon="i-lucide-refresh-cw" square variant="outline" @click="refresh()" />
+            </UTooltip>
+            <UTooltip text="Прочитать все">
+              <UButton aria-label="Прочитать все" color="neutral" icon="i-lucide-check-check" :disabled="!unreadCount" square variant="outline" @click="markAllRead" />
+            </UTooltip>
+            <UTooltip text="Проверить заказы за сегодня">
+              <UButton aria-label="Проверить заказы" color="primary" icon="i-lucide-search-check" :loading="checking" square @click="runTodayCheck" />
+            </UTooltip>
+          </div>
+        </div>
+
+        <p v-if="checkMessage" class="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-charcoal-700" role="status">
           {{ checkMessage }}
         </p>
 
-        <section class="grid gap-3 sm:grid-cols-2" aria-label="Настройки push-уведомлений">
-          <div class="flex flex-col justify-between gap-4 rounded-2xl border border-charcoal-200 bg-white p-4 sm:flex-row sm:items-center">
-            <div class="flex items-start gap-3">
-              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-charcoal-50 text-charcoal-600"><UIcon :name="deviceKind === 'computer' ? 'i-lucide-monitor' : deviceKind === 'tablet' ? 'i-lucide-tablet' : 'i-lucide-smartphone'" class="size-5" /></span>
-              <div>
-                <p class="font-medium text-charcoal-950">{{ pushSectionTitle }}</p>
-                <p class="mt-1 text-xs leading-5 text-charcoal-500">{{ pushSectionDescription }}</p>
-              </div>
+        <section class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white" aria-label="Список уведомлений">
+          <div class="flex items-center justify-between gap-3 border-b border-charcoal-100 px-4 py-3 sm:px-5">
+            <div class="flex rounded-md bg-charcoal-100/70 p-0.5" role="group" aria-label="Фильтр уведомлений">
+              <button type="button" class="rounded px-3 py-1.5 text-sm font-medium transition" :class="activeFilter === 'all' ? 'bg-white text-charcoal-950 shadow-sm' : 'text-charcoal-500 hover:text-charcoal-800'" @click="activeFilter = 'all'">Все <USkeleton v-if="isListInitialLoading" class="ml-1 inline-block h-3 w-4 rounded align-middle" /><span v-else class="ml-1 text-xs text-charcoal-400">{{ items.length }}</span></button>
+              <button type="button" class="rounded px-3 py-1.5 text-sm font-medium transition" :class="activeFilter === 'unread' ? 'bg-white text-charcoal-950 shadow-sm' : 'text-charcoal-500 hover:text-charcoal-800'" @click="activeFilter = 'unread'">Непрочитанные <USkeleton v-if="isListInitialLoading" class="ml-1 inline-block h-3 w-4 rounded align-middle" /><span v-else class="ml-1 text-xs text-charcoal-400">{{ unreadCount }}</span></button>
             </div>
-            <UButton v-if="pushSupported && pushServiceAvailable === true && pushPermission !== 'denied'" class="shrink-0" color="primary" variant="outline" size="sm" :loading="enablingPush" :disabled="pushChecking" @click="enableCurrentDeviceNotifications">
-              {{ pushEnabled ? 'Перерегистрировать' : pushPermission === 'granted' ? 'Зарегистрировать' : 'Включить здесь' }}
-            </UButton>
-            <span v-else-if="deviceResolved && !pushSupported" class="text-xs text-charcoal-500">Недоступно</span>
+
+            <!-- Search floats like the filters on other pages. -->
+            <UPopover v-model:open="searchOpen" :content="{ align: 'end', sideOffset: 8 }">
+              <UChip :show="Boolean(search.trim())" text="1" size="3xl" color="primary">
+                <UButton aria-label="Поиск по уведомлениям" color="neutral" :variant="searchOpen ? 'soft' : 'ghost'" icon="i-lucide-sliders-horizontal" square />
+              </UChip>
+
+              <template #content>
+                <div class="w-72 space-y-3 p-3">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-charcoal-950">Фильтры</p>
+                    <UButton v-if="search.trim()" color="neutral" size="xs" variant="link" @click="search = ''">Сбросить</UButton>
+                  </div>
+                  <UInput v-model="search" class="w-full" icon="i-lucide-search" placeholder="Найти уведомление" size="sm" variant="soft" aria-label="Поиск по уведомлениям" autofocus />
+                </div>
+              </template>
+            </UPopover>
           </div>
 
-          <div class="flex flex-col justify-between gap-4 rounded-2xl border border-charcoal-200 bg-white p-4 sm:flex-row sm:items-center">
-            <div class="flex items-start gap-3">
-              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-charcoal-50 text-charcoal-600"><UIcon name="i-lucide-send" class="size-5" /></span>
-              <div>
-                <p class="font-medium text-charcoal-950">Проверка доставки</p>
-                <p class="mt-1 text-xs leading-5 text-charcoal-500">Отправьте тест, чтобы убедиться, что push работает.</p>
-              </div>
-            </div>
-              <UButton v-if="pushSupported && pushServiceAvailable === true" class="shrink-0" color="neutral" variant="outline" size="sm" :loading="sendingTestPush" :disabled="pushPermission !== 'granted' || pushChecking" @click="sendTestNotification">Тест на этом устройстве</UButton>
+          <div v-if="isListInitialLoading" class="p-4 sm:px-5">
+            <SharedSkeletonRows :rows="5" :columns="2" />
           </div>
-        </section>
-
-        <section class="overflow-hidden rounded-2xl border border-charcoal-200 bg-white shadow-sm" aria-label="Список уведомлений">
-          <div class="flex flex-col gap-3 border-b border-charcoal-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <div class="flex items-center gap-1 rounded-xl bg-charcoal-50 p-1">
-              <button type="button" class="rounded-lg px-3 py-2 text-sm font-medium transition" :class="activeFilter === 'all' ? 'bg-white text-charcoal-950 shadow-sm' : 'text-charcoal-500 hover:text-charcoal-800'" @click="activeFilter = 'all'">Все <span class="ml-1 text-xs text-charcoal-400">{{ items.length }}</span></button>
-              <button type="button" class="rounded-lg px-3 py-2 text-sm font-medium transition" :class="activeFilter === 'unread' ? 'bg-white text-charcoal-950 shadow-sm' : 'text-charcoal-500 hover:text-charcoal-800'" @click="activeFilter = 'unread'">Непрочитанные <span class="ml-1 text-xs text-charcoal-400">{{ unreadCount }}</span></button>
-            </div>
-            <UInput v-model="search" icon="i-lucide-search" placeholder="Найти уведомление" class="w-full sm:max-w-xs" aria-label="Поиск по уведомлениям" />
-          </div>
-
-          <div v-if="filteredItems.length" class="divide-y divide-charcoal-100">
+          <div v-else-if="filteredItems.length" class="divide-y divide-charcoal-100">
             <article
               v-for="item in filteredItems"
               :key="item.id"
@@ -247,7 +281,7 @@ async function openNotification(item: (typeof items.value)[number]) {
               @keydown.enter="openNotification(item)"
               @keydown.space.prevent="openNotification(item)"
             >
-              <span class="relative mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl" :class="item.read_at ? 'bg-charcoal-100 text-charcoal-500' : 'bg-red-50 text-red-700'">
+              <span class="relative mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg" :class="item.read_at ? 'bg-charcoal-100 text-charcoal-500' : 'bg-red-50 text-red-700'">
                 <UIcon name="i-lucide-triangle-alert" class="size-5" />
                 <span v-if="!item.read_at" class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-white bg-red-500" />
               </span>
@@ -262,13 +296,13 @@ async function openNotification(item: (typeof items.value)[number]) {
             </article>
           </div>
           <div v-else class="px-5 py-12 text-center">
-            <span class="mx-auto flex size-12 items-center justify-center rounded-2xl bg-charcoal-50 text-charcoal-400"><UIcon name="i-lucide-bell-off" class="size-6" /></span>
+            <span class="mx-auto flex size-12 items-center justify-center rounded-xl bg-charcoal-50 text-charcoal-400"><UIcon name="i-lucide-bell-off" class="size-6" /></span>
             <h2 class="mt-4 font-semibold text-charcoal-950">{{ search || activeFilter === 'unread' ? 'Ничего не найдено' : 'Уведомлений пока нет' }}</h2>
             <p class="mt-1 text-sm text-charcoal-500">{{ search ? 'Попробуйте изменить поисковый запрос.' : activeFilter === 'unread' ? 'Все уведомления уже прочитаны.' : 'Здесь появятся важные события и уведомления о заказах.' }}</p>
             <UButton v-if="search || activeFilter === 'unread'" class="mt-4" color="neutral" variant="outline" size="sm" @click="search = ''; activeFilter = 'all'">Сбросить фильтр</UButton>
           </div>
         </section>
-        <p class="pb-2 text-center text-xs text-charcoal-400">Показаны последние {{ items.length }} уведомлений</p>
+        <p v-if="!isListInitialLoading" class="pb-2 text-center text-xs text-charcoal-400">Показаны последние {{ items.length }} уведомлений</p>
       </div>
       <BranchesLocationEventMapModal
         v-model:open="locationModalOpen"

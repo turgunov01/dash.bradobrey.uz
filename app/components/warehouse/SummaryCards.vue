@@ -28,19 +28,29 @@ function hasNumberField(source: Record<string, any>, keys: string[]) {
   return keys.some(key => source[key] !== undefined && source[key] !== null)
 }
 
-const { data: summaryData } = await useAsyncData('warehouse-summary', () => warehouseApi.summary(), {
-  default: () => ({})
+const { data: summaryData, pending: summaryPending } = await useAsyncData('warehouse-summary', () => warehouseApi.summary(), {
+  default: () => ({}),
+  lazy: true
 })
 
 // The API summary was introduced after the list endpoints. Keep the cards
 // accurate during a rolling backend deployment by deriving missing metrics from
 // the same shared data used by the warehouse pages.
-const { data: positionsData } = await useAsyncData('warehouse-positions', () => warehouseApi.positions(), {
-  default: () => ({ items: [] })
+const { data: positionsData, pending: positionsPending } = await useAsyncData('warehouse-positions', () => warehouseApi.positions(), {
+  default: () => ({ items: [] }),
+  lazy: true
 })
-const { data: stocksData } = await useAsyncData('warehouse-stocks', () => warehouseApi.stocks(), {
-  default: () => ({ items: [] })
+const { data: stocksData, pending: stocksPending } = await useAsyncData('warehouse-stocks', () => warehouseApi.stocks(), {
+  default: () => ({ items: [] }),
+  lazy: true
 })
+
+// `default` keeps data non-null, so first load = pending with nothing received yet.
+const isInitialLoading = computed(() =>
+  (summaryPending.value && !Object.keys(summaryData.value || {}).length)
+  || (positionsPending.value && !extractItems(positionsData.value).length)
+  || (stocksPending.value && !extractItems(stocksData.value).length)
+)
 
 const summary = computed(() => {
   const source = summaryData.value && typeof summaryData.value === 'object'
@@ -82,30 +92,35 @@ const stocksValue = computed(() => props.stocksCount ?? summary.value.stocks)
 <template>
   <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
     <DashboardMetricCard
+      :loading="isInitialLoading"
       description="Количество складских позиций."
       icon="i-lucide-box"
       label="Позиции"
       :value="formatCount(positionsValue)"
     />
     <DashboardMetricCard
+      :loading="isInitialLoading"
       description="Текущие строки остатков по филиалам."
       icon="i-lucide-warehouse"
       label="Остатки"
       :value="formatCount(stocksValue)"
     />
     <DashboardMetricCard
+      :loading="isInitialLoading"
       description="Закупки за текущий месяц."
       icon="i-lucide-shopping-cart"
       label="Закупки"
       :value="formatMoney(summary.purchases)"
     />
     <DashboardMetricCard
+      :loading="isInitialLoading"
       description="Оценочная стоимость остатков."
       icon="i-lucide-coins"
       label="Стоимость"
       :value="formatMoney(summary.stockValue)"
     />
     <DashboardMetricCard
+      :loading="isInitialLoading"
       description="Позиции ниже минимального остатка."
       icon="i-lucide-triangle-alert"
       label="Низкий остаток"

@@ -108,14 +108,16 @@ function cloneWorkHours(source: Record<DayKey, { start_time: string, end_time: s
 const workHours = reactive<Record<DayKey, { start_time: string, end_time: string }>>(
   cloneWorkHours(defaultWorkHours)
 )
-const { pending, refresh } = await useAsyncData('dashboard-marketplace-catalog', async () => {
+const { data: catalogLoaded, pending, refresh } = await useAsyncData('dashboard-marketplace-catalog', async () => {
   await store.fetchBarbershops({
     city: city.value || undefined,
     status: status.value
   })
 
   return true
-})
+}, { lazy: true })
+
+const isInitialLoading = computed(() => pending.value && !catalogLoaded.value)
 
 const rows = computed<BarbershopRow[]>(() =>
   (store.barbershops || []).flatMap(item => {
@@ -314,18 +316,21 @@ async function deleteBarbershop(row: BarbershopRow) {
                   Показать
                 </UButton>
 
-                <UBadge color="neutral" size="lg" variant="soft">
+                <USkeleton v-if="isInitialLoading" class="h-7 w-14" />
+                <UBadge v-else color="neutral" size="lg" variant="soft">
                   {{ rows.length }} шт.
                 </UBadge>
               </div>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="6" :columns="4" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
-            <UTable :columns="columns" :data="rows">
+            <UTable :columns="columns" :data="rows" :loading="pending">
               <template #name-cell="{ row }">
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
@@ -458,7 +463,7 @@ async function deleteBarbershop(row: BarbershopRow) {
               </div>
             </div>
 
-            <UCard class="rounded-2xl border border-charcoal-200 bg-white/70">
+            <UCard class="rounded-xl border border-charcoal-200 bg-white/70">
               <template #header>
                 <div class="flex items-center justify-between gap-3">
                   <div class="space-y-1">
@@ -476,7 +481,7 @@ async function deleteBarbershop(row: BarbershopRow) {
                 <div
                   v-for="day in days"
                   :key="day.key"
-                  class="rounded-2xl border border-charcoal-200 bg-white/80 p-4"
+                  class="rounded-xl border border-charcoal-200 bg-white/80 p-4"
                 >
                   <p class="text-sm font-medium text-charcoal-950">
                     {{ day.label }}

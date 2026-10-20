@@ -775,12 +775,22 @@ const hasActiveFilters = computed(() =>
   )
 )
 
+// Shown on the filter icon so active filters stay visible while the popover is closed.
+const activeFilterCount = computed(() => [
+  search.value.trim() !== '',
+  selectedBarberId.value !== allBarbersValue,
+  selectedOriginBarberId.value !== allBarbersValue,
+  selectedStatus.value !== allStatusesValue,
+  dateFrom.value !== defaultDateRange.start || dateTo.value !== defaultDateRange.end
+].filter(Boolean).length)
+const filtersOpen = ref(false)
+
 async function loadAllHistoryPages(query: Record<string, string>) {
   return historyApi.listAll<HistoryItem>(query)
 }
 
 const initialHistoryPageSize = 100
-const { data, pending, error: historyError, refresh } = await useAsyncData('history-current-filter', async () => {
+const { data, pending, status: historyStatus, error: historyError, refresh } = await useAsyncData('history-current-filter', async () => {
   const response = await historyApi.list({
     ...historyQuery.value,
     limit: initialHistoryPageSize,
@@ -798,15 +808,22 @@ const { data, pending, error: historyError, refresh } = await useAsyncData('hist
     nextOffset: items.length
   }
 }, {
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId, allBranches, selectedStatus, dateFrom, dateTo]
 })
+
+// server: false keeps status 'idle' during SSR/hydration, so treat it as loading too.
+const isHistoryInitialLoading = computed(() =>
+  !data.value && (pending.value || historyStatus.value === 'idle')
+)
 
 const { data: servicesData } = await useAsyncData('history-services', async () => {
   const branchId = allBranches.value ? undefined : (branchStore.activeBranchId || undefined)
   const response = await kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) })
   return flattenServicesPayload(response)
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId, allBranches]
 })
 
@@ -827,6 +844,7 @@ const { data: barbersData } = await useAsyncData('history-barbers-directory', as
     return { items: [] }
   }
 }, {
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId, allBranches]
 })
@@ -1236,91 +1254,90 @@ async function exportHistoryToExcel() {
   {{ allBranches ? 'Все филиалы' : (branchStore.activeBranch?.name || 'Общее по всем филиалам') }}
         </UBadge>
         <div class="history-actions flex flex-wrap items-center justify-end gap-2">
-          <UBadge color="neutral" variant="outline">
+          <USkeleton v-if="isHistoryInitialLoading" class="h-6 w-24 rounded-md" />
+          <UBadge v-else color="neutral" variant="outline">
             {{ rows.length }} записей
           </UBadge>
-          <UButton
-            color="neutral"
-            icon="i-lucide-file-spreadsheet"
-            :loading="exporting"
-            :disabled="!rows.length"
-            variant="outline"
-            @click="exportHistoryToExcel"
-          >
-            Экспорт в Excel
-          </UButton>
-          <div class="relative">
-            <UButton
-              color="neutral"
-              icon="i-lucide-columns-3"
-              variant="outline"
-              @click="columnMenuOpen = !columnMenuOpen"
-            >
-              Столбцы
-            </UButton>
-            <div v-if="columnMenuOpen" class="history-column-menu absolute right-0 z-30 mt-2 w-64 space-y-2 rounded-xl border border-charcoal-200 bg-white p-4 shadow-xl">
-              <UCheckbox
-                v-for="option in columnOptions"
-                :key="option.key"
-                v-model="columnVisibility[option.key]"
-                :label="option.label"
-              />
-              <UButton color="neutral" size="xs" variant="ghost" @click="showAllColumns">
-                Показать все
-              </UButton>
-            </div>
-          </div>
-          <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="isHydrated && pending" variant="outline" @click="refresh()">
-            Обновить
-          </UButton>
+          <!-- Floating panels: filters and columns open over the content, so nothing shifts. -->
+          <UPopover v-model:open="filtersOpen" :content="{ align: 'end', sideOffset: 8 }">
+            <UChip :show="activeFilterCount > 0" :text="activeFilterCount" size="3xl" color="primary">
+              <UButton aria-label="Фильтры" color="neutral" :variant="filtersOpen ? 'soft' : 'ghost'" icon="i-lucide-sliders-horizontal" square />
+            </UChip>
+
+            <template #content>
+              <div class="w-80 space-y-3 p-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-charcoal-950">Фильтры</p>
+                  <UButton v-if="hasActiveFilters" color="neutral" size="xs" variant="link" @click="resetHistoryFilters">
+                    Сбросить
+                  </UButton>
+                </div>
+                <UInput v-model="search" class="w-full" icon="i-lucide-search" placeholder="Клиент, телефон, барбер, услуга или ID" size="sm" variant="soft" />
+                <label class="block space-y-1">
+                  <span class="text-xs text-charcoal-500">Барбер</span>
+                  <USelect v-model="selectedBarberId" class="w-full" :items="barberFilterOptions" value-key="value" size="sm" variant="soft" portal="body" />
+                </label>
+                <label class="block space-y-1">
+                  <span class="text-xs text-charcoal-500">Исходный барбер</span>
+                  <USelect v-model="selectedOriginBarberId" class="w-full" :items="barberFilterOptions" value-key="value" size="sm" variant="soft" portal="body" />
+                </label>
+                <label class="block space-y-1">
+                  <span class="text-xs text-charcoal-500">Статус</span>
+                  <USelect v-model="selectedStatus" class="w-full" :items="statusFilterOptions" value-key="value" size="sm" variant="soft" portal="body" />
+                </label>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="space-y-1">
+                    <span class="text-xs text-charcoal-500">От</span>
+                    <UInput v-model="dateFrom" class="w-full" type="date" size="sm" variant="soft" />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="text-xs text-charcoal-500">До</span>
+                    <UInput v-model="dateTo" class="w-full" type="date" size="sm" variant="soft" />
+                  </label>
+                </div>
+              </div>
+            </template>
+          </UPopover>
+
+          <UPopover v-model:open="columnMenuOpen" :content="{ align: 'end', sideOffset: 8 }">
+            <UTooltip text="Столбцы">
+              <UButton aria-label="Столбцы" color="neutral" :variant="columnMenuOpen ? 'soft' : 'ghost'" icon="i-lucide-columns-3" square />
+            </UTooltip>
+
+            <template #content>
+              <div class="w-64 space-y-2 p-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-charcoal-950">Столбцы</p>
+                  <UButton color="neutral" size="xs" variant="link" @click="showAllColumns">
+                    Показать все
+                  </UButton>
+                </div>
+                <UCheckbox
+                  v-for="option in columnOptions"
+                  :key="option.key"
+                  v-model="columnVisibility[option.key]"
+                  :label="option.label"
+                />
+              </div>
+            </template>
+          </UPopover>
+
+          <span class="mx-1 h-6 w-px bg-charcoal-200" aria-hidden="true" />
+
+          <UTooltip text="Экспорт в Excel">
+            <UButton aria-label="Экспорт в Excel" color="neutral" icon="i-lucide-file-spreadsheet" :loading="exporting" :disabled="!rows.length" square variant="outline" @click="exportHistoryToExcel" />
+          </UTooltip>
+          <UTooltip text="Обновить">
+            <UButton aria-label="Обновить" color="neutral" icon="i-lucide-refresh-cw" :loading="isHydrated && pending" square variant="outline" @click="refresh()" />
+          </UTooltip>
         </div>
       </div>
 
-      <div class="history-filters mb-4 grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_auto] md:items-end">
-        <UFormField label="Поиск">
-          <UInput v-model="search" class="w-full" icon="i-lucide-search" placeholder="Клиент, телефон, барбер, услуга или ID" />
-        </UFormField>
-
-        <UFormField label="Барбер">
-          <USelect
-            v-model="selectedBarberId"
-            class="w-full"
-            :items="barberFilterOptions"
-            value-key="value" portal="body" />
-        </UFormField>
-
-        <UFormField label="Исходный барбер">
-          <USelect v-model="selectedOriginBarberId" class="w-full" :items="barberFilterOptions" value-key="value" portal="body" />
-        </UFormField>
-
-        <UFormField label="Статус">
-          <USelect
-            v-model="selectedStatus"
-            class="w-full"
-            :items="statusFilterOptions"
-            value-key="value" portal="body" />
-        </UFormField>
-
-        <UFormField label="От">
-          <UInput v-model="dateFrom" type="date" />
-        </UFormField>
-
-        <UFormField label="До">
-          <UInput v-model="dateTo" type="date" />
-        </UFormField>
-
-        <UButton
-          color="neutral"
-          icon="i-lucide-rotate-ccw"
-          :disabled="!hasActiveFilters"
-          variant="outline"
-          @click="resetHistoryFilters"
-        >
-          Сбросить
-        </UButton>
+      <div v-if="isHistoryInitialLoading" class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 px-4 py-2">
+        <SharedSkeletonRows :rows="8" :columns="6" />
       </div>
 
-      <div v-if="rows.length" class="rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+      <div v-else-if="rows.length" class="rounded-[0.875rem] border border-charcoal-200 bg-white/90">
         <div class="min-w-0">
           <div v-for="day in historyDays" :key="day.date" class="border-b border-charcoal-200 last:border-b-0">
             <button type="button" class="flex w-full cursor-pointer items-center px-4 py-3 text-left text-sm font-semibold text-charcoal-950 hover:bg-charcoal-50" @click="toggleHistoryDay(day.date)">
@@ -1434,7 +1451,7 @@ async function exportHistoryToExcel() {
         description="Проверьте подключение к API и повторите запрос."
       />
 
-      <div v-else class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
+      <div v-else-if="!rows.length && !isHistoryInitialLoading" class="rounded-[0.875rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6 text-sm text-charcoal-500">
         По выбранным фильтрам записи отсутствуют.
         <UButton v-if="data?.hasMore" class="ml-3" color="neutral" variant="outline" size="sm" :loading="loadingMoreHistory" @click="loadMoreHistory">
           {{ loadMoreHistoryError ? 'Повторить загрузку' : 'Загрузить более ранние записи' }}
@@ -1444,18 +1461,18 @@ async function exportHistoryToExcel() {
       <UModal v-model:open="detailModalOpen" title="Детали визита">
         <template #body>
           <div v-if="selectedEntry" class="space-y-3">
-            <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
               <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Клиент</p>
               <p class="text-lg font-semibold text-charcoal-950">{{ getClientName(selectedEntry) || 'Клиент' }}</p>
               <p class="text-sm text-charcoal-600">{{ getClientPhone(selectedEntry) || 'Телефон не указан' }}</p>
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Статус</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ historyStatusLabel(selectedEntry.status) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Оплата</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatPaymentMethod(selectedEntry.payment_method) }}</p>
                 <div v-if="isMixedPayment(selectedEntry) && getPaymentBreakdown(selectedEntry).length" class="mt-2 space-y-1 text-xs text-charcoal-600">
@@ -1469,7 +1486,7 @@ async function exportHistoryToExcel() {
                   </div>
                 </div>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Сумма</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatMoney(selectedEntry.amount) }}</p>
                 <div v-if="isPriceAdjusted(selectedEntry)" class="mt-2 space-y-1 text-xs text-charcoal-600">
@@ -1481,34 +1498,34 @@ async function exportHistoryToExcel() {
                   </p>
                 </div>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Начало услуги</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.started_at || selectedEntry.startedAt) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Окончание услуги</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ formatDateTime(selectedEntry.finished_at || selectedEntry.finishedAt || selectedEntry.completed_at || selectedEntry.completedAt) }}</p>
               </div>
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
-              <div v-if="isSuspiciousOrder(selectedEntry)" class="sm:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+              <div v-if="isSuspiciousOrder(selectedEntry)" class="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">
                 <p class="text-xs font-semibold uppercase tracking-[0.16em]">Подозрительный заказ</p>
                 <p class="mt-1 text-sm">{{ suspiciousOrderTitle(selectedEntry) }}. Проверьте фактическое выполнение услуги.</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Филиал</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ getVisitBranchName(selectedEntry) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Выбранный барбер</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ getVisitSelectedBarberName(selectedEntry) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Исполняющий барбер</p>
                 <p class="text-sm font-semibold text-charcoal-950">{{ getVisitExecutingBarberName(selectedEntry) }}</p>
               </div>
-              <div class="flex items-center justify-between gap-3 rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="flex items-center justify-between gap-3 rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <span class="text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">Смена барбера</span>
                 <UBadge :color="hasBarberSwap(selectedEntry) ? 'warning' : 'neutral'" variant="soft">
                   {{ hasBarberSwap(selectedEntry) ? 'Да' : 'Нет' }}
@@ -1516,7 +1533,7 @@ async function exportHistoryToExcel() {
               </div>
             </div>
 
-            <div v-if="Array.isArray(selectedEntry.transfer_history) && selectedEntry.transfer_history.length" class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <div v-if="Array.isArray(selectedEntry.transfer_history) && selectedEntry.transfer_history.length" class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
               <p class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">История передачи заказа</p>
               <ol class="space-y-3">
                 <li v-for="transfer in selectedEntry.transfer_history" :key="transfer.id" class="border-l-2 border-charcoal-200 pl-3">
@@ -1529,7 +1546,7 @@ async function exportHistoryToExcel() {
               <p class="mt-3 text-sm font-medium text-charcoal-800">Текущий ответственный: {{ getVisitExecutingBarberName(selectedEntry) }}</p>
             </div>
 
-            <div v-if="Array.isArray(selectedEntry.status_history) && selectedEntry.status_history.length" class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <div v-if="Array.isArray(selectedEntry.status_history) && selectedEntry.status_history.length" class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
               <p class="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">История статусов</p>
               <ol class="space-y-2">
                 <li v-for="event in selectedEntry.status_history" :key="event.id" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-charcoal-100 pb-2 last:border-0">
@@ -1539,7 +1556,7 @@ async function exportHistoryToExcel() {
               </ol>
             </div>
 
-            <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
               <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500 mb-2">Услуги</p>
               <div v-if="getServiceNames(selectedEntry).length" class="text-sm text-charcoal-700 space-y-1">
                 <div v-for="(svc, i) in getServiceNames(selectedEntry)" :key="`svc-${i}`">

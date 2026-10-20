@@ -508,19 +508,21 @@ const remoteError = ref<unknown>(null)
 const hasLocalDraft = ref(false)
 const dirty = ref(false)
 
-const { data: overviewData, pending: overviewPending, refresh: refreshOverview } = await useAsyncData('finance-overview', async () => {
+const { data: overviewData, pending: overviewPending, refresh: refreshOverview, status: overviewStatus } = await useAsyncData('finance-overview', async () => {
   return await financeApi.overview(periodKey.value, { silent: true })
 }, {
   default: () => ({}),
+  lazy: true,
   watch: [periodKey]
 })
 
-const { data: manualPenaltiesData } = await useAsyncData('finance-manual-penalties', async () => {
+const { data: manualPenaltiesData, pending: manualPenaltiesPending } = await useAsyncData('finance-manual-penalties', async () => {
   const query: Record<string, unknown> = { period: periodKey.value }
   if (branchStore.activeBranchId) query.branch_id = branchStore.activeBranchId
   return await penaltiesApi.list(query)
 }, {
   default: () => ({ items: [] }),
+  lazy: true,
   watch: [periodKey, () => branchStore.activeBranchId]
 })
 
@@ -779,6 +781,7 @@ const { data: employeeItems, pending: employeesPending, refresh: refreshEmployee
   const response = await barbersApi.list({ mode: 'employees' })
   return Array.isArray(response?.items) ? response.items : []
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
 
@@ -789,6 +792,7 @@ const { data: serviceItems, pending: financeServicesPending, refresh: refreshFin
   return flattenServicesPayload(response)
 }, {
   default: () => [] as FlatServiceItem[],
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId]
 })
@@ -812,6 +816,7 @@ const {
   return extractHistoryItems(response)
 }, {
   default: () => [] as Record<string, any>[],
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId, periodKey]
 })
@@ -819,7 +824,8 @@ const {
 const {
   data: verifixLoginItems,
   pending: verifixPending,
-  refresh: refreshVerifix
+  refresh: refreshVerifix,
+  status: verifixStatus
 } = await useAsyncData('finance-verifix-logins', async () => {
   const branchId = branchStore.activeBranchId || undefined
   const range = periodRange.value
@@ -833,6 +839,7 @@ const {
   return Array.isArray(response?.items) ? response.items : []
 }, {
   default: () => [] as VerifixEvent[],
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId, periodKey]
 })
@@ -840,7 +847,8 @@ const {
 const {
   data: verifixSchedules,
   pending: verifixSchedulesPending,
-  refresh: refreshVerifixSchedules
+  refresh: refreshVerifixSchedules,
+  status: verifixSchedulesStatus
 } = await useAsyncData('finance-verifix-schedules', async () => {
   const branchId = branchStore.activeBranchId
 
@@ -853,6 +861,7 @@ const {
   return Array.isArray(response?.items) ? response.items : []
 }, {
   default: () => [],
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId]
 })
@@ -860,7 +869,8 @@ const {
 const {
   data: branchPayrolls,
   pending: branchPayrollsPending,
-  refresh: refreshBranchPayrolls
+  refresh: refreshBranchPayrolls,
+  status: branchPayrollsStatus
 } = await useAsyncData('finance-branch-payrolls', async () => {
   const payrolls: Record<string, number> = {}
 
@@ -884,6 +894,7 @@ const {
   return payrolls
 }, {
   default: () => ({} as Record<string, number>),
+  lazy: true,
   server: false,
   watch: [periodKey, () => branchStore.branches.map(branch => branch.id).join(',')]
 })
@@ -1223,6 +1234,32 @@ const totals = computed(() => {
   }
 })
 
+// Skeletons only on the first load; later refreshes keep the old values.
+// `server: false` sources stay 'idle' until mounted, so 'idle' also means "no data yet".
+const isOverviewInitialLoading = computed(() =>
+  overviewStatus.value === 'idle' || (overviewPending.value && !Object.keys(overviewData.value || {}).length)
+)
+const isEmployeesInitialLoading = computed(() => employeesPending.value && !employeeItems.value?.length)
+const isFinanceHistoryInitialLoading = computed(() =>
+  financeHistoryStatus.value === 'idle' || (financeHistoryPending.value && !financeHistoryItems.value?.length)
+)
+const isPenaltiesInitialLoading = computed(() =>
+  manualPenaltiesPending.value && !extractPenaltyItems(manualPenaltiesData.value).length
+)
+const isLateInitialLoading = computed(() =>
+  isPenaltiesInitialLoading.value
+  || verifixStatus.value === 'idle'
+  || verifixSchedulesStatus.value === 'idle'
+  || (verifixPending.value && !verifixLoginItems.value?.length)
+)
+const isBranchPayrollsInitialLoading = computed(() =>
+  branchPayrollsStatus.value === 'idle'
+  || (branchPayrollsPending.value && !Object.keys(branchPayrolls.value || {}).length)
+)
+const isPayrollInitialLoading = computed(() =>
+  isEmployeesInitialLoading.value || isFinanceHistoryInitialLoading.value || isPenaltiesInitialLoading.value
+)
+
 // Это единственный источник зарплатного фонда для выбранного филиала:
 // точная сумма всех строк «К выплате» в таблице, включая авансы, штрафы
 // и рассчитанные проценты.
@@ -1269,10 +1306,14 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div class="flex flex-wrap items-center gap-2">
           <UBadge color="neutral" size="lg" variant="soft">
-            {{ formatCount(employees.length) }} сотрудников
+            <USkeleton v-if="isEmployeesInitialLoading" class="h-4 w-6 rounded" />
+            <template v-else>{{ formatCount(employees.length) }}</template>
+            сотрудников
           </UBadge>
           <UBadge color="primary" size="lg" variant="soft">
-            Итого: {{ formatMoney(totals.payout) }}
+            Итого:
+            <USkeleton v-if="isPayrollInitialLoading" class="h-4 w-20 rounded" />
+            <template v-else>{{ formatMoney(totals.payout) }}</template>
           </UBadge>
         </div>
 
@@ -1325,31 +1366,35 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
           description="Сумма только выполненных заказов выбранного филиала за выбранный месяц."
           icon="i-lucide-wallet"
           label="Оборот"
+          :loading="isFinanceHistoryInitialLoading"
           :value="formatMoney(selectedBranchTurnover)"
         />
         <DashboardMetricCard
           description="Точная сумма «К выплате» по таблице выбранного филиала."
           icon="i-lucide-users"
           label="Зарплатный фонд"
+          :loading="isPayrollInitialLoading"
           :value="formatMoney(selectedBranchPayroll)"
         />
         <DashboardMetricCard
           description="Закупки склада за выбранный период."
           icon="i-lucide-package"
           label="Закупки"
+          :loading="isOverviewInitialLoading"
           :value="formatMoney(overviewTotals.purchases)"
         />
         <DashboardMetricCard
           description="Филиалы, попавшие в финансовую сводку."
           icon="i-lucide-store"
           label="Филиалы"
+          :loading="isOverviewInitialLoading"
           :value="formatCount(overviewTotals.branches)"
         />
       </div>
 
       <UCard
-        v-if="overviewBranchRows.length"
-        class="warm-card mb-4 rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+        v-if="isOverviewInitialLoading || overviewBranchRows.length"
+        class="warm-card mb-4 rounded-[0.875rem] border border-charcoal-200 bg-white/90"
       >
         <template #header>
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1362,12 +1407,15 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
               </p>
             </div>
             <UBadge color="neutral" size="lg" variant="soft">
-              {{ overviewBranchRows.length }} филиалов
+              <USkeleton v-if="isOverviewInitialLoading" class="h-4 w-5 rounded" />
+              <template v-else>{{ overviewBranchRows.length }}</template>
+              филиалов
             </UBadge>
           </div>
         </template>
 
-        <div class="overflow-x-auto rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <SharedSkeletonRows v-if="isOverviewInitialLoading" :rows="3" :columns="5" />
+        <div v-else class="overflow-x-auto rounded-[0.875rem] border border-charcoal-200 bg-white/90">
           <UTable
             :columns="overviewBranchColumns"
             :data="overviewBranchRows"
@@ -1382,17 +1430,23 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
             }"
           >
             <template #turnover-cell="{ row }">
-              <span class="font-semibold text-charcoal-950">
+              <USkeleton
+                v-if="row.original.id === branchStore.activeBranchId && isFinanceHistoryInitialLoading"
+                class="h-4 w-24 rounded"
+              />
+              <span v-else class="font-semibold text-charcoal-950">
                 {{ formatMoney(row.original.id === branchStore.activeBranchId ? selectedBranchTurnover : row.original.turnover) }}
               </span>
             </template>
             <template #payroll-cell="{ row }">
               <template v-if="row.original.id === branchStore.activeBranchId">
-                {{ formatMoney(selectedBranchPayroll) }}
+                <USkeleton v-if="isPayrollInitialLoading" class="h-4 w-20 rounded" />
+                <template v-else>{{ formatMoney(selectedBranchPayroll) }}</template>
               </template>
               <template v-else-if="row.original.payroll !== null">
                 {{ formatMoney(row.original.payroll) }}
               </template>
+              <USkeleton v-else-if="isBranchPayrollsInitialLoading" class="h-4 w-20 rounded" />
               <template v-else>—</template>
             </template>
             <template #purchases-cell="{ row }">
@@ -1406,64 +1460,76 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
       </UCard>
 
       <div class="grid gap-3 pb-4 md:grid-cols-5">
-        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200 bg-white/90 md:col-span-5">
+        <UCard class="warm-card rounded-[0.875rem] border border-charcoal-200 bg-white/90 md:col-span-5">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 План оборота
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isEmployeesInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.plan) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Val
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isPayrollInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.profit) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 С прибыли
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isPayrollInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.commission) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Авансы
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isEmployeesInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.advances) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Штрафы
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isPayrollInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.penalties) }}
               </p>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Опозданий по графику за месяц
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
-                {{ formatCount(lateTotals.count) }}
-              </p>
-              <p class="text-xs text-charcoal-500">
-                {{ formatCount(lateTotals.minutes) }} мин · для учёта штрафа за график
-              </p>
+              <template v-if="isLateInitialLoading">
+                <USkeleton class="mt-2 h-7 w-16 rounded-md" />
+                <USkeleton class="mt-1 h-3 w-40 rounded" />
+              </template>
+              <template v-else>
+                <p class="mt-2 text-lg font-semibold text-charcoal-950">
+                  {{ formatCount(lateTotals.count) }}
+                </p>
+                <p class="text-xs text-charcoal-500">
+                  {{ formatCount(lateTotals.minutes) }} мин · для учёта штрафа за график
+                </p>
+              </template>
             </div>
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 px-4 py-3">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 px-4 py-3">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                 Прибыль
               </p>
-              <p class="mt-2 text-lg font-semibold text-charcoal-950">
+              <USkeleton v-if="isPayrollInitialLoading" class="mt-2 h-7 w-28 rounded-md" />
+              <p v-else class="mt-2 text-lg font-semibold text-charcoal-950">
                 {{ formatMoney(totals.netProfit) }}
               </p>
             </div>
@@ -1471,8 +1537,13 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
         </UCard>
       </div>
 
+      <div v-if="isEmployeesInitialLoading">
+        <SharedSkeletonRows class="xl:hidden" card :rows="4" :columns="3" />
+        <SharedSkeletonRows class="hidden xl:block" :rows="6" :columns="10" />
+      </div>
+
       <SharedEmptyState
-        v-if="!employeesPending && !employees.length"
+        v-else-if="!employees.length"
         title="Нет сотрудников"
         description="Добавьте сотрудников в разделе «Сотрудники», чтобы заполнять финансы."
         icon="i-lucide-users"
@@ -1484,7 +1555,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
           <div
             v-for="row in employees"
             :key="row.id"
-            class="rounded-[1.25rem] border border-charcoal-200 bg-white/90 p-4 space-y-4"
+            class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 p-4 space-y-4"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -1589,7 +1660,7 @@ const columns: TableColumn<FinanceEmployeeRow>[] = [
         </div>
 
         <!-- Планшет/десктоп: таблица -->
-        <div class="hidden xl:block max-h-[70vh] overflow-x-auto overflow-y-auto rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <div class="hidden xl:block max-h-[70vh] overflow-x-auto overflow-y-auto rounded-[0.875rem] border border-charcoal-200 bg-white/90">
           <UTable
             :columns="columns"
             :data="employees"

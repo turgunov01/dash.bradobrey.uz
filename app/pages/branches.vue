@@ -18,6 +18,7 @@ type BranchRow = {
   timezone: string | null
   marketplace_barbershop_id: string | null
   is_active: boolean | null
+  photo_url: string | null
 }
 
 function normalizeText(value: unknown) {
@@ -56,6 +57,7 @@ function toBranchRow(value: unknown): BranchRow | null {
     city: normalizeText((branch as any).city),
     timezone: normalizeText((branch as any).timezone),
     marketplace_barbershop_id: normalizeText((branch as any).marketplace_barbershop_id),
+    photo_url: normalizeText((branch as any).photo_url),
     is_active: (branch as any).is_active == null ? null : Boolean((branch as any).is_active)
   }
 }
@@ -102,6 +104,7 @@ function extractBranchItems(response: unknown): unknown[] {
 
 const branchesApi = useBranchesApi()
 const branchStore = useBranchStore()
+const config = useRuntimeConfig()
 const barbersApi = useBarbersApi()
 const verifixApi = useVerifixApi()
 
@@ -158,6 +161,7 @@ const eventMapBranchLocation = computed<BranchLocation | null>(() => validMapPoi
 
 const outsideRadiusEvents = computed(() => locationEvents.value.filter(event => event.status === 'outside_radius'))
 
+// city/timezone are no longer edited in the form but are kept so saving never clears them.
 const form = reactive({
   id: '',
   name: '',
@@ -167,9 +171,63 @@ const form = reactive({
   is_active: true
 })
 
+// Optional branch photo: a new file to upload, or a request to remove the current one.
+const BRANCH_PHOTO_MAX_BYTES = 5 * 1024 * 1024
+const formPhotoUrl = ref<string | null>(null)
+const formPhotoFile = ref<File | null>(null)
+const formPhotoPreview = ref<string | null>(null)
+const formPhotoRemoved = ref(false)
+const formPhotoInput = ref<HTMLInputElement | null>(null)
+const formPhotoShown = computed(() =>
+  formPhotoPreview.value || (formPhotoRemoved.value || !formPhotoUrl.value ? null : resolveApiMediaUrl(formPhotoUrl.value, config.public.apiBase))
+)
+
+function clearPhotoPreview() {
+  if (formPhotoPreview.value) URL.revokeObjectURL(formPhotoPreview.value)
+  formPhotoPreview.value = null
+}
+
+function onPhotoSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/') || file.size > BRANCH_PHOTO_MAX_BYTES) {
+    apiClient.notifyError(new Error('Выберите изображение JPEG, PNG или WebP до 5 МБ'))
+    return
+  }
+  clearPhotoPreview()
+  formPhotoFile.value = file
+  formPhotoPreview.value = URL.createObjectURL(file)
+  formPhotoRemoved.value = false
+}
+
+function removeFormPhoto() {
+  clearPhotoPreview()
+  formPhotoFile.value = null
+  formPhotoRemoved.value = Boolean(formPhotoUrl.value)
+  if (formPhotoInput.value) formPhotoInput.value.value = ''
+}
+
+function resetFormPhoto(photoUrl: string | null = null) {
+  clearPhotoPreview()
+  formPhotoUrl.value = photoUrl
+  formPhotoFile.value = null
+  formPhotoRemoved.value = false
+}
+
+// JSON normally; multipart only when a photo is added or removed.
+function toBranchRequestBody<T extends Record<string, unknown>>(payload: T): T | FormData {
+  if (!formPhotoFile.value && !formPhotoRemoved.value) return payload
+  const body = new FormData()
+  for (const [key, value] of Object.entries(payload)) {
+    if (value !== undefined && value !== null) body.append(key, String(value))
+  }
+  if (formPhotoFile.value) body.append('photo', formPhotoFile.value)
+  else body.append('photo_url', '')
+  return body
+}
+
 const columns: TableColumn<BranchRow>[] = [
   { accessorKey: 'name', header: 'Название' },
-  { accessorKey: 'city', header: 'Город' },
   { accessorKey: 'address', header: 'Адрес' },
   { id: 'status', header: 'Статус' },
   { id: 'actions', header: '' }
@@ -177,11 +235,15 @@ const columns: TableColumn<BranchRow>[] = [
 
 const { data, pending, refresh } = await useAsyncData('branches-dashboard', async () => {
   return await branchesApi.list()
-})
+}, { lazy: true })
 
 const { data: barbersData } = await useAsyncData('branches-verifix-barbers', async () => {
   return await barbersApi.list({ include_inactive: true })
-})
+}, { lazy: true })
+
+const isBranchesInitialLoading = computed(() => pending.value && !data.value)
+// Table or card layout; a cookie keeps the choice across reloads and SSR.
+const viewMode = useCookie<'table' | 'cards'>('branches-view', { default: () => 'table', maxAge: 60 * 60 * 24 * 365 })
 
 const branchRows = computed<BranchRow[]>(() =>
   extractBranchItems(data.value).flatMap(item => {
@@ -447,13 +509,17 @@ async function useMyLocation() {
   await centerOnCurrentLocation(true)
 }
 
-function openMapPicker() {
-  mapPickerSearchQuery.value = ''
+// The same OSM picker serves two fields: geofence coordinates and the branch address.
+const mapPickerTarget = ref<'location' | 'address'>('location')
+
+function openMapPicker(target: 'location' | 'address' = 'location') {
+  mapPickerTarget.value = target
+  mapPickerSearchQuery.value = target === 'address' ? form.address : ''
   mapPickerSearchResults.value = []
   mapPickerAddress.value = ''
   mapPickerError.value = ''
-  mapPickerDraft.latitude = locationForm.latitude
-  mapPickerDraft.longitude = locationForm.longitude
+  mapPickerDraft.latitude = target === 'location' ? locationForm.latitude : ''
+  mapPickerDraft.longitude = target === 'location' ? locationForm.longitude : ''
   mapPickerDraft.address = ''
   mapPickerOpen.value = true
   mapPickerLoading.value = true
@@ -461,8 +527,13 @@ function openMapPicker() {
 
 function applyMapPicker() {
   if (!validMapPoint(mapPickerDraft.latitude, mapPickerDraft.longitude)) return
-  locationForm.latitude = mapPickerDraft.latitude
-  locationForm.longitude = mapPickerDraft.longitude
+  if (mapPickerTarget.value === 'address') {
+    form.address = mapPickerDraft.address || `${mapPickerDraft.latitude}, ${mapPickerDraft.longitude}`
+  }
+  else {
+    locationForm.latitude = mapPickerDraft.latitude
+    locationForm.longitude = mapPickerDraft.longitude
+  }
   mapPickerOpen.value = false
 }
 
@@ -649,6 +720,7 @@ function resetForm() {
   form.city = ''
   form.timezone = ''
   form.is_active = true
+  resetFormPhoto()
 }
 
 function openCreateModal() {
@@ -663,6 +735,7 @@ function openEditModal(row: BranchRow) {
   form.city = row.city || ''
   form.timezone = row.timezone || ''
   form.is_active = row.is_active !== false
+  resetFormPhoto(row.photo_url)
   modalOpen.value = true
 }
 
@@ -683,11 +756,12 @@ async function submit() {
   submitting.value = true
 
   try {
+    const body = toBranchRequestBody(parsed.data)
     if (form.id) {
-      await branchesApi.update(form.id, parsed.data)
+      await branchesApi.update(form.id, body)
     }
     else {
-      await branchesApi.create(parsed.data)
+      await branchesApi.create(body)
     }
 
     await refresh()
@@ -808,7 +882,7 @@ async function removeBranch(row: BranchRow) {
 
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="space-y-2">
@@ -823,16 +897,66 @@ async function removeBranch(row: BranchRow) {
               <div class="flex flex-wrap items-center justify-end gap-3">
                 <UInput v-model="search" placeholder="Поиск по названию, адресу или id" class="w-full sm:w-72" />
 
-                <UBadge color="neutral" size="lg" variant="soft">
+                <USkeleton v-if="isBranchesInitialLoading" class="h-7 w-28 rounded-md" />
+                <UBadge v-else color="neutral" size="lg" variant="soft">
                   {{ filteredRows.length }} филиалов
                 </UBadge>
+
+                <div class="flex rounded-md bg-charcoal-100/70 p-0.5" role="group" aria-label="Вид списка">
+                  <UTooltip text="Таблица">
+                    <UButton
+                      aria-label="Показать таблицей"
+                      :aria-pressed="viewMode === 'table'"
+                      color="neutral"
+                      :variant="viewMode === 'table' ? 'solid' : 'ghost'"
+                      :class="viewMode === 'table' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                      icon="i-lucide-table-2"
+                      size="sm"
+                      square
+                      @click="viewMode = 'table'"
+                    />
+                  </UTooltip>
+                  <UTooltip text="Карточки">
+                    <UButton
+                      aria-label="Показать карточками"
+                      :aria-pressed="viewMode === 'cards'"
+                      color="neutral"
+                      :variant="viewMode === 'cards' ? 'solid' : 'ghost'"
+                      :class="viewMode === 'cards' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                      icon="i-lucide-layout-grid"
+                      size="sm"
+                      square
+                      @click="viewMode = 'cards'"
+                    />
+                  </UTooltip>
+                </div>
               </div>
             </div>
           </template>
 
+          <div v-if="isBranchesInitialLoading && viewMode === 'cards'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <USkeleton v-for="index in 6" :key="index" class="h-60 rounded-[0.875rem]" />
+          </div>
+          <SharedSkeletonRows v-else-if="isBranchesInitialLoading" :rows="6" :columns="4" />
+
+          <div v-else-if="filteredRows.length && viewMode === 'cards'" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <BranchesBranchCard
+              v-for="row in filteredRows"
+              :key="row.id"
+              :branch="row"
+              :is-current="row.id === branchStore.activeBranchId"
+              :maps-url="getExternalAddressUrl(row.address)"
+              :removing="removingId === row.id"
+              @location="openLocation(row)"
+              @schedules="openSchedules(row)"
+              @edit="openEditModal(row)"
+              @remove="removeBranch(row)"
+            />
+          </div>
+
           <div
-            v-if="filteredRows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="filteredRows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="filteredRows">
               <template #name-cell="{ row }">
@@ -845,12 +969,6 @@ async function removeBranch(row: BranchRow) {
                 <p class="mt-1 text-xs text-charcoal-500">
                   {{ row.original.id }}
                 </p>
-              </template>
-
-              <template #city-cell="{ row }">
-                <span class="text-sm text-charcoal-700">
-                  {{ row.original.city || '—' }}
-                </span>
               </template>
 
               <template #address-cell="{ row }">
@@ -932,14 +1050,14 @@ async function removeBranch(row: BranchRow) {
               <UFormField label="Радиус, метров" required><UInput v-model.number="locationForm.radius_meters" type="number" min="1" max="50000" /></UFormField>
               <UCheckbox v-model="locationForm.is_enabled" class="self-end" label="Включить обязательную проверку" />
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <div>
                 <p class="text-sm font-semibold text-charcoal-950">Точка филиала</p>
                 <p class="text-xs text-charcoal-500">Отметьте место на карте — координаты заполнятся автоматически.</p>
               </div>
-              <UButton icon="i-lucide-map" color="primary" variant="soft" @click="openMapPicker">Выбрать на карте</UButton>
+              <UButton icon="i-lucide-map" color="primary" variant="soft" @click="openMapPicker('location')">Выбрать на карте</UButton>
             </div>
-            <div v-if="!validMapPoint(locationForm.latitude, locationForm.longitude)" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div v-if="!validMapPoint(locationForm.latitude, locationForm.longitude)" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p class="font-semibold">Точка филиала не настроена</p>
               <p class="mt-1">Контрольная точка и окружность разрешённого радиуса появятся после сохранения корректных координат филиала.</p>
             </div>
@@ -948,7 +1066,7 @@ async function removeBranch(row: BranchRow) {
               <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
               <UAlert v-if="outsideRadiusEvents.length" class="mb-3" color="error" variant="soft" icon="i-lucide-triangle-alert" title="Обнаружен вход вне радиуса" :description="`${outsideRadiusEvents.length} ${outsideRadiusEvents.length === 1 ? 'событие требует' : 'события требуют'} внимания. Нажмите на сотрудника, чтобы открыть карту.`" />
               <div v-if="locationEvents.length" class="space-y-2">
-                <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80" @click="openEventMap(event)">
+                <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80" @click="openEventMap(event)">
                   <span>{{ event.barber_name || event.barber_id }} · {{ locationEventStatusLabel(event) }}</span>
                   <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }} · {{ validEventCoordinates(event) ? 'Открыть карту' : 'Открыть и посмотреть сообщение' }}</span>
                 </button>
@@ -962,18 +1080,25 @@ async function removeBranch(row: BranchRow) {
 
       <BranchesLocationEventMapModal v-model:open="eventMapOpen" :event="eventMapEvent" :branch-location="eventMapBranchLocation" />
 
-      <UModal v-model:open="mapPickerOpen" class="sm:max-w-4xl" title="Выберите локацию филиала" description="Кликните по карте, чтобы поставить метку." @after:enter="initializeMapPicker" @after:leave="destroyMapPicker">
+      <UModal
+        v-model:open="mapPickerOpen"
+        class="sm:max-w-4xl"
+        :title="mapPickerTarget === 'address' ? 'Выберите адрес филиала' : 'Выберите локацию филиала'"
+        :description="mapPickerTarget === 'address' ? 'Найдите адрес или переместите карту — адрес подставится в форму.' : 'Кликните по карте, чтобы поставить метку.'"
+        @after:enter="initializeMapPicker"
+        @after:leave="destroyMapPicker"
+      >
         <template #body>
           <form class="mb-3 flex gap-2" @submit.prevent="searchMapAddress">
             <UInput v-model="mapPickerSearchQuery" class="min-w-0 flex-1" placeholder="Введите адрес для поиска" aria-label="Поиск адреса" />
             <UButton type="submit" icon="i-lucide-search" :loading="mapPickerSearching">Найти</UButton>
           </form>
-          <div v-if="mapPickerSearchResults.length" class="mb-3 max-h-44 overflow-auto rounded-xl border border-charcoal-200 bg-white">
+          <div v-if="mapPickerSearchResults.length" class="mb-3 max-h-44 overflow-auto rounded-lg border border-charcoal-200 bg-white">
             <button v-for="result in mapPickerSearchResults" :key="`${result.lat}:${result.lon}`" type="button" class="block w-full border-b border-charcoal-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-charcoal-50" @click="selectMapSearchResult(result)">
               {{ result.display_name }}
             </button>
           </div>
-          <div class="relative h-[min(60vh,28rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
+          <div class="relative h-[min(60vh,28rem)] min-h-80 overflow-hidden rounded-lg border border-charcoal-200 bg-charcoal-100">
             <div ref="mapPickerElement" class="absolute inset-0"></div>
             <div class="pointer-events-none absolute left-1/2 top-1/2 z-400 -translate-x-1/2 -translate-y-full" aria-hidden="true">
               <div class="h-8 w-8 rounded-full border-4 border-white bg-primary-600 shadow-lg"></div>
@@ -990,7 +1115,10 @@ async function removeBranch(row: BranchRow) {
             <div class="rounded-lg bg-charcoal-50 p-3"><span class="font-semibold">Долгота:</span> {{ mapPickerDraft.longitude || '—' }}</div>
           </div>
           <p class="mt-3 rounded-lg bg-charcoal-50 p-3 text-sm text-charcoal-700"><span class="font-semibold">Адрес:</span> {{ mapPickerAddress || 'Адрес определяется после перемещения карты' }}</p>
-          <p class="mt-3 text-xs text-charcoal-500">Перемещайте карту под центральной меткой или используйте поиск. После выбора нажмите «Применить», затем сохраните локацию филиала.</p>
+          <p class="mt-3 text-xs text-charcoal-500">
+            Перемещайте карту под центральной меткой или используйте поиск. После выбора нажмите «Применить», затем
+            {{ mapPickerTarget === 'address' ? 'сохраните филиал' : 'сохраните локацию филиала' }}.
+          </p>
         </template>
         <template #footer>
           <div class="flex justify-end gap-2">
@@ -1013,18 +1141,31 @@ async function removeBranch(row: BranchRow) {
             </UFormField>
 
             <UFormField label="Адрес">
-              <UInput v-model="form.address" />
+              <div class="flex gap-2">
+                <UInput v-model="form.address" class="min-w-0 flex-1" placeholder="Улица, дом, ориентир" />
+                <UTooltip text="Выбрать на карте">
+                  <UButton aria-label="Выбрать адрес на карте" color="neutral" icon="i-lucide-map-pinned" square variant="outline" @click="openMapPicker('address')" />
+                </UTooltip>
+              </div>
             </UFormField>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-              <UFormField label="Город">
-                <UInput v-model="form.city" />
-              </UFormField>
-
-              <UFormField label="Timezone">
-                <UInput v-model="form.timezone" placeholder="Asia/Tashkent" />
-              </UFormField>
-            </div>
+            <UFormField label="Фото филиала" hint="Необязательно">
+              <div class="flex items-center gap-3">
+                <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-charcoal-300 bg-charcoal-50">
+                  <img v-if="formPhotoShown" :src="formPhotoShown" alt="Фото филиала" class="size-full object-cover">
+                  <UIcon v-else name="i-lucide-image" class="size-6 text-charcoal-400" />
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <UButton color="neutral" icon="i-lucide-upload" size="sm" variant="outline" @click="formPhotoInput?.click()">
+                    {{ formPhotoShown ? 'Заменить' : 'Загрузить' }}
+                  </UButton>
+                  <UButton v-if="formPhotoShown" color="error" icon="i-lucide-trash-2" size="sm" variant="ghost" @click="removeFormPhoto">
+                    Убрать
+                  </UButton>
+                </div>
+                <input ref="formPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="onPhotoSelected">
+              </div>
+            </UFormField>
 
             <UCheckbox v-model="form.is_active" label="Филиал активен" />
           </div>
@@ -1068,7 +1209,7 @@ async function removeBranch(row: BranchRow) {
       >
         <template #body>
           <div class="space-y-5">
-            <div class="rounded-[1.25rem] border border-primary-200 bg-primary-50/60 p-4 text-sm text-charcoal-700">
+            <div class="rounded-[0.875rem] border border-primary-200 bg-primary-50/60 p-4 text-sm text-charcoal-700">
               Общий график действует на всех барберов филиала, пока для сотрудника не задан персональный.
             </div>
 
@@ -1107,7 +1248,7 @@ async function removeBranch(row: BranchRow) {
               </div>
               <div v-if="schedulesPending" class="py-6 text-center text-sm text-charcoal-500">Загрузка графика Verifix…</div>
               <div v-else-if="verifixSchedules.length" class="space-y-2">
-                <div v-for="schedule in verifixSchedules" :key="schedule.id" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 bg-charcoal-50/60 px-4 py-3">
+                <div v-for="schedule in verifixSchedules" :key="schedule.id" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-charcoal-200 bg-charcoal-50/60 px-4 py-3">
                   <div class="min-w-0">
                     <p class="font-medium text-charcoal-950">
                       {{ scheduleDays.find(day => day.value === schedule.day_of_week)?.label }} · <span v-if="schedule.is_working === false">Выходной</span><template v-else>{{ String(schedule.start_time).slice(0, 5) }}<span v-if="schedule.end_time">–{{ String(schedule.end_time).slice(0, 5) }}</span></template>

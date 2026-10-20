@@ -41,7 +41,7 @@ const utilityLinks = computed(() =>
       <template #header="{ collapsed }">
         <div class="w-full">
           <div class="flex items-center gap-2 px-2 py-1">
-            <div class="h-8 w-8 rounded-xl bg-brass-400/15" />
+            <div class="h-8 w-8 rounded-lg bg-brass-400/15" />
             <div v-if="!collapsed" class="min-w-0">
               <p class="text-sm font-semibold text-charcoal-950">
                 Кабинет мерчанта

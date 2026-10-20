@@ -357,7 +357,7 @@ function handleButtonPress(button: CalculatorButton) {
   >
     <template #body>
       <div class="space-y-4">
-        <div class="rounded-[1.5rem] border border-charcoal-200 bg-[var(--dashboard-shell)] p-4 shadow-sm">
+        <div class="rounded-[1rem] border border-charcoal-200 bg-[var(--dashboard-shell)] p-4 shadow-sm">
           <p class="text-xs font-semibold uppercase tracking-[0.22em] text-charcoal-500">
             {{ secondaryValue }}
           </p>

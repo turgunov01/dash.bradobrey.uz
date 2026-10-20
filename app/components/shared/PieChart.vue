@@ -128,7 +128,7 @@ const showLegend = computed(() => props.showLegend !== false)
       <div
         v-for="slice in slices"
         :key="`${slice.label}-${slice.displayValue}`"
-        class="flex items-center justify-between gap-3 rounded-xl border border-charcoal-100 bg-white/80 px-3 py-2"
+        class="flex items-center justify-between gap-3 rounded-lg border border-charcoal-100 bg-white/80 px-3 py-2"
       >
         <div class="flex items-center gap-2">
           <span class="size-3 rounded-full" :style="{ backgroundColor: slice.color }" />

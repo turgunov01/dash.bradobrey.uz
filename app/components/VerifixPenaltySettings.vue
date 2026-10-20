@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { UCard } from '#components'
 import { formatMoney } from '~/utils/format'
+
+defineProps<{
+  embedded?: boolean
+}>()
 
 const { data, pending, error, refresh } = await useVerifixPenalty()
 const api = useVerifixApi()
@@ -45,14 +50,15 @@ async function save() {
 </script>
 
 <template>
-  <UCard class="mb-4">
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,18rem)_auto] lg:items-end">
+  <!-- `embedded`: rendered inside a popover, so no card wrapper and a stacked layout. -->
+  <component :is="embedded ? 'div' : UCard" :class="embedded ? 'w-80 p-3' : 'mb-4'">
+    <div :class="embedded ? 'space-y-3' : 'grid gap-4 lg:grid-cols-[minmax(0,18rem)_auto] lg:items-end'">
       <UFormField label="Фиксированный штраф за минуту, сум">
-        <UInput v-model="minuteRate" type="number" min="0" step="0.01" :disabled="pending || saving || !canEdit || !!error" />
+        <UInput v-model="minuteRate" class="w-full" type="number" min="0" step="0.01" :disabled="pending || saving || !canEdit || !!error" />
       </UFormField>
 
       <div class="flex flex-wrap items-center gap-2">
-        <UButton v-if="canEdit" :loading="saving" :disabled="pending || !valid || !!error" @click="save">Сохранить настройки</UButton>
+        <UButton v-if="canEdit" :block="embedded" :loading="saving" :disabled="pending || !valid || !!error" @click="save">Сохранить настройки</UButton>
         <UButton v-if="error" color="error" variant="outline" @click="() => refresh()">Повторить загрузку</UButton>
       </div>
     </div>
@@ -66,5 +72,5 @@ async function save() {
     </p>
 
     <p v-if="error" class="mt-3 text-sm text-red-600">Ставка не загружена. Расчёт штрафов недоступен.</p>
-  </UCard>
+  </component>
 </template>

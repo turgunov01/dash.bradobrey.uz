@@ -22,7 +22,7 @@ useSeoMeta({
   <UApp :locale="ru" :toaster="null">
     <div class="min-h-screen bg-[var(--dashboard-shell)] px-4 py-12">
       <div class="mx-auto max-w-xl">
-        <UCard class="warm-card rounded-[2rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="space-y-2">
               <p class="text-xs font-semibold uppercase tracking-[0.28em] text-brass-700">

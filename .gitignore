@@ -5,7 +5,6 @@
 .nitro
 .cache
 .env
-.env.example
 
 dist
 
@@ -24,4 +23,8 @@ logs
 
 # VSC
 .history
+.vscode/*
 dashboard-output.tar.gz
+
+# Local Claude Code settings
+.claude/settings.local.json

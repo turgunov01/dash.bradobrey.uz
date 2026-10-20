@@ -38,14 +38,17 @@ watch(baseQueryKey, () => {
   previousCursors.value = []
 })
 
-const { data, error, pending, refresh } = await useAsyncData(
+const { data, error, pending, status, refresh } = await useAsyncData(
   () => `employee-quality-evidence-${employeeId.value}-${JSON.stringify(query.value)}`,
   () => apiClient.request<EmployeeQualityEvidenceResponse>(
     `/api/statistics/employees/${encodeURIComponent(employeeId.value)}/orders`,
     { query: query.value, silent: true }
   ),
-  { server: false, watch: [query] }
+  { server: false, lazy: true, watch: [query] }
 )
+
+// server: false starts in "idle" during hydration, so treat it as loading too.
+const isInitialLoading = computed(() => (pending.value || status.value === 'idle') && !data.value)
 
 const errorMessage = computed(() => {
   const source = error.value as any
@@ -92,14 +95,14 @@ function previousPage() {
           <UButton icon="i-lucide-arrow-left" to="/statistics/employees" variant="ghost">К рейтингу</UButton>
         </div>
 
-        <div v-if="pending && !data" class="space-y-3">
-          <USkeleton v-for="index in 4" :key="index" class="h-16 w-full rounded-2xl" />
+        <div v-if="isInitialLoading" class="space-y-3">
+          <USkeleton v-for="index in 4" :key="index" class="h-16 w-full rounded-xl" />
         </div>
         <UAlert v-else-if="error" color="error" icon="i-lucide-triangle-alert" title="Доказательства не загружены" :description="errorMessage" variant="soft">
           <template #actions><UButton color="error" size="sm" variant="outline" @click="refresh()">Повторить</UButton></template>
         </UAlert>
         <SharedEmptyState v-else-if="!data?.orders.length" description="Для выбранного показателя нет канонических записей." icon="i-lucide-file-search" title="Список пуст" />
-        <div v-else class="overflow-x-auto rounded-2xl border border-charcoal-200">
+        <div v-else class="overflow-x-auto rounded-xl border border-charcoal-200">
           <table class="min-w-[980px] w-full text-left text-sm">
             <thead class="bg-charcoal-50 text-[11px] uppercase tracking-[0.14em] text-charcoal-500">
               <tr>

@@ -34,8 +34,11 @@ const { data, pending, refresh } = await useAsyncData('barber-queue-detail', asy
     services
   }
 }, {
+  lazy: true,
   watch: [queueId]
 })
+
+const isQueueInitialLoading = computed(() => pending.value && !data.value)
 
 const queueItem = computed<Record<string, any> | null>(() => (data.value?.detail as any)?.data || null)
 const queueStatusCode = computed(() => (data.value?.detail as any)?.status || 200)
@@ -159,6 +162,10 @@ async function markNotInTime() {
           <UDashboardSidebarCollapse />
         </template>
 
+        <template v-if="isQueueInitialLoading" #title>
+          <USkeleton class="h-6 w-48 rounded-md" />
+        </template>
+
         <template #right>
           <UButton color="neutral" icon="i-lucide-arrow-left" to="/barbers/workspace" variant="outline">
             Назад
@@ -182,7 +189,7 @@ async function markNotInTime() {
         />
 
         <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -194,22 +201,33 @@ async function markNotInTime() {
               </div>
             </template>
 
-            <div v-if="queueItem" class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+            <div v-if="isQueueInitialLoading" class="grid gap-3 sm:grid-cols-2">
+              <div
+                v-for="label in ['Статус', 'Оплата', 'Создано', 'Сумма']"
+                :key="label"
+                class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4"
+              >
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">{{ label }}</p>
+                <USkeleton class="mt-3 h-7 w-28 rounded-md" />
+              </div>
+            </div>
+
+            <div v-else-if="queueItem" class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Статус</p>
                 <div class="mt-3">
                   <SharedStatusBadge :label="queueItem.status" />
                 </div>
               </div>
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Оплата</p>
                 <p class="mt-3 text-lg font-semibold text-charcoal-950">{{ formatPaymentMethod(queueItem.payment_method) }}</p>
               </div>
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Создано</p>
                 <p class="mt-3 text-lg font-semibold text-charcoal-950">{{ formatDateTime(queueItem.created_at) }}</p>
               </div>
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Сумма</p>
                 <p class="mt-3 text-lg font-semibold text-charcoal-950">{{ formatMoney(queueItem.amount) }}</p>
               </div>
@@ -228,7 +246,7 @@ async function markNotInTime() {
             </div>
           </UCard>
 
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -265,7 +283,7 @@ async function markNotInTime() {
                 </UButton>
               </div>
 
-              <div class="rounded-[1.5rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="rounded-[1rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">
                   Редактирование перед завершением
                 </p>
@@ -290,7 +308,7 @@ async function markNotInTime() {
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[0.7fr_1.3fr]">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -312,7 +330,8 @@ async function markNotInTime() {
             </div>
           </UCard>
 
-          <SharedJsonBlock label="Сырые данные очереди" :value="queueItem || {}" />
+          <SharedSkeletonRows v-if="isQueueInitialLoading" card :rows="4" :columns="2" />
+          <SharedJsonBlock v-else label="Сырые данные очереди" :value="queueItem || {}" />
         </div>
       </div>
 

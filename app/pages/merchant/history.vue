@@ -72,7 +72,9 @@ const queryParams = computed(() => {
 
 const { data, pending, refresh } = await useAsyncData('merchant-history', async () => {
   return await merchantApi.historyAll(queryParams.value)
-}, { watch: [queryParams] })
+}, { lazy: true, watch: [queryParams] })
+
+const isHistoryInitialLoading = computed(() => pending.value && !data.value)
 
 const rows = computed<HistoryRow[]>(() => {
   const items = (data.value as any)?.items
@@ -136,9 +138,11 @@ const columns: TableColumn<HistoryRow>[] = [
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isHistoryInitialLoading" :rows="5" :columns="6" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
               <template #created_at-cell="{ row }">

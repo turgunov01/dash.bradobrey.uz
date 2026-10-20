@@ -194,9 +194,10 @@ function moveRow(target: 'regular' | 'kids', index: number, direction: -1 | 1) {
   list.value = copy
 }
 
-const { data, pending, refresh, error } = await useAsyncData('settings-kiosk-ads', async () => {
+const { data, pending, status, refresh, error } = await useAsyncData('settings-kiosk-ads', async () => {
   return await adsApi.getSettings()
-}, { server: false })
+}, { server: false, lazy: true })
+const isInitialLoading = computed(() => !data.value && (pending.value || status.value === 'idle'))
 
 watch(
   () => data.value?.settings,
@@ -275,16 +276,28 @@ async function submit() {
 
     <template #body>
       <div class="space-y-6">
-        <div class="text-xs text-charcoal-600">
-          Последнее обновление: {{ updatedAtLabel }}
+        <div class="flex items-center gap-1 text-xs text-charcoal-600">
+          Последнее обновление:
+          <USkeleton v-if="isInitialLoading" class="h-3 w-28 rounded" />
+          <template v-else>{{ updatedAtLabel }}</template>
         </div>
 
-        <div v-if="pending" class="flex justify-center py-10">
+        <div v-if="isInitialLoading" class="grid gap-6 xl:grid-cols-2" aria-busy="true" aria-label="Загрузка настроек">
+          <UCard v-for="card in 2" :key="card" class="warm-card rounded-[1.25rem] border border-charcoal-200">
+            <div class="space-y-4">
+              <USkeleton class="h-4 w-40 rounded" />
+              <USkeleton class="h-4 w-3/4 rounded" />
+              <USkeleton v-for="field in 3" :key="field" class="h-9 w-full rounded-md" />
+            </div>
+          </UCard>
+        </div>
+
+        <div v-else-if="pending" class="flex justify-center py-10">
           <ULoader size="lg" />
         </div>
 
         <div v-else class="grid gap-6 xl:grid-cols-2">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="flex items-start justify-between gap-4">
                 <div class="space-y-1">
@@ -329,7 +342,7 @@ async function submit() {
               ghost-class="opacity-60"
             >
               <template #item="{ element, index }">
-                <div class="rounded-xl border border-charcoal-200 bg-white/90 p-3">
+                <div class="rounded-lg border border-charcoal-200 bg-white/90 p-3">
                   <div class="flex items-start gap-2">
                     <UButton icon="i-lucide-grip-vertical" variant="ghost" size="xs" class="drag-handle cursor-grab" />
 
@@ -390,7 +403,7 @@ async function submit() {
             </div>
           </UCard>
 
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="flex items-start justify-between gap-4">
                 <div class="space-y-1">
@@ -435,7 +448,7 @@ async function submit() {
               ghost-class="opacity-60"
             >
               <template #item="{ element, index }">
-                <div class="rounded-xl border border-charcoal-200 bg-white/90 p-3">
+                <div class="rounded-lg border border-charcoal-200 bg-white/90 p-3">
                   <div class="flex items-start gap-2">
                     <UButton icon="i-lucide-grip-vertical" variant="ghost" size="xs" class="drag-handle cursor-grab" />
 

@@ -28,12 +28,15 @@ const columns: TableColumn<MarketplaceReview>[] = [
   { accessorKey: 'created_at', header: 'Дата' }
 ]
 
-const { data, pending, refresh } = await useAsyncData('marketplace-reviews', () => api.fetchReviews({
+const { data, pending, status, refresh } = await useAsyncData('marketplace-reviews', () => api.fetchReviews({
   q: search.value.trim() || undefined,
   rating: rating.value === 'all' ? undefined : Number(rating.value),
   limit: pageSize,
   offset: (page.value - 1) * pageSize
-}), { server: false, watch: [page, rating] })
+}), { server: false, lazy: true, watch: [page, rating] })
+
+// server: false starts in "idle" during hydration, so treat it as loading too.
+const isInitialLoading = computed(() => (pending.value || status.value === 'idle') && !data.value)
 
 const rows = computed(() => (data.value?.items || []) as MarketplaceReview[])
 const total = computed(() => Number(data.value?.count || 0))
@@ -59,7 +62,7 @@ function submitSearch() {
     <template #body>
       <div class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-sm text-charcoal-500">Отзывы по барберам: {{ total }}</p>
+          <p class="flex items-center gap-1 text-sm text-charcoal-500">Отзывы по барберам: <USkeleton v-if="isInitialLoading" class="h-4 w-8" /><template v-else>{{ total }}</template></p>
           <UButton icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refresh()">Обновить</UButton>
         </div>
         <div class="flex flex-wrap gap-3">
@@ -67,7 +70,8 @@ function submitSearch() {
           <USelect v-model="rating" :items="[{ label: 'Все оценки', value: 'all' }, { label: '5 звёзд', value: '5' }, { label: '4 звезды', value: '4' }, { label: '3 звезды', value: '3' }, { label: '2 звезды', value: '2' }, { label: '1 звезда', value: '1' }]" class="w-48" />
           <UButton color="primary" @click="submitSearch">Найти</UButton>
         </div>
-        <UTable :columns="columns" :data="rows" :loading="pending">
+        <SharedSkeletonRows v-if="isInitialLoading" :rows="8" :columns="6" />
+        <UTable v-else :columns="columns" :data="rows" :loading="pending">
           <template #rating-cell="{ row }"><span class="text-amber-500">{{ stars(row.original.rating) }}</span></template>
           <template #comment-cell="{ row }"><span class="line-clamp-2 max-w-md">{{ row.original.comment || 'Без комментария' }}</span></template>
           <template #client_name-cell="{ row }"><div>{{ row.original.client_name }}</div><div class="text-xs text-charcoal-500">{{ row.original.client_phone || 'Телефон не указан' }}</div></template>

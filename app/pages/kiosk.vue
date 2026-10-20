@@ -61,8 +61,11 @@ const { data, pending, refresh } = await useAsyncData('kiosk-dashboard', async (
     services
   }
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
+
+const isKioskInitialLoading = computed(() => pending.value && !data.value)
 
 const allServices = computed(() => flattenServicesPayload(data.value?.services))
 
@@ -253,7 +256,7 @@ async function createBooking() {
 
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="space-y-2">
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -267,9 +270,9 @@ async function createBooking() {
             <div class="overflow-x-auto">
               <UTabs v-model="activeTab" :content="false" :items="tabs" :ui="{
                 root: 'min-w-max items-start',
-                list: 'inline-flex w-max rounded-[1.35rem] bg-charcoal-100 p-1.5',
-                indicator: 'rounded-[0.95rem] bg-primary shadow-none',
-                trigger: 'h-11 rounded-[0.95rem] px-4 text-sm font-semibold data-[state=active]:text-inverted sm:text-[15px]',
+                list: 'inline-flex w-max rounded-[0.875rem] bg-charcoal-100 p-1.5',
+                indicator: 'rounded-[0.75rem] bg-primary shadow-none',
+                trigger: 'h-11 rounded-[0.75rem] px-4 text-sm font-semibold data-[state=active]:text-inverted sm:text-[15px]',
                 label: 'whitespace-nowrap'
               }" />
             </div>
@@ -277,7 +280,8 @@ async function createBooking() {
         </UCard>
 
         <section v-if="activeTab === 'barbers'" class="space-y-4">
-          <div v-if="barberRows.length" class="overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isKioskInitialLoading" :rows="5" :columns="4" />
+          <div v-else-if="barberRows.length" class="overflow-hidden rounded-[1rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="barberColumns" :data="barberRows" :get-row-id="(row) => row.id" :loading="pending" :meta="{
               class: {
                 tr: (row) => row.original.barberId === selectedBarberId ? 'bg-primary/10 cursor-pointer' : 'cursor-pointer'
@@ -321,8 +325,9 @@ async function createBooking() {
         </section>
 
         <section v-else-if="activeTab === 'services'" class="space-y-4">
-          <div v-if="serviceRows.length"
-            class="overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isKioskInitialLoading" :rows="6" :columns="5" />
+          <div v-else-if="serviceRows.length"
+            class="overflow-hidden rounded-[1rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="serviceColumns" :data="serviceRows" :get-row-id="(row) => row.id" :loading="pending"
               :meta="{
                 class: {
@@ -367,7 +372,7 @@ async function createBooking() {
         </section>
 
         <section v-else class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -402,7 +407,7 @@ async function createBooking() {
           </UCard>
 
           <div class="space-y-6">
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -415,15 +420,15 @@ async function createBooking() {
               </template>
 
               <div class="space-y-3">
-                <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+                <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Барбер</p>
                   <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ selectedBarber?.name || 'Не выбран' }}</p>
                 </div>
-                <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+                <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Услуги</p>
                   <div v-if="selectedServices.length" class="mt-3 space-y-2">
                     <div v-for="service in selectedServices" :key="String(service.id)"
-                      class="rounded-[1rem] bg-sand-100 px-3 py-2 text-sm text-charcoal-700">
+                      class="rounded-[0.75rem] bg-sand-100 px-3 py-2 text-sm text-charcoal-700">
                       {{ service.name }} / {{ service.duration || 0 }} мин / {{ service.price || 0 }}
                     </div>
                   </div>
@@ -432,7 +437,7 @@ async function createBooking() {
               </div>
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">

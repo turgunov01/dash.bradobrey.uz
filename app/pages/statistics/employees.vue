@@ -22,6 +22,13 @@ const {
   selectedBarberId
 } = useStatisticsAnalytics()
 
+// Statistics load client-side after mount; until the first response arrives,
+// render skeletons instead of zero values and empty states.
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
+const isInitialLoading = computed(() => isFirstLoad(pending.value, hasData.value, isMounted.value))
 const employeeModalOpen = ref(false)
 const selectedEmployeeId = ref<string | null>(null)
 const selectedEmployeeDetail = computed(() => employeeDetails.value.find(item => item.id === selectedEmployeeId.value) || null)
@@ -56,6 +63,7 @@ function openEmployeeDetails(employeeId: string) {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :loading="isInitialLoading"
           :range-error="rangeError"
           :scope-options="scopeOptions"
           subtitle="Показатели сотрудников считаются по завершённым записям и прайсу услуг в выбранном периоде и области."
@@ -70,7 +78,7 @@ function openEmployeeDetails(employeeId: string) {
         />
 
         <SharedEmptyState
-          v-else-if="needsBarberSelection"
+          v-else-if="needsBarberSelection && !isInitialLoading"
           description="Не найдено ни одного барбера для построения персональной статистики."
           icon="i-lucide-user-round-search"
           title="Барбер не выбран"
@@ -78,9 +86,6 @@ function openEmployeeDetails(employeeId: string) {
 
         <template v-else>
           <UAlert v-if="dataError" color="error" icon="i-lucide-triangle-alert" title="Статистика загружена не полностью" :description="dataError" variant="soft" />
-          <div v-if="pending && !hasData" class="grid gap-4 xl:grid-cols-4 md:grid-cols-2" aria-live="polite">
-            <USkeleton v-for="index in 4" :key="index" class="h-24 rounded-2xl" />
-          </div>
           <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
             <DashboardMetricCard
               v-for="card in operationsCards"
@@ -88,12 +93,13 @@ function openEmployeeDetails(employeeId: string) {
               :description="card.description"
               :icon="card.icon"
               :label="card.label"
+              :loading="isInitialLoading"
               :value="card.value"
             />
           </div>
 
           <div class="space-y-6">
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -106,7 +112,8 @@ function openEmployeeDetails(employeeId: string) {
                 </div>
               </template>
 
-              <div v-if="barberBreakdown.length" class="space-y-6">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="barberBreakdown.length" class="space-y-6">
                 <div class="flex justify-center">
                   <SharedPieChart
                     :items="barberPieItems"
@@ -119,7 +126,7 @@ function openEmployeeDetails(employeeId: string) {
                   <button
                     v-for="row in barberBreakdown"
                     :key="row.id"
-                    class="w-full rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3 text-left transition hover:border-charcoal-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-700"
+                    class="w-full rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3 text-left transition hover:border-charcoal-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-700"
                     type="button"
                     @click="openEmployeeDetails(row.id)"
                   >

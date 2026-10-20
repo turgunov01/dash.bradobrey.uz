@@ -150,7 +150,7 @@ function focusMerchantAccount() {
   document.getElementById('merchant-account')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const { pending, refresh } = await useAsyncData(
+const { data: barbershopLoaded, pending, refresh } = await useAsyncData(
   () => `dashboard-marketplace-barbershop-${barbershopId.value}`,
   async () => {
     const id = barbershopId.value
@@ -163,8 +163,10 @@ const { pending, refresh } = await useAsyncData(
 
     return true
   },
-  { watch: [barbershopId] }
+  { lazy: true, watch: [barbershopId] }
 )
+
+const isInitialLoading = computed(() => pending.value && !barbershopLoaded.value)
 
 const barbershop = computed<any>(() => store.selectedBarbershop as any)
 
@@ -175,7 +177,7 @@ const { data: merchantsData, pending: merchantsPending, refresh: refreshMerchant
     if (!id) return { items: [], total: 0 }
     return await marketplaceBarbershopsApi.listMerchants(id)
   },
-  { watch: [barbershopId] }
+  { lazy: true, watch: [barbershopId] }
 )
 
 const merchants = computed<any[]>(() => Array.isArray((merchantsData.value as any)?.items) ? (merchantsData.value as any).items : [])
@@ -500,6 +502,10 @@ const columns: TableColumn<BranchRow>[] = [
   <UDashboardPanel id="marketplace-barbershop">
     <template #header>
       <UDashboardNavbar :title="barbershop?.name || 'Барбершоп'" :ui="{ right: 'gap-3' }">
+        <template v-if="isInitialLoading" #title>
+          <USkeleton class="h-5 w-40" />
+        </template>
+
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -534,11 +540,12 @@ const columns: TableColumn<BranchRow>[] = [
           <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div class="space-y-2">
               <div class="flex flex-wrap items-center gap-2">
-                <h2 class="barbershop-heading text-2xl text-charcoal-950">
+                <USkeleton v-if="isInitialLoading" class="h-8 w-56" />
+                <h2 v-else class="barbershop-heading text-2xl text-charcoal-950">
                   {{ barbershop?.name || 'Барбершоп' }}
                 </h2>
                 <UBadge
-                  v-if="barbershop?.is_active !== undefined && barbershop?.is_active !== null"
+                  v-if="!isInitialLoading && barbershop?.is_active !== undefined && barbershop?.is_active !== null"
                   :color="barbershop?.is_active === false ? 'neutral' : 'success'"
                   variant="soft"
                 >
@@ -552,7 +559,8 @@ const columns: TableColumn<BranchRow>[] = [
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isInitialLoading" class="h-7 w-24" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ branchRows.length }} филиалов
               </UBadge>
               <UButton
@@ -567,21 +575,23 @@ const columns: TableColumn<BranchRow>[] = [
           </div>
 
           <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">
                 Город
               </p>
-              <p class="text-sm font-medium text-charcoal-950">
+              <USkeleton v-if="isInitialLoading" class="mt-1 h-4 w-28" />
+              <p v-else class="text-sm font-medium text-charcoal-950">
                 {{ barbershop?.city || '—' }}
               </p>
             </div>
 
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">
                 Адрес
               </p>
+              <USkeleton v-if="isInitialLoading" class="mt-1 h-4 w-48" />
               <UButton
-                v-if="getExternalAddressUrl(barbershop?.address)"
+                v-else-if="getExternalAddressUrl(barbershop?.address)"
                 color="neutral"
                 icon="i-lucide-map-pinned"
                 :to="getExternalAddressUrl(barbershop?.address) || undefined"
@@ -620,11 +630,13 @@ const columns: TableColumn<BranchRow>[] = [
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="4" />
+
           <div
-            v-if="branchRows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="branchRows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
-            <UTable :columns="columns" :data="branchRows">
+            <UTable :columns="columns" :data="branchRows" :loading="pending">
               <template #name-cell="{ row }">
                 <div class="space-y-1">
                   <span class="font-medium text-charcoal-950">{{ row.original.name }}</span>
@@ -727,10 +739,12 @@ const columns: TableColumn<BranchRow>[] = [
           </template>
 
           <div class="space-y-4">
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">Current merchant</p>
 
-              <div v-if="merchantsPending" class="text-sm text-charcoal-500">
+              <USkeleton v-if="merchantsPending && !merchantsData" class="mt-1 h-4 w-40" />
+
+              <div v-else-if="merchantsPending" class="text-sm text-charcoal-500">
                 Loading...
               </div>
 
@@ -787,7 +801,7 @@ const columns: TableColumn<BranchRow>[] = [
               </div>
             </UCard>
 
-            <div v-if="!merchantAccount" class="space-y-4">
+            <div v-if="!merchantAccount && !(merchantsPending && !merchantsData)" class="space-y-4">
               <UFormField label="Login" required>
                 <UInput v-model="merchantForm.login" placeholder="merchant_login" />
               </UFormField>
@@ -860,7 +874,7 @@ const columns: TableColumn<BranchRow>[] = [
                 <UCheckbox v-model="branchForm.is_active" label="Филиал активен" />
               </div>
 
-              <UCard class="rounded-2xl border border-charcoal-200 bg-white/70">
+              <UCard class="rounded-xl border border-charcoal-200 bg-white/70">
                 <template #header>
                   <div class="space-y-1">
                     <h4 class="font-semibold text-charcoal-950">
@@ -876,7 +890,7 @@ const columns: TableColumn<BranchRow>[] = [
                   <div
                     v-for="day in days"
                     :key="day.key"
-                    class="rounded-2xl border border-charcoal-200 bg-white/80 p-4"
+                    class="rounded-xl border border-charcoal-200 bg-white/80 p-4"
                   >
                     <p class="text-sm font-medium text-charcoal-950">
                       {{ day.label }}
@@ -961,7 +975,7 @@ const columns: TableColumn<BranchRow>[] = [
                 </div>
               </div>
 
-              <UCard class="rounded-2xl border border-charcoal-200 bg-white/70">
+              <UCard class="rounded-xl border border-charcoal-200 bg-white/70">
                 <template #header>
                   <div class="space-y-1">
                     <h4 class="font-semibold text-charcoal-950">
@@ -977,7 +991,7 @@ const columns: TableColumn<BranchRow>[] = [
                   <div
                     v-for="day in days"
                     :key="day.key"
-                    class="rounded-2xl border border-charcoal-200 bg-white/80 p-4"
+                    class="rounded-xl border border-charcoal-200 bg-white/80 p-4"
                   >
                     <p class="text-sm font-medium text-charcoal-950">
                       {{ day.label }}

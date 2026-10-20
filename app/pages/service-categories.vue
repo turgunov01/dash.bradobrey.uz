@@ -90,8 +90,11 @@ const { data, pending, refresh } = await useAsyncData('admin-service-categories'
 
   return await categoriesApi.list(true)
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
+
+const isCategoriesInitialLoading = computed(() => pending.value && !data.value)
 
 const rows = computed<CategoryRow[]>(() =>
   ((data.value as any)?.items || []).flatMap((item: ServiceCategory) => {
@@ -354,15 +357,17 @@ async function cloneToAllBranches() {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isCategoriesInitialLoading" class="h-7 w-16 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ rows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isCategoriesInitialLoading" :rows="5" :columns="4" />
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
               <template #sort_order-cell="{ row }">

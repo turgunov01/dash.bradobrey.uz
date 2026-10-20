@@ -76,6 +76,7 @@ const previewUrl = computed(() => objectUrl.value || resolveServiceImageUrl(form
 const { data, pending, refresh } = await useAsyncData('services-dashboard', async () => {
   return await servicesApi.list()
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
 
@@ -89,9 +90,12 @@ const { data: categoriesData, pending: categoriesPending, refresh: refreshCatego
     return await categoriesApi.list(true)
   },
   {
+    lazy: true,
     watch: [() => branchStore.activeBranchId]
   }
 )
+
+const isServicesInitialLoading = computed(() => pending.value && !data.value)
 
 const serviceRows = computed<ServiceRow[]>(() =>
   flattenServicesPayload(data.value).map((service, index) => ({
@@ -394,7 +398,8 @@ function openPreview(src: string, title: string) {
     </template>
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
-        <UBadge color="neutral" size="lg" variant="soft">
+        <USkeleton v-if="isServicesInitialLoading" class="h-7 w-24 rounded-md" />
+        <UBadge v-else color="neutral" size="lg" variant="soft">
           {{ totalServices }} услуг
         </UBadge>
 
@@ -443,7 +448,7 @@ function openPreview(src: string, title: string) {
       >
         <template v-for="bucket in buckets" :key="bucket.name">
           <div
-            class="rounded-2xl border border-charcoal-200 bg-white/90 p-3"
+            class="rounded-xl border border-charcoal-200 bg-white/90 p-3"
           >
             <div class="mb-2 flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
@@ -465,7 +470,7 @@ function openPreview(src: string, title: string) {
                 @change="onDragChange(bucket.name, $event)"
               >
                 <template #item="{ element, index }">
-                  <div class="rounded-xl border border-charcoal-200 bg-white shadow-sm transition hover:-translate-y-[1px] hover:shadow-md">
+                  <div class="rounded-lg border border-charcoal-200 bg-white shadow-sm transition hover:-translate-y-[1px] hover:shadow-md">
                     <div class="flex items-start justify-between gap-3 p-3">
                       <div class="space-y-1">
                         <p class="font-semibold text-charcoal-950">{{ index + 1 }}. {{ element.name }}</p>
@@ -522,16 +527,14 @@ function openPreview(src: string, title: string) {
         </template>
       </div>
 
+      <SharedSkeletonRows v-else-if="!ready || isServicesInitialLoading" :rows="6" :columns="3" card />
+
       <SharedEmptyState
-        v-else-if="ready"
+        v-else
         description="Список услуг пуст или не был получен от бэкенда."
         icon="i-lucide-badge-dollar-sign"
         title="Услуги не загружены"
       />
-
-      <div v-else class="flex justify-center py-8">
-        <UProgress class="max-w-64" />
-      </div>
 
       <UModal
         v-model:open="serviceModalOpen"
@@ -578,7 +581,7 @@ function openPreview(src: string, title: string) {
               </UFormField>
             </div>
 
-            <div v-if="previewUrl" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+            <div v-if="previewUrl" class="rounded-lg border border-charcoal-200 bg-white/70 p-3">
               <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
                 Предпросмотр
               </p>
@@ -621,7 +624,7 @@ function openPreview(src: string, title: string) {
           v-if="previewSrc"
           :alt="previewTitle || 'Превью услуги'"
           :src="previewSrc"
-          class="max-h-[70vh] max-w-full rounded-2xl border border-charcoal-200 object-contain"
+          class="max-h-[70vh] max-w-full rounded-xl border border-charcoal-200 object-contain"
         >
       </div>
     </template>

@@ -196,7 +196,8 @@ export function useApiClient() {
     const scopedQuery = buildScopedQuery(options.query, options.method, branchStore?.activeBranchId);
 
     try {
-      const data = await $fetch<TResponse>(url, {
+      // Sequential on the client: each request waits for the previous response.
+      const data = await enqueueRequest(() => $fetch<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
         headers: buildRequestHeaders(
@@ -206,7 +207,7 @@ export function useApiClient() {
         ),
         method: options.method || "GET",
         query: scopedQuery,
-      });
+      }));
 
       if (import.meta.client) {
         uiStore.pushDebug({
@@ -262,7 +263,7 @@ export function useApiClient() {
     const scopedQuery = buildScopedQuery(options.query, options.method, branchStore?.activeBranchId);
 
     try {
-      const response = await $fetch.raw<TResponse>(url, {
+      const response = await enqueueRequest(() => $fetch.raw<TResponse>(url, {
         body: options.body as BodyInit | Record<string, unknown> | undefined,
         credentials: "include",
         headers: buildRequestHeaders(
@@ -272,7 +273,7 @@ export function useApiClient() {
         ),
         method: options.method || "GET",
         query: scopedQuery,
-      });
+      }));
 
       if (import.meta.client) {
         uiStore.pushDebug({
