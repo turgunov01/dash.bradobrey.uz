@@ -92,6 +92,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
   {
     label: "Система",
     items: [
+      { icon: "i-lucide-tablet-smartphone", label: "Киоски", to: "/settings/kiosks" },
       { icon: "i-lucide-monitor-play", label: "Реклама киоска", to: "/settings/kiosk-ads" },
       { icon: "i-lucide-panels-top-left", label: "Баннеры приложения", to: "/settings/banners" },
       { icon: "i-lucide-bell-ring", label: "Настройки уведомлений", to: "/settings/notifications" },

@@ -3,10 +3,27 @@ import type {
   KioskRegisterPayload
 } from '~~/shared/schemas'
 
+export interface KioskDevice {
+  id: string
+  branch_id: string
+  branch_name: string | null
+  device_name: string
+  has_device_token: boolean
+  created_at: string
+  updated_at: string
+}
+
 export function useKioskApi() {
   const client = useApiClient()
 
   return {
+    // Scoped to the active branch by useApiClient; all branches when none is active.
+    devices() {
+      return client.request<{ entry: KioskDevice[] }>('/api/kiosk/devices')
+    },
+    removeDevice(id: string) {
+      return client.request(`/api/kiosk/devices/${id}`, { method: 'DELETE', successMessage: 'Киоск удалён' })
+    },
     barbers(branchId: string) {
       return client.request<{ data: any[] }>(`/api/kiosk/barbers/${branchId}`)
     },
