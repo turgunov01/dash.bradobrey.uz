@@ -27,7 +27,7 @@ const columns: TableColumn<QueueItem>[] = [
 </script>
 
 <template>
-  <div class="overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-white/90">
+  <div class="overflow-hidden rounded-[1rem] border border-charcoal-200 bg-white/90">
     <UTable
       :columns="columns"
       :data="props.items"

@@ -79,7 +79,7 @@ export const useBranchStore = defineStore('branch', () => {
     }
 
     try {
-      return await $fetch('/api/branches', options)
+      return await enqueueRequest(() => $fetch('/api/branches', options))
     }
     catch {
       return { items: [] }

@@ -98,6 +98,6 @@ test('statistics keeps rejected entries in refusal metrics and preserves client 
 
 test('history page exposes partial-source failures and initial loading state', () => {
   assert.match(historyStatisticsPageSource, /dataError/)
-  assert.match(historyStatisticsPageSource, /pending && !hasData/)
+  assert.match(historyStatisticsPageSource, /isFirstLoad\(pending\.value, hasData\.value/)
   assert.match(historyStatisticsPageSource, /USkeleton/)
 })

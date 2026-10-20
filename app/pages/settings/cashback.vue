@@ -42,7 +42,8 @@ function apply(value: CashbackSettings) {
   snapshot.value = { ...next }
 }
 
-const { data, pending, error, refresh } = await useAsyncData('settings-cashback', () => settingsApi.getSettings(), { server: false })
+const { data, pending, status, error, refresh } = await useAsyncData('settings-cashback', () => settingsApi.getSettings(), { server: false, lazy: true })
+const isInitialLoading = computed(() => !data.value && (pending.value || status.value === 'idle'))
 watch(() => data.value, value => { if (value) apply(value) }, { immediate: true })
 
 const validation = computed(() => {
@@ -102,14 +103,31 @@ async function save() {
     </template>
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">Marketplace</p>
             <h2 class="barbershop-heading text-3xl text-charcoal-950">Настройки кэшбэка</h2>
             <p class="mt-2 text-sm text-charcoal-600">После окончания акции автоматически применяется дефолтный процент.</p>
           </template>
 
-          <div v-if="pending" class="py-6 text-sm text-charcoal-600">Загрузка настроек…</div>
+          <div v-if="isInitialLoading" class="space-y-6" aria-busy="true" aria-label="Загрузка настроек">
+            <div class="grid gap-4 md:grid-cols-3">
+              <div v-for="field in 3" :key="field" class="space-y-2">
+                <USkeleton class="h-4 w-32 rounded" />
+                <USkeleton class="h-9 w-full rounded-md" />
+              </div>
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div v-for="field in 2" :key="field" class="space-y-2">
+                <USkeleton class="h-4 w-36 rounded" />
+                <USkeleton class="h-9 w-full rounded-md" />
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <USkeleton class="h-9 w-28 rounded-md" />
+              <USkeleton class="h-9 w-44 rounded-md" />
+            </div>
+          </div>
           <div v-else class="space-y-6">
             <div class="grid gap-4 md:grid-cols-3">
               <UFormField label="Дефолтный процент" name="default_percent" :error="validation.default_percent">

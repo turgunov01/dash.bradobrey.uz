@@ -23,6 +23,7 @@ type LateRow = {
 type LateEmployeeGroup = {
   barberId: string
   barberName: string
+  photoUrl: string | null
   branches: string[]
   events: LateRow[]
   lateDays: number
@@ -121,6 +122,27 @@ const [currentYear, currentMonth] = toDateValue.split('-').map(Number)
 const fromDate = ref(`${currentYear}-${String(currentMonth).padStart(2, '0')}-01`)
 const toDate = ref(toDateValue)
 const selectedBranchId = ref<string>(branchStore.activeBranchId || 'all')
+
+// Filters live in a floating popover; the icon shows how many differ from the defaults.
+const DEFAULT_FROM_DATE = fromDate.value
+const DEFAULT_TO_DATE = toDate.value
+const DEFAULT_BRANCH_ID = selectedBranchId.value
+const filtersOpen = ref(false)
+const activeFilterCount = computed(() => [
+  fromDate.value !== DEFAULT_FROM_DATE || toDate.value !== DEFAULT_TO_DATE,
+  selectedBranchId.value !== DEFAULT_BRANCH_ID
+].filter(Boolean).length)
+
+function resetFilters() {
+  fromDate.value = DEFAULT_FROM_DATE
+  toDate.value = DEFAULT_TO_DATE
+  selectedBranchId.value = DEFAULT_BRANCH_ID
+}
+
+function formatFilterDate(value: string) {
+  const [year, month, day] = value.split('-')
+  return year && month && day ? `${day}.${month}.${year}` : value
+}
 const locationOpen = ref(false)
 const locationPending = ref(false)
 const locationSubmitting = ref(false)
@@ -340,11 +362,15 @@ const branchOptions = computed(() => [
   }))
 ])
 
+const selectedBranchLabel = computed(() =>
+  branchOptions.value.find(option => option.value === selectedBranchId.value)?.label || 'Все филиалы'
+)
+
 const branchNameMap = computed(() => new Map(
   branchStore.branches.map(branch => [String(branch.id), String(branch.name || 'Филиал')])
 ))
 
-const { data: verifixData, pending, refresh } = await useAsyncData('verifix-lateness', async () => {
+const { data: verifixData, pending, refresh, status: verifixStatus } = await useAsyncData('verifix-lateness', async () => {
   if (!fromDate.value || !toDate.value) {
     return { employees: [], events: [] as VerifixEvent[], schedules: [] as VerifixSchedule[] }
   }
@@ -375,9 +401,16 @@ const { data: verifixData, pending, refresh } = await useAsyncData('verifix-late
   }
 }, {
   default: () => ({ employees: [], events: [] as VerifixEvent[], schedules: [] as VerifixSchedule[] }),
+  lazy: true,
   server: false,
   watch: [selectedBranchId, fromDate, toDate]
 })
+
+// `server: false` keeps status 'idle' until mounted; skeletons only until the first response.
+const isLatenessInitialLoading = computed(() =>
+  verifixStatus.value === 'idle'
+  || (pending.value && !verifixData.value.events.length && !verifixData.value.schedules.length && !verifixData.value.employees.length)
+)
 
 async function refreshAll() {
   await Promise.all([refresh(), refreshPenaltySettings()])
@@ -454,6 +487,22 @@ const penaltyTotal = computed(() => penaltySettings.value
   ? lateRows.value.reduce((sum, row) => row ? sum + penaltyForRow(row) : sum, 0)
   : null)
 
+const config = useRuntimeConfig()
+
+// Barber photos come from the employees list already loaded with the lateness data.
+const employeePhotoMap = computed(() => new Map(
+  (verifixData.value?.employees || [])
+    .filter(employee => employee?.id && employee.photo_url)
+    .map(employee => [String(employee.id), resolveApiMediaUrl(employee.photo_url, config.public.apiBase)])
+))
+
+// Photos that fail to load fall back to the placeholder icon.
+const failedPhotos = ref(new Set<string>())
+
+function markPhotoFailed(barberId: string) {
+  failedPhotos.value = new Set(failedPhotos.value).add(barberId)
+}
+
 const lateEmployeeGroups = computed<LateEmployeeGroup[]>(() => {
   const groups = new Map<string, LateRow[]>()
 
@@ -467,6 +516,7 @@ const lateEmployeeGroups = computed<LateEmployeeGroup[]>(() => {
     .map(([barberId, events]) => ({
       barberId,
       barberName: events[0]?.barberName || `Сотрудник ${barberId.slice(0, 6)}`,
+      photoUrl: employeePhotoMap.value.get(barberId) || null,
       branches: [...new Set(events.map(event => event.branchName))],
       events: events.sort((left, right) => right.loginAt.getTime() - left.loginAt.getTime()),
       lateDays: new Set(events.map(event => dateInputValue(event.date))).size,
@@ -527,35 +577,74 @@ const detailColumns: TableColumn<LateRow>[] = [
             <h1 class="barbershop-heading text-2xl text-charcoal-950 sm:text-3xl">Verifix</h1>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-charcoal-500">Опоздания по первому входу сотрудника относительно графика филиала.</p>
           </div>
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <UButton class="w-full sm:w-auto" icon="i-lucide-map" color="primary" @click="openLocationHistory">Карта входов</UButton>
-            <UButton class="w-full sm:w-auto" icon="i-lucide-map-pin" color="primary" variant="soft" :disabled="selectedBranchId === 'all'" @click="openLocationModal">Локация филиала</UButton>
-            <UButton class="w-full sm:w-auto" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refreshAll">Обновить</UButton>
+          <div class="flex items-center gap-2">
+            <!-- Floating filter panel: opens over the content, so nothing shifts. -->
+            <UPopover v-model:open="filtersOpen" :content="{ align: 'end', sideOffset: 8 }">
+              <UChip :show="activeFilterCount > 0" :text="activeFilterCount" size="3xl" color="primary">
+                <UButton aria-label="Фильтры" color="neutral" :variant="filtersOpen ? 'soft' : 'ghost'" icon="i-lucide-sliders-horizontal" square />
+              </UChip>
+
+              <template #content>
+                <div class="w-72 space-y-3 p-3">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold text-charcoal-950">Фильтры</p>
+                    <UButton v-if="activeFilterCount > 0" color="neutral" size="xs" variant="link" @click="resetFilters">
+                      Сбросить
+                    </UButton>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="space-y-1">
+                      <span class="text-xs text-charcoal-500">С</span>
+                      <UInput v-model="fromDate" type="date" size="sm" variant="soft" class="w-full" :max="toDate" />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-xs text-charcoal-500">По</span>
+                      <UInput v-model="toDate" type="date" size="sm" variant="soft" class="w-full" :min="fromDate" />
+                    </label>
+                  </div>
+                  <label class="block space-y-1">
+                    <span class="text-xs text-charcoal-500">Филиал</span>
+                    <USelectMenu v-model="selectedBranchId" :items="branchOptions" value-key="value" size="sm" variant="soft" class="w-full" placeholder="Выберите филиал" portal="body" />
+                  </label>
+                </div>
+              </template>
+            </UPopover>
+
+            <!-- Penalty rate editor floats next to its trigger instead of taking page space. -->
+            <UPopover :content="{ align: 'end', sideOffset: 8 }">
+              <UTooltip :text="`Штраф за минуту: ${penaltySettings ? formatMoney(penaltySettings.penalty_per_minute) : '—'}`">
+                <UButton aria-label="Ставка штрафа за опоздание" color="neutral" variant="ghost" icon="i-lucide-pencil" square />
+              </UTooltip>
+
+              <template #content>
+                <VerifixPenaltySettings embedded />
+              </template>
+            </UPopover>
+
+            <span class="mx-1 h-6 w-px bg-charcoal-200" aria-hidden="true" />
+
+            <UTooltip text="Обновить">
+              <UButton aria-label="Обновить" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" square @click="refreshAll" />
+            </UTooltip>
+            <UTooltip :text="selectedBranchId === 'all' ? 'Локация филиала — выберите филиал' : 'Локация филиала'">
+              <UButton aria-label="Локация филиала" icon="i-lucide-map-pin" color="primary" variant="soft" :disabled="selectedBranchId === 'all'" square @click="openLocationModal" />
+            </UTooltip>
+            <UTooltip text="Карта входов">
+              <UButton aria-label="Карта входов" icon="i-lucide-map" color="primary" square @click="openLocationHistory" />
+            </UTooltip>
           </div>
         </div>
 
-        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200 bg-white/90" :ui="{ body: 'p-4 sm:p-6' }">
-          <div class="grid gap-4 md:grid-cols-3">
-            <label class="flex items-center gap-3">
-              <span class="shrink-0 text-sm font-semibold text-charcoal-700">С</span>
-              <UInput v-model="fromDate" type="date" size="lg" class="min-w-0 flex-1" :max="toDate" :ui="{ base: 'px-4' }" />
-            </label>
-            <label class="flex items-center gap-3">
-              <span class="shrink-0 text-sm font-semibold text-charcoal-700">По</span>
-              <UInput v-model="toDate" type="date" size="lg" class="min-w-0 flex-1" :min="fromDate" :ui="{ base: 'px-4' }" />
-            </label>
-            <label class="space-y-2">
-              <span class="text-xs font-semibold uppercase tracking-widest text-charcoal-500">Филиал</span>
-              <USelectMenu v-model="selectedBranchId" :items="branchOptions" value-key="value" size="lg" class="w-full" placeholder="Выберите филиал" portal="body" />
-            </label>
-          </div>
-        </UCard>
+        <!-- Current filter context stays visible while the panel is closed. -->
+        <p class="-mt-2 text-xs text-charcoal-500">
+          {{ formatFilterDate(fromDate) }} – {{ formatFilterDate(toDate) }} · {{ selectedBranchLabel }}
+        </p>
 
         <UModal v-model:open="locationHistoryOpen" class="sm:max-w-3xl" title="Локации входов барберов" description="Фактические координаты, полученные при входе в приложение.">
           <template #body>
             <div v-if="locationHistoryPending" class="flex justify-center py-8"><ULoader size="lg" /></div>
             <div v-else-if="locationHistoryEvents.length" class="max-h-[60vh] space-y-2 overflow-y-auto">
-              <button v-for="event in locationHistoryEvents" :key="event.id" type="button" class="flex w-full flex-col gap-3 rounded-xl border border-charcoal-200 p-3 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center sm:justify-between" :disabled="!hasValidEventCoordinates(event)" @click="openEventMap(event)">
+              <button v-for="event in locationHistoryEvents" :key="event.id" type="button" class="flex w-full flex-col gap-3 rounded-lg border border-charcoal-200 p-3 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-row sm:items-center sm:justify-between" :disabled="!hasValidEventCoordinates(event)" @click="openEventMap(event)">
                 <div class="min-w-0">
                   <p class="font-semibold text-charcoal-950">{{ event.barber_name || event.barber_id }}</p>
                   <p class="text-charcoal-500">{{ event.branch_name || event.branch_id }} · {{ formatDateTime(locationEventDate(event)) }}</p>
@@ -584,7 +673,7 @@ const detailColumns: TableColumn<LateRow>[] = [
               <div class="border-t border-charcoal-200 pt-4">
                 <p class="mb-3 text-sm font-semibold text-charcoal-950">История входов</p>
                 <div v-if="locationEvents.length" class="space-y-2">
-                  <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!hasValidEventCoordinates(event)" @click="openEventMap(event)">
+                  <button v-for="event in locationEvents" :key="event.id" type="button" class="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border border-charcoal-200 px-3 py-2 text-left text-sm transition hover:bg-charcoal-50/80 disabled:cursor-not-allowed disabled:opacity-60" :disabled="!hasValidEventCoordinates(event)" @click="openEventMap(event)">
                     <span>{{ event.barber_name || event.barber_id }} · {{ locationEventStatusLabel(event) }}</span>
                     <span class="text-charcoal-500">{{ event.distance_meters == null ? '—' : `${Math.round(event.distance_meters)} м` }} · {{ formatDateTime(locationEventDate(event)) }} · {{ hasValidEventCoordinates(event) ? 'Карта' : 'Координаты отсутствуют' }}</span>
                   </button>
@@ -599,13 +688,13 @@ const detailColumns: TableColumn<LateRow>[] = [
         <UModal v-model:open="mapOpen" class="sm:max-w-4xl" title="Место входа барбера" :description="mapEvent ? `${mapEvent.barber_name || mapEvent.barber_id} · ${formatDateTime(locationEventDate(mapEvent))}` : ''" @after:enter="initializeEventMap" @after:leave="destroyEventMap">
           <template #body>
             <div v-if="mapEvent" class="space-y-4">
-              <div class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
+              <div class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-lg border border-charcoal-200 bg-charcoal-50">
                 <div ref="eventMapElement" class="absolute inset-0" />
               </div>
               <div class="grid gap-3 text-sm sm:grid-cols-3">
-                <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ mapEvent.barber_name || mapEvent.barber_id }}</p></div>
-                <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(locationEventDate(mapEvent)) }}</p></div>
-                <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ locationEventStatusLabel(mapEvent) }}</p></div>
+                <div class="rounded-lg bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ mapEvent.barber_name || mapEvent.barber_id }}</p></div>
+                <div class="rounded-lg bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(locationEventDate(mapEvent)) }}</p></div>
+                <div class="rounded-lg bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ locationEventStatusLabel(mapEvent) }}</p></div>
               </div>
               <p class="text-xs text-charcoal-500">Метка показывает фактическое место входа. Контрольная точка и разрешённый радиус отображаются, если они настроены для филиала.</p>
             </div>
@@ -613,17 +702,17 @@ const detailColumns: TableColumn<LateRow>[] = [
           <template #footer><div class="flex justify-end"><UButton color="neutral" variant="ghost" @click="mapOpen = false">Закрыть</UButton></div></template>
         </UModal>
 
-        <VerifixPenaltySettings />
 
         <div class="grid gap-4 sm:grid-cols-4">
-          <DashboardMetricCard label="Общая сумма штрафов" icon="i-lucide-coins" :value="penaltyTotal === null ? '—' : formatMoney(penaltyTotal)" />
-          <DashboardMetricCard label="Опоздания" icon="i-lucide-circle-alert" :value="String(lateRows.length)" />
-          <DashboardMetricCard label="Сотрудники" icon="i-lucide-users" :value="String(lateEmployees)" />
-          <DashboardMetricCard label="Всего минут" icon="i-lucide-clock-3" :value="`${totalLateMinutes} мин`" />
+          <DashboardMetricCard label="Общая сумма штрафов" icon="i-lucide-coins" :loading="isLatenessInitialLoading" :value="penaltyTotal === null ? '—' : formatMoney(penaltyTotal)" />
+          <DashboardMetricCard label="Опоздания" icon="i-lucide-circle-alert" :loading="isLatenessInitialLoading" :value="String(lateRows.length)" />
+          <DashboardMetricCard label="Сотрудники" icon="i-lucide-users" :loading="isLatenessInitialLoading" :value="String(lateEmployees)" />
+          <DashboardMetricCard label="Всего минут" icon="i-lucide-clock-3" :loading="isLatenessInitialLoading" :value="`${totalLateMinutes} мин`" />
         </div>
 
-        <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
-          <div v-if="pagedLateEmployees.length" class="divide-y divide-charcoal-100">
+        <div class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isLatenessInitialLoading" class="p-4" :rows="5" :columns="4" />
+          <div v-else-if="pagedLateEmployees.length" class="divide-y divide-charcoal-100">
             <article v-for="employee in pagedLateEmployees" :key="employee.barberId">
               <button
                 type="button"
@@ -632,7 +721,17 @@ const detailColumns: TableColumn<LateRow>[] = [
                 @click="toggleBarber(employee.barberId)"
               >
                 <span class="flex min-w-0 flex-1 items-center gap-3">
-                  <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><UIcon name="i-lucide-user-round" class="size-5" /></span>
+                  <span class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-primary">
+                    <img
+                      v-if="employee.photoUrl && !failedPhotos.has(employee.barberId)"
+                      :src="employee.photoUrl"
+                      :alt="employee.barberName"
+                      class="size-full object-cover"
+                      loading="lazy"
+                      @error="markPhotoFailed(employee.barberId)"
+                    >
+                    <UIcon v-else name="i-lucide-user-round" class="size-5" />
+                  </span>
                   <span class="min-w-0">
                     <strong class="block truncate text-sm font-semibold text-charcoal-950">{{ employee.barberName }}</strong>
                     <span class="mt-1 flex flex-wrap gap-1">
@@ -641,15 +740,15 @@ const detailColumns: TableColumn<LateRow>[] = [
                   </span>
                 </span>
                 <span class="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-88">
-                  <span class="rounded-xl bg-charcoal-50 px-3 py-2 text-center">
+                  <span class="rounded-lg bg-charcoal-50 px-3 py-2 text-center">
                     <strong class="block text-sm text-charcoal-950">{{ employee.lateDays }}</strong>
                     <span class="text-[11px] text-charcoal-500">дней</span>
                   </span>
-                  <span class="rounded-xl bg-red-50 px-3 py-2 text-center">
+                  <span class="rounded-lg bg-red-50 px-3 py-2 text-center">
                     <strong class="block text-sm text-red-700">{{ employee.totalLateMinutes }} мин</strong>
                     <span class="text-[11px] text-red-600">опоздания</span>
                   </span>
-                  <span class="rounded-xl bg-charcoal-50 px-3 py-2 text-center">
+                  <span class="rounded-lg bg-charcoal-50 px-3 py-2 text-center">
                     <strong class="block text-sm text-charcoal-950">{{ employee.events.length }}</strong>
                     <span class="text-[11px] text-charcoal-500">случаев</span>
                   </span>
@@ -659,7 +758,7 @@ const detailColumns: TableColumn<LateRow>[] = [
 
               <div v-if="expandedBarbers[employee.barberId]" class="border-t border-charcoal-100 bg-charcoal-50/40 px-3 py-4 sm:px-5">
                 <p class="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-charcoal-500">Дни и детали опозданий</p>
-                <div class="overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+                <div class="overflow-hidden rounded-lg border border-charcoal-200 bg-white">
                   <UTable :columns="detailColumns" :data="employee.events" :ui="{ root: 'w-full overflow-auto', base: 'w-full min-w-[52rem]', thead: 'bg-charcoal-50/90', tbody: 'divide-y divide-charcoal-100', th: 'px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-charcoal-500 whitespace-nowrap', td: 'px-4 py-3 text-sm text-charcoal-700 align-middle whitespace-nowrap' }">
                     <template #date-cell="{ row }">{{ formatDate(row.original.date) }}</template>
                     <template #scheduleStart-cell="{ row }">{{ row.original.scheduleStart }}</template>

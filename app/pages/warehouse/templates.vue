@@ -82,11 +82,13 @@ const templateForm = reactive({
 const { data: templatesData, pending: templatesPending, refresh: refreshTemplates } = await useAsyncData('warehouse-templates', () => {
   return warehouseApi.templates()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const { data: positionsData } = await useAsyncData('warehouse-positions', () => warehouseApi.positions(), {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const positionOptions = computed<PositionOption[]>(() =>
@@ -119,6 +121,8 @@ const templateRows = computed<TemplateRow[]>(() =>
     }
   })
 )
+
+const isInitialLoading = computed(() => templatesPending.value && !templateRows.value.length)
 
 const templateColumns: TableColumn<TemplateRow>[] = [
   { accessorKey: 'name', header: 'Шаблон' },
@@ -280,7 +284,9 @@ async function deleteTemplate(row: TemplateRow) {
             </div>
           </template>
 
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="5" :columns="5" />
+
+          <div v-else class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="templateColumns" :data="templateRows" :loading="templatesPending">
               <template #items_count-cell="{ row }">
                 {{ formatCount(row.original.items_count) }}

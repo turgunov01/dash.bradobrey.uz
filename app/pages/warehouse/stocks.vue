@@ -91,13 +91,15 @@ const stockForm = reactive({
 const { data: positionsData } = await useAsyncData('warehouse-positions', () => {
   return warehouseApi.positions()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const { data: stocksData, pending: stocksPending, refresh: refreshStocks } = await useAsyncData('warehouse-stocks', () => {
   return warehouseApi.stocks()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const branchOptions = computed<Option[]>(() =>
@@ -142,6 +144,8 @@ const stockRows = computed<StockRow[]>(() =>
     }
   })
 )
+
+const isInitialLoading = computed(() => stocksPending.value && !stockRows.value.length)
 
 const stockColumns: TableColumn<StockRow>[] = [
   { accessorKey: 'branch', header: 'Филиал' },
@@ -245,7 +249,9 @@ async function submitStock() {
             </div>
           </template>
 
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="6" :columns="5" />
+
+          <div v-else class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="stockColumns" :data="stockRows" :loading="stocksPending">
               <template #quantity-cell="{ row }">
                 <span class="font-semibold text-charcoal-950">

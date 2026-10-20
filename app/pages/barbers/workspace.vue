@@ -62,7 +62,9 @@ const { data, pending, refresh } = await useAsyncData('barber-workspace', async 
     queue: { count: 0, items: [] },
     services
   }
-})
+}, { lazy: true })
+
+const isWorkspaceInitialLoading = computed(() => pending.value && !data.value)
 
 const { data: pendingTransfersData, refresh: refreshPendingTransfers } = await useAsyncData(
   'barber-pending-transfers',
@@ -273,7 +275,7 @@ function openItem(item: any) {
           <div
             v-for="transfer in pendingTransfers"
             :key="transfer.id"
-            class="rounded-[1.5rem] border border-warning-300 bg-warning-50 p-4 shadow-sm"
+            class="rounded-[1rem] border border-warning-300 bg-warning-50 p-4 shadow-sm"
           >
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0">
@@ -318,6 +320,7 @@ function openItem(item: any) {
             description="Текущие активные записи для авторизованного барбера."
             icon="i-lucide-clock-3"
             label="Элементы очереди"
+            :loading="isWorkspaceInitialLoading"
             :value="data?.queue?.count || 0"
           />
           <DashboardMetricCard
@@ -340,7 +343,7 @@ function openItem(item: any) {
           />
         </div>
 
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="space-y-1">
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">История работы</p>
@@ -348,12 +351,12 @@ function openItem(item: any) {
             </div>
           </template>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <DashboardMetricCard label="Заработок" :value="formatMoney(workStatistics.totals.revenue || 0)" />
-            <DashboardMetricCard label="К выплате" :value="formatMoney(workFinance.totals.payout || 0)" />
-            <DashboardMetricCard label="Услуги" :value="workStatistics.totals.services || 0" />
-            <DashboardMetricCard label="Смены" :value="workStatistics.totals.shifts || 0" />
-            <DashboardMetricCard label="Дни" :value="workStatistics.totals.worked_days || 0" />
-            <DashboardMetricCard label="Время" :value="`${workStatistics.totals.worked_minutes || 0} мин`" />
+            <DashboardMetricCard label="Заработок" :loading="isWorkspaceInitialLoading" :value="formatMoney(workStatistics.totals.revenue || 0)" />
+            <DashboardMetricCard label="К выплате" :loading="isWorkspaceInitialLoading" :value="formatMoney(workFinance.totals.payout || 0)" />
+            <DashboardMetricCard label="Услуги" :loading="isWorkspaceInitialLoading" :value="workStatistics.totals.services || 0" />
+            <DashboardMetricCard label="Смены" :loading="isWorkspaceInitialLoading" :value="workStatistics.totals.shifts || 0" />
+            <DashboardMetricCard label="Дни" :loading="isWorkspaceInitialLoading" :value="workStatistics.totals.worked_days || 0" />
+            <DashboardMetricCard label="Время" :loading="isWorkspaceInitialLoading" :value="`${workStatistics.totals.worked_minutes || 0} мин`" />
           </div>
           <div v-if="workStatistics.branches?.length" class="mt-5 overflow-x-auto">
             <table class="min-w-full text-left text-sm">
@@ -374,7 +377,7 @@ function openItem(item: any) {
         </UCard>
 
         <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -388,17 +391,17 @@ function openItem(item: any) {
 
             <div class="space-y-5">
               <div class="grid gap-3 sm:grid-cols-2">
-                <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+                <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                   <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Логин</p>
                   <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ sessionStore.user?.login || 'Не указан' }}</p>
                 </div>
-                <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+                <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                   <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Специализация</p>
                   <p class="mt-2 text-lg font-semibold text-charcoal-950">{{ sessionStore.barber?.specialization || 'Общие услуги' }}</p>
                 </div>
               </div>
 
-              <div v-if="availableBranches.length > 1" class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+              <div v-if="availableBranches.length > 1" class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <UFormField label="Текущий филиал" name="active_branch_id">
                   <USelectMenu
                     :model-value="selectedBranchId"
@@ -411,7 +414,7 @@ function openItem(item: any) {
                 </UFormField>
               </div>
 
-              <div class="space-y-3 rounded-[1.5rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="space-y-3 rounded-[1rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Управление сменой</p>
                 <div class="flex flex-wrap gap-3">
                   <UButton
@@ -436,7 +439,7 @@ function openItem(item: any) {
                 </div>
               </div>
 
-              <div class="space-y-3 rounded-[1.5rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="space-y-3 rounded-[1rem] border border-charcoal-200 bg-white/80 p-4">
                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-charcoal-500">Управление перерывом</p>
                 <div class="flex flex-wrap items-end gap-3">
                   <UFormField label="Минуты" name="minutes">
@@ -461,7 +464,7 @@ function openItem(item: any) {
             </div>
           </UCard>
 
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -473,7 +476,8 @@ function openItem(item: any) {
               </div>
             </template>
 
-            <div v-if="data?.queue?.items?.length">
+            <SharedSkeletonRows v-if="isWorkspaceInitialLoading" :rows="4" :columns="4" />
+            <div v-else-if="data?.queue?.items?.length">
               <QueueTable
                 :items="queueItems"
                 :loading="pending"

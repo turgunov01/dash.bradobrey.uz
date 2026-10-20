@@ -194,7 +194,7 @@ async function submit() {
 
 <template>
   <UCard
-    class="warm-card w-full max-w-md rounded-[2.25rem] border border-charcoal-200 shadow-[0_24px_70px_rgba(18,15,13,0.10)]">
+    class="warm-card w-full max-w-md rounded-[1.25rem] border border-charcoal-200 shadow-[0_24px_70px_rgba(18,15,13,0.10)]">
     <form class="space-y-5" @submit.prevent="submit">
       <div class="space-y-1">
         <h1 class="barbershop-heading text-3xl text-charcoal-950">

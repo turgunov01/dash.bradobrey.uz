@@ -385,7 +385,23 @@ const minVisits = ref<number | null>(null)
 const serviceFilter = ref('')
 const ALL_SERVICES_VALUE = '__all__'
 
-const { data, pending, refresh } = await useAsyncData('clients-directory', async () => {
+// Filters live in a floating popover; the icon shows how many are active.
+const filtersOpen = ref(false)
+const activeFilterCount = computed(() => [
+  searchName.value.trim() !== '',
+  searchPhone.value.trim() !== '',
+  typeof minVisits.value === 'number' && minVisits.value > 0,
+  Boolean(serviceFilter.value) && serviceFilter.value !== ALL_SERVICES_VALUE
+].filter(Boolean).length)
+
+function resetFilters() {
+  searchName.value = ''
+  searchPhone.value = ''
+  minVisits.value = null
+  serviceFilter.value = ''
+}
+
+const { data, pending, status: clientsStatus, refresh } = await useAsyncData('clients-directory', async () => {
   const query = {
     end_date: uiStore.statisticsRange.end,
     start_date: uiStore.statisticsRange.start
@@ -397,15 +413,22 @@ const { data, pending, refresh } = await useAsyncData('clients-directory', async
 
   return { items: extractHistoryItems(response) }
 }, {
+  lazy: true,
   server: false,
   watch: [() => uiStore.statisticsRange.start, () => uiStore.statisticsRange.end, () => branchStore.activeBranchId]
 })
+
+// server: false keeps status 'idle' during SSR/hydration, so treat it as loading too.
+const isClientsInitialLoading = computed(() =>
+  !data.value && (pending.value || clientsStatus.value === 'idle')
+)
 
 const { data: servicesData } = await useAsyncData('clients-services', async () => {
   const branchId = branchStore.activeBranchId || undefined
   const response = await kioskApi.services({ active: true, grouped: true, ...(branchId ? { branch_id: branchId } : {}) })
   return flattenServicesPayload(response)
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
 
@@ -425,6 +448,7 @@ const { data: barbersData } = await useAsyncData('clients-barbers-directory', as
     return { items: [] }
   }
 }, {
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId]
 })
@@ -631,41 +655,53 @@ function getVisitServiceIds(visit: Record<string, any>) {
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <div class="flex items-center gap-3">
-          <UBadge color="neutral" size="lg" variant="soft">
+          <USkeleton v-if="isClientsInitialLoading" class="h-7 w-28 rounded-md" />
+          <UBadge v-else color="neutral" size="lg" variant="soft">
             {{ formatCount(filteredClientRows.length) }} клиентов
           </UBadge>
         </div>
-        <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending" variant="outline" @click="refresh()">
-          Обновить
-        </UButton>
+        <div class="flex items-center gap-2">
+          <!-- Floating filter panel: opens over the content, so nothing shifts. -->
+          <UPopover v-model:open="filtersOpen" :content="{ align: 'end', sideOffset: 8 }">
+            <UChip :show="activeFilterCount > 0" :text="activeFilterCount" size="3xl" color="primary">
+              <UButton
+                aria-label="Фильтры"
+                color="neutral"
+                :variant="filtersOpen ? 'soft' : 'ghost'"
+                icon="i-lucide-sliders-horizontal"
+                square
+              />
+            </UChip>
+
+            <template #content>
+              <div class="w-72 space-y-3 p-3">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-semibold text-charcoal-950">Фильтры</p>
+                  <UButton v-if="activeFilterCount > 0" color="neutral" size="xs" variant="link" @click="resetFilters">
+                    Сбросить
+                  </UButton>
+                </div>
+                <UInput v-model="searchName" class="w-full" icon="i-lucide-user-round-search" placeholder="Имя" size="sm" variant="soft" />
+                <UInput v-model="searchPhone" class="w-full" icon="i-lucide-search" placeholder="Телефон" size="sm" variant="soft" />
+                <UInput v-model.number="minVisits" class="w-full" type="number" min="0" placeholder="Мин. визитов" size="sm" variant="soft" />
+                <USelect v-model="serviceFilter" class="w-full" :items="serviceOptions" placeholder="Все услуги" size="sm" variant="soft" portal="body" />
+              </div>
+            </template>
+          </UPopover>
+
+          <span class="mx-1 h-6 w-px bg-charcoal-200" aria-hidden="true" />
+
+          <UTooltip text="Обновить">
+            <UButton aria-label="Обновить" color="neutral" icon="i-lucide-refresh-cw" :loading="pending" square variant="outline" @click="refresh()" />
+          </UTooltip>
+        </div>
       </div>
 
-      <div class="grid gap-3 pb-4 md:grid-cols-4">
-        <UInput
-          v-model="searchName"
-          icon="i-lucide-user-round-search"
-          placeholder="Имя"
-        />
-        <UInput
-          v-model="searchPhone"
-          icon="i-lucide-search"
-          placeholder="Телефон"
-        />
-        <UInput
-          v-model.number="minVisits"
-          type="number"
-          min="0"
-          placeholder="Мин. визитов"
-        />
-        <USelect
-          v-model="serviceFilter"
-          :items="serviceOptions"
-          placeholder="Все услуги" portal="body" />
-      </div>
-
-      <div class="flex flex-col max-h-[70vh] overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+      <div class="flex flex-col max-h-[70vh] overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
         <div class="flex-1 overflow-auto">
+          <SharedSkeletonRows v-if="isClientsInitialLoading" class="px-4 py-2" :rows="8" :columns="5" />
           <UTable
+            v-else
             :columns="columns"
             :data="pagedRows"
             :loading="pending"
@@ -726,7 +762,7 @@ function getVisitServiceIds(visit: Record<string, any>) {
       </div>
 
       <SharedEmptyState
-        v-if="!clientRows.length"
+        v-if="!clientRows.length && !isClientsInitialLoading"
         description="За выбранный период не найдено клиентов."
         icon="i-lucide-users-round"
         title="Нет данных"
@@ -735,7 +771,7 @@ function getVisitServiceIds(visit: Record<string, any>) {
       <UModal v-model:open="detailModalOpen" title="История клиента" description="Все визиты и услуги по выбранному номеру">
         <template #body>
           <div class="space-y-3">
-            <div class="flex items-center justify-between gap-3 rounded-xl bg-sand-50 px-4 py-3">
+            <div class="flex items-center justify-between gap-3 rounded-lg bg-sand-50 px-4 py-3">
               <div class="space-y-1">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Телефон</p>
                 <p class="text-lg font-semibold text-charcoal-950">{{ selectedPhone || '—' }}</p>
@@ -746,25 +782,25 @@ function getVisitServiceIds(visit: Record<string, any>) {
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Визиты</p>
                 <p class="text-lg font-semibold text-charcoal-950">{{ formatCount(selectedSummary.total) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Завершено</p>
                 <p class="text-lg font-semibold text-emerald-600">{{ formatCount(selectedSummary.completed) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Отказы</p>
                 <p class="text-lg font-semibold text-amber-600">{{ formatCount(selectedSummary.cancelled) }}</p>
               </div>
-              <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+              <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
                 <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Completion</p>
                 <p class="text-lg font-semibold text-charcoal-950">{{ formatPercent(selectedSummary.completionRate) }}</p>
               </div>
             </div>
 
-            <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+            <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
               <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Сумма оплат</p>
               <p class="text-lg font-semibold text-charcoal-950">{{ formatMoney(selectedSummary.spend) }}</p>
             </div>
@@ -773,7 +809,7 @@ function getVisitServiceIds(visit: Record<string, any>) {
               <div
                 v-for="(visit, index) in selectedVisits"
                 :key="visit.id || index"
-                class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3"
+                class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3"
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="space-y-1">

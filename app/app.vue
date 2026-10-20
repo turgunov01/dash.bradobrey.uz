@@ -43,6 +43,7 @@ useSeoMeta({
 <template>
   <UApp :locale="ru" :toaster="toasterReady ? { position: 'top-right' } : null">
     <NuxtLoadingIndicator />
+    <AppPageLoader />
 
     <NuxtLayout>
       <NuxtPage />

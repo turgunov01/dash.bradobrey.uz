@@ -70,7 +70,8 @@ const form = reactive({
 const { data, pending, refresh } = await useAsyncData('warehouse-categories', () => {
   return warehouseApi.categories()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const rows = computed<CategoryRow[]>(() =>
@@ -86,6 +87,8 @@ const rows = computed<CategoryRow[]>(() =>
     }]
   })
 )
+
+const isInitialLoading = computed(() => pending.value && !rows.value.length)
 
 const nextSortOrder = computed(() => {
   const maxOrder = rows.value.reduce((max, row) => {
@@ -232,15 +235,18 @@ async function removeRow(row: CategoryRow) {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isInitialLoading" class="h-7 w-16 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ rows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="5" :columns="5" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows" :loading="pending">
               <template #sort_order-cell="{ row }">

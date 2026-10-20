@@ -25,6 +25,13 @@ scope.value = 'branch'
 const rankingRef = ref<{ refresh: () => Promise<unknown> | void } | null>(null)
 const refreshing = ref(false)
 const branchScopeOptions = [{ label: 'Филиал', value: 'branch' as const }]
+// Statistics load client-side after mount; until the first response arrives,
+// render skeletons instead of zero values and empty states.
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
+const isInitialLoading = computed(() => isFirstLoad(pending.value, hasData.value, isMounted.value))
 const employeeModalOpen = ref(false)
 const selectedEmployeeId = ref<string | null>(null)
 const selectedEmployeeDetail = computed(() => employeeDetails.value.find(item => item.id === selectedEmployeeId.value) || null)
@@ -69,6 +76,7 @@ async function refreshAll() {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :loading="isInitialLoading"
           :range-error="rangeError"
           :scope-options="branchScopeOptions"
           subtitle="Период применяется одновременно к операционной статистике и рейтингу качества филиала."
@@ -83,8 +91,8 @@ async function refreshAll() {
             <h1 class="barbershop-heading text-2xl text-charcoal-950">
               Показатели сотрудников филиала
             </h1>
-            <p class="text-sm text-charcoal-500">
-              {{ scopeContextLabel }} · {{ formatCount(filteredHistory.length) }} записей за период.
+            <p class="flex flex-wrap items-center gap-1 text-sm text-charcoal-500">
+              {{ scopeContextLabel }} · <USkeleton v-if="isInitialLoading" class="h-4 w-8" /><template v-else>{{ formatCount(filteredHistory.length) }}</template> записей за период.
             </p>
           </div>
         </div>
@@ -98,9 +106,6 @@ async function refreshAll() {
 
         <template v-else>
           <UAlert v-if="dataError" color="error" icon="i-lucide-triangle-alert" title="Статистика загружена не полностью" :description="dataError" variant="soft" />
-          <div v-if="pending && !hasData" class="grid gap-4 xl:grid-cols-4 md:grid-cols-2" aria-live="polite">
-            <USkeleton v-for="index in 4" :key="index" class="h-24 rounded-2xl" />
-          </div>
           <div class="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
             <DashboardMetricCard
               v-for="card in operationsCards"
@@ -108,6 +113,7 @@ async function refreshAll() {
               :description="card.description"
               :icon="card.icon"
               :label="card.label"
+              :loading="isInitialLoading"
               :value="card.value"
             />
           </div>
@@ -115,7 +121,7 @@ async function refreshAll() {
           <div class="space-y-6">
             <StatisticsEmployeeQualityRanking ref="rankingRef" :scope="scope" />
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -128,7 +134,8 @@ async function refreshAll() {
                 </div>
               </template>
 
-              <div v-if="barberBreakdown.length" class="space-y-6">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="barberBreakdown.length" class="space-y-6">
                 <div class="flex justify-center">
                   <SharedPieChart
                     :items="barberPieItems"
@@ -141,7 +148,7 @@ async function refreshAll() {
                   <button
                     v-for="row in barberBreakdown"
                     :key="row.id"
-                    class="w-full rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3 text-left transition hover:border-charcoal-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-700"
+                    class="w-full rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3 text-left transition hover:border-charcoal-400 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-700"
                     type="button"
                     @click="openEmployeeDetails(row.id)"
                   >

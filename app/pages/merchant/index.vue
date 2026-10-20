@@ -56,13 +56,15 @@ const barbershopForm = reactive({
 
 const { data, pending, refresh } = await useAsyncData('merchant-dashboard', async () => {
   const dashboard = await merchantApi.dashboard()
-  const barbershop = await $fetch(`/api/marketplace/catalog/barbershops/${dashboard.barbershop_id}`).catch(() => null)
+  const barbershop = await enqueueRequest(() => $fetch(`/api/marketplace/catalog/barbershops/${dashboard.barbershop_id}`)).catch(() => null)
 
   return {
     barbershop,
     dashboard
   }
-})
+}, { lazy: true })
+
+const isDashboardInitialLoading = computed(() => pending.value && !data.value)
 
 const dashboard = computed(() => (data.value as any)?.dashboard as Awaited<ReturnType<typeof merchantApi.dashboard>> | null)
 const barbershop = computed(() => {
@@ -156,10 +158,12 @@ async function submitBarbershopEdit() {
           <template #header>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
-                <h2 class="barbershop-heading text-xl text-charcoal-950">
+                <USkeleton v-if="isDashboardInitialLoading" class="h-7 w-48 rounded-md" />
+                <h2 v-else class="barbershop-heading text-xl text-charcoal-950">
                   {{ barbershopName }}
                 </h2>
-                <p class="text-sm text-charcoal-500">
+                <USkeleton v-if="isDashboardInitialLoading" class="h-4 w-32 rounded" />
+                <p v-else class="text-sm text-charcoal-500">
                   {{ barbershopCity ? `Город: ${barbershopCity}` : 'Город не указан' }}
                 </p>
               </div>
@@ -175,18 +179,21 @@ async function submitBarbershopEdit() {
               description="Количество филиалов вашего барбершопа в маркетплейсе."
               icon="i-lucide-store"
               label="Филиалы"
+              :loading="isDashboardInitialLoading"
               :value="String(dashboard?.counts?.branches ?? 0)"
             />
             <DashboardMetricCard
               description="Открытые заявки/заказы (ожидает/в работе)."
               icon="i-lucide-list-checks"
               label="Активные"
+              :loading="isDashboardInitialLoading"
               :value="String(dashboard?.counts?.active_orders ?? 0)"
             />
             <DashboardMetricCard
               description="Завершено сегодня и выручка по завершённым."
               icon="i-lucide-chart-column"
               label="Сегодня"
+              :loading="isDashboardInitialLoading"
               :value="`${dashboard?.today?.completed ?? 0} / ${formatMoney(dashboard?.today?.revenue ?? 0)}`"
             />
           </div>
@@ -196,12 +203,14 @@ async function submitBarbershopEdit() {
               description="Барберы, созданные в кабинете мерчанта (только ваши)."
               icon="i-lucide-scissors"
               label="Барберы"
+              :loading="isDashboardInitialLoading"
               :value="String(dashboard?.counts?.barbers ?? 0)"
             />
             <DashboardMetricCard
               description="Услуги, созданные в кабинете мерчанта (только ваши)."
               icon="i-lucide-tags"
               label="Услуги"
+              :loading="isDashboardInitialLoading"
               :value="String(dashboard?.counts?.services ?? 0)"
             />
           </div>
@@ -291,15 +300,18 @@ async function submitBarbershopEdit() {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isDashboardInitialLoading" class="h-7 w-14 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ activeRows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isDashboardInitialLoading" :rows="5" :columns="5" />
+
           <div
-            v-if="activeRows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="activeRows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="activeRows">
               <template #status-cell="{ row }">

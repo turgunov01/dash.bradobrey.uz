@@ -9,7 +9,8 @@ export function useBranchesApi() {
   const client = useApiClient()
 
   return {
-    create(payload: BranchFormPayload) {
+    // FormData is used when the request carries an optional branch photo.
+    create(payload: BranchFormPayload | FormData) {
       return client.request<{ item: Branch }>('/api/branches', {
         body: payload,
         method: 'POST',
@@ -32,7 +33,7 @@ export function useBranchesApi() {
         successMessage: 'Филиал удалён'
       })
     },
-    update(id: string, payload: BranchUpdatePayload) {
+    update(id: string, payload: BranchUpdatePayload | FormData) {
       return client.request<{ item: Branch }>(`/api/branches/${id}`, {
         body: payload,
         method: 'PATCH',

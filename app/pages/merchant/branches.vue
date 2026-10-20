@@ -153,11 +153,13 @@ function openEditModal(row: BranchRow) {
 
 const { data, pending, refresh } = await useAsyncData('merchant-branches', async () => {
   return await merchantApi.branches()
-})
+}, { lazy: true })
 
 const { data: barbersData } = await useAsyncData('merchant-branch-verifix-barbers', async () => {
   return await merchantApi.barbers()
-})
+}, { lazy: true })
+
+const isBranchesInitialLoading = computed(() => pending.value && !data.value)
 
 const rows = computed(() =>
   ((data.value as any)?.items || []).flatMap((item: unknown) => {
@@ -419,15 +421,18 @@ async function confirmDelete() {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isBranchesInitialLoading" class="h-7 w-14 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ rows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isBranchesInitialLoading" :rows="5" :columns="5" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
               <template #address-cell="{ row }">
@@ -512,7 +517,7 @@ async function confirmDelete() {
               <UInput v-model="branchForm.address" placeholder="Улица, дом" />
             </UFormField>
 
-            <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+            <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
               <p class="text-sm font-medium text-charcoal-950">
                 График работы
               </p>
@@ -554,7 +559,7 @@ async function confirmDelete() {
       >
         <template #body>
           <div class="space-y-5">
-            <div class="rounded-[1.25rem] border border-primary-200 bg-primary-50/60 p-4 text-sm text-charcoal-700">
+            <div class="rounded-[0.875rem] border border-primary-200 bg-primary-50/60 p-4 text-sm text-charcoal-700">
               Укажите время начала смены и допустимое опоздание. Общий график действует на всех барберов филиала, пока для сотрудника не задан персональный.
             </div>
 
@@ -617,7 +622,7 @@ async function confirmDelete() {
                 <div
                   v-for="schedule in verifixSchedules"
                   :key="schedule.id"
-                  class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-charcoal-200 bg-charcoal-50/60 px-4 py-3"
+                  class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-charcoal-200 bg-charcoal-50/60 px-4 py-3"
                 >
                   <div class="min-w-0">
                     <p class="font-medium text-charcoal-950">
@@ -673,7 +678,7 @@ async function confirmDelete() {
               <UInput v-model="branchForm.address" placeholder="Улица, дом" />
             </UFormField>
 
-            <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+            <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
               <p class="text-sm font-medium text-charcoal-950">
                 График работы
               </p>
@@ -715,7 +720,7 @@ async function confirmDelete() {
       >
         <template #body>
           <div class="space-y-4">
-            <div class="flex items-start gap-3 rounded-xl border p-3" :class="deleteHard ? 'border-error-300 bg-error-50/60' : 'border-charcoal-200 bg-charcoal-50/70'">
+            <div class="flex items-start gap-3 rounded-lg border p-3" :class="deleteHard ? 'border-error-300 bg-error-50/60' : 'border-charcoal-200 bg-charcoal-50/70'">
               <USwitch v-model="deleteHard" color="error" />
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-charcoal-950">

@@ -8,6 +8,8 @@ defineProps<{
   barberOptions: BarberOption[]
   contextLabel: string
   count: number
+  // Show a skeleton instead of the record count while the first load is pending.
+  loading?: boolean
   rangeError?: string | null
   scopeOptions: Array<{ label: string, value: StatisticsScope }>
   subtitle: string
@@ -21,7 +23,7 @@ const uiStore = useUiStore()
 </script>
 
 <template>
-  <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+  <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
     <template #header>
       <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div class="space-y-2">
@@ -43,7 +45,8 @@ const uiStore = useUiStore()
           <UBadge color="neutral" variant="outline">
             {{ contextLabel }}
           </UBadge>
-          <UBadge color="neutral" variant="outline">
+          <USkeleton v-if="loading" class="h-6 w-24" />
+          <UBadge v-else color="neutral" variant="outline">
             {{ formatCount(count) }} записей
           </UBadge>
         </div>

@@ -99,12 +99,14 @@ function openEdit(row: ServiceRow) {
 
 const { data, pending, refresh } = await useAsyncData('merchant-services', async () => {
   return await merchantApi.services(true)
-})
+}, { lazy: true })
 
-const { data: categoriesData, pending: categoriesPending, refresh: refreshCategories, error: categoriesError } = await useAsyncData(
+const isServicesInitialLoading = computed(() => pending.value && !data.value)
+
+const { data: categoriesData, pending: categoriesPending, refresh: refreshCategories, error: categoriesError, status: categoriesStatus } = await useAsyncData(
   'merchant-service-categories',
   async () => await merchantApi.categories(true),
-  { server: false }
+  { server: false, lazy: true }
 )
 
 const rows = computed<ServiceRow[]>(() =>
@@ -296,7 +298,7 @@ function openPreview(row: ServiceRow) {
 
     <template #body>
       <div class="space-y-6">
-        <div v-if="!categoriesPending && (categoriesError || !canCreateService)" class="space-y-3">
+        <div v-if="categoriesStatus !== 'idle' && !categoriesPending && (categoriesError || !canCreateService)" class="space-y-3">
           <UAlert
             color="error"
             icon="i-lucide-triangle-alert"
@@ -327,15 +329,18 @@ function openPreview(row: ServiceRow) {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isServicesInitialLoading" class="h-7 w-14 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ rows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isServicesInitialLoading" :rows="5" :columns="6" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
               <template #category_name-cell="{ row }">
@@ -430,7 +435,7 @@ function openPreview(row: ServiceRow) {
               <UInput v-model="form.image" placeholder="https://..." />
             </UFormField>
 
-            <div v-if="formImagePreviewSrc" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+            <div v-if="formImagePreviewSrc" class="rounded-lg border border-charcoal-200 bg-white/70 p-3">
               <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
                 Предпросмотр
               </p>
@@ -494,7 +499,7 @@ function openPreview(row: ServiceRow) {
               <UInput v-model="form.image" placeholder="https://..." />
             </UFormField>
 
-            <div v-if="formImagePreviewSrc" class="rounded-xl border border-charcoal-200 bg-white/70 p-3">
+            <div v-if="formImagePreviewSrc" class="rounded-lg border border-charcoal-200 bg-white/70 p-3">
               <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-charcoal-500">
                 Предпросмотр
               </p>
@@ -534,7 +539,7 @@ function openPreview(row: ServiceRow) {
               v-if="previewSrc"
               :alt="previewTitle || 'Превью услуги'"
               :src="previewSrc"
-              class="max-h-[70vh] max-w-full rounded-2xl border border-charcoal-200 object-contain"
+              class="max-h-[70vh] max-w-full rounded-xl border border-charcoal-200 object-contain"
             >
           </div>
         </template>

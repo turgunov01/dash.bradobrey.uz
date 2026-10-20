@@ -12,9 +12,10 @@ const errorMessage = ref('')
 const levels = ref<LoyaltyRank[]>([])
 const snapshot = ref<LoyaltyRanksSettings | null>(null)
 
-const { data, pending, refresh, error } = await useAsyncData('settings-loyalty-ranks', async () => {
+const { data, pending, status, refresh, error } = await useAsyncData('settings-loyalty-ranks', async () => {
   return await ranksApi.getSettings()
-}, { server: false })
+}, { server: false, lazy: true })
+const isInitialLoading = computed(() => !data.value && (pending.value || status.value === 'idle'))
 
 function applySettings(settings: LoyaltyRanksSettings | null | undefined) {
   if (!settings?.levels?.length) return
@@ -136,7 +137,7 @@ function formatUpdatedAt(value: string | null | undefined) {
 
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="space-y-2">
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">Настройки лояльности</p>
@@ -145,13 +146,25 @@ function formatUpdatedAt(value: string | null | undefined) {
             </div>
           </template>
 
-          <div v-if="pending" class="py-6 text-sm text-charcoal-600">Загрузка настроек…</div>
+          <div v-if="isInitialLoading" class="space-y-5" aria-busy="true" aria-label="Загрузка настроек">
+            <div v-for="row in 3" :key="row" class="grid items-end gap-4 rounded-xl border border-charcoal-200 p-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
+              <div v-for="field in 5" :key="field" class="space-y-2">
+                <USkeleton class="h-4 w-28 rounded" />
+                <USkeleton class="h-9 w-full rounded-md" />
+              </div>
+              <USkeleton class="h-9 w-20 rounded-md" />
+            </div>
+            <div class="flex gap-3">
+              <USkeleton class="h-9 w-36 rounded-md" />
+              <USkeleton class="h-9 w-28 rounded-md" />
+            </div>
+          </div>
           <div v-else-if="error && !snapshot" class="space-y-3 py-6 text-sm text-red-700">
             <p>Не удалось загрузить настройки рангов.</p>
             <UButton color="neutral" variant="outline" @click="refresh()">Повторить</UButton>
           </div>
           <div v-else class="space-y-5">
-            <div v-for="(level, index) in levels" :key="index" class="grid items-end gap-4 rounded-2xl border border-charcoal-200 p-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
+            <div v-for="(level, index) in levels" :key="index" class="grid items-end gap-4 rounded-xl border border-charcoal-200 p-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_auto]">
               <UFormField label="Название статуса" :name="`level-${index}-name`">
                 <UInput v-model="level.name" maxlength="40" placeholder="Например: SILVER" />
               </UFormField>
@@ -185,7 +198,11 @@ function formatUpdatedAt(value: string | null | undefined) {
           </div>
 
           <template #footer>
-            <div class="text-xs text-charcoal-600">Последнее обновление: {{ formatUpdatedAt(snapshot?.updated_at) }}</div>
+            <div class="flex items-center gap-1 text-xs text-charcoal-600">
+              Последнее обновление:
+              <USkeleton v-if="isInitialLoading" class="h-3 w-28 rounded" />
+              <template v-else>{{ formatUpdatedAt(snapshot?.updated_at) }}</template>
+            </div>
           </template>
         </UCard>
       </div>

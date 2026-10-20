@@ -63,7 +63,7 @@ const employeeQuery = computed(() => {
   const ownBranchId = String(session.user?.branch_id || branches.activeBranchId || '')
   return ownBranchId ? { branch_id: ownBranchId } : {}
 })
-const { data: employeeData } = await useAsyncData('penalty-employees', () => barbersApi.list({ ...employeeQuery.value, archived: 'active' }), { default: () => ({ items: [] }), watch: [employeeQuery] })
+const { data: employeeData } = await useAsyncData('penalty-employees', () => barbersApi.list({ ...employeeQuery.value, archived: 'active' }), { default: () => ({ items: [] }), lazy: true, watch: [employeeQuery] })
 const employeeOptions = computed<Option[]>(() => (employeeData.value?.items || []).map((item: any) => ({ label: item.name || item.login || item.id, value: String(item.id) })))
 const recipientFilterOptions = computed<Option[]>(() => [{ label: 'Все сотрудники', value: ALL }, ...employeeOptions.value])
 const sourceOptions: Option[] = [
@@ -89,7 +89,7 @@ const { data, pending, refresh } = await useAsyncData('penalties-list', () => {
   if (sourceFilter.value !== ALL) query.source = sourceFilter.value
   if (statusFilter.value !== ALL) query.status = statusFilter.value
   return penaltiesApi.list(query)
-}, { default: () => ({ items: [] }), watch: [period, branchFilter, recipientFilter, sourceFilter, statusFilter] })
+}, { default: () => ({ items: [] }), lazy: true, watch: [period, branchFilter, recipientFilter, sourceFilter, statusFilter] })
 
 function text(value: unknown) { const result = String(value ?? '').trim(); return result || null }
 function money(value: unknown) { const result = Number(value ?? 0); return Number.isFinite(result) ? result : 0 }
@@ -144,6 +144,7 @@ const rows = computed<PenaltyRow[]>(() => allRows.value.filter((row) => {
   if (statusFilter.value === 'active' && row.canceled) return false
   return true
 }))
+const isPenaltiesInitialLoading = computed(() => pending.value && !allRows.value.length)
 const totalAmount = computed(() => rows.value.reduce((sum, row) => sum + (row.canceled ? 0 : row.amount), 0))
 
 const columns: TableColumn<PenaltyRow>[] = [
@@ -221,7 +222,8 @@ async function cancel(row: PenaltyRow) {
       <div v-else class="space-y-6">
         <UCard class="warm-card">
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Общая сумма активных штрафов</p>
-          <p class="mt-2 text-2xl font-semibold text-error">{{ formatMoney(totalAmount) }}</p>
+          <USkeleton v-if="isPenaltiesInitialLoading" class="mt-2 h-8 w-36 rounded-md" />
+          <p v-else class="mt-2 text-2xl font-semibold text-error">{{ formatMoney(totalAmount) }}</p>
         </UCard>
         <UCard class="warm-card">
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -233,7 +235,8 @@ async function cancel(row: PenaltyRow) {
           </div>
         </UCard>
         <UCard class="warm-card">
-          <div class="overflow-x-auto rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isPenaltiesInitialLoading" :rows="6" :columns="6" />
+          <div v-else class="overflow-x-auto rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="columns" :data="rows" :loading="pending" :ui="{ root: 'w-full overflow-auto', base: 'w-full min-w-[66rem]', th: 'whitespace-nowrap', td: 'whitespace-nowrap align-middle' }">
               <template #date-cell="{ row }">{{ displayDate(row.original.date) }}</template>
               <template #lateMinutes-cell="{ row }">{{ row.original.lateMinutes == null ? '—' : `${row.original.lateMinutes} мин.` }}</template>

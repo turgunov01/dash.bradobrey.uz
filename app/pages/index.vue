@@ -32,11 +32,6 @@ function getCurrentTashkentMonthRange() {
 }
 
 const currentMonthRange = getCurrentTashkentMonthRange()
-const currentMonthLabel = new Intl.DateTimeFormat('ru-RU', {
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'Asia/Tashkent'
-}).format(new Date())
 
 useRealtimeQueue()
 
@@ -55,7 +50,7 @@ const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${curr
     to: monthEndAt
   }
   const [health, branches, promoDashboard, history, servicesPayload, queueStats] = await Promise.all([
-    $fetch('/api/health').catch(() => null),
+    enqueueRequest(() => $fetch('/api/health')).catch(() => null),
     branchStore.ensureLoaded({ force: true }).catch(() => branchStore.branches),
     promoApi.dashboard({ __skipBranchScope: true }).catch(() => ({ items: [] })),
     historyApi.listAll({
@@ -92,7 +87,10 @@ const { data, pending, refresh } = await useAsyncData(`overview-dashboard-${curr
     },
     statistics
   }
-})
+}, { lazy: true })
+
+// Skeletons only on the first load; a manual refresh keeps the old numbers visible.
+const isInitialLoading = computed(() => pending.value && !data.value)
 
 const promoItems = computed(() => {
   const dashboard = data.value?.promoDashboard as any
@@ -190,44 +188,38 @@ const shortcuts = computed(() =>
     <template #body>
       <div class="space-y-6">
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DashboardMetricCard description="Заказы со статусом «В работе» за текущий месяц по всем филиалам."
+          <DashboardMetricCard :loading="isInitialLoading" description="Заказы со статусом «В работе» за текущий месяц по всем филиалам."
             icon="i-lucide-clock-3" label="Заказы в процессе" :value="formatCount(data?.queue?.count)" />
-          <NuxtLink to="/branches" class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
-            <DashboardMetricCard description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
+          <NuxtLink to="/branches" class="block rounded-[1rem] transition hover:-translate-y-0.5">
+            <DashboardMetricCard :loading="isInitialLoading" description="Филиалы, загруженные из конфигурации киоска." icon="i-lucide-map"
               label="Филиалы" :value="formatCount(data?.branchCount)" />
           </NuxtLink>
-          <NuxtLink to="/promo-codes" class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
-            <DashboardMetricCard description="Промокоды, полученные с панели управления." icon="i-lucide-ticket-percent"
+          <NuxtLink to="/promo-codes" class="block rounded-[1rem] transition hover:-translate-y-0.5">
+            <DashboardMetricCard :loading="isInitialLoading" description="Промокоды, полученные с панели управления." icon="i-lucide-ticket-percent"
               label="Промокоды" :value="formatCount(promoItems.length)" />
           </NuxtLink>
-          <DashboardMetricCard description="Состояние основного health-эндпоинта." icon="i-lucide-heart-pulse"
+          <DashboardMetricCard :loading="isInitialLoading" description="Состояние основного health-эндпоинта." icon="i-lucide-heart-pulse"
             label="Состояние" :value="data?.health ? 'OK' : 'В ожидании'" />
         </div>
 
         <div class="grid gap-6">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
-              <div class="space-y-2">
-                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
-                  Пульс салона
-                </p>
-                <h2 class="barbershop-heading text-3xl text-charcoal-950">
-                  Быстрая операционная сводка
-                </h2>
-                <p class="text-sm capitalize text-charcoal-500">{{ currentMonthLabel }} · все филиалы</p>
-              </div>
+              <h2 class="barbershop-heading text-3xl text-charcoal-950">
+                Быстрая операционная сводка
+              </h2>
             </template>
 
             <div class="grid gap-4 md:grid-cols-3">
               <NuxtLink v-for="card in statisticsHighlights" :key="card.label" :to="card.to"
-                class="block rounded-[1.75rem] transition hover:-translate-y-0.5">
-                <DashboardMetricCard :description="card.description" :icon="card.icon" :label="card.label" :value="card.value" />
+                class="block rounded-[1rem] transition hover:-translate-y-0.5">
+                <DashboardMetricCard :loading="isInitialLoading" :description="card.description" :icon="card.icon" :label="card.label" :value="card.value" />
               </NuxtLink>
             </div>
 
             <!-- <div class="mt-6 grid gap-3">
               <div v-for="[key, value] in statRows" :key="key"
-                class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3">
+                class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3">
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-sm font-medium text-charcoal-700">{{ toKeyLabel(key) }}</span>
                   <span class="text-sm font-semibold text-charcoal-950">{{ value }}</span>
@@ -241,7 +233,7 @@ const shortcuts = computed(() =>
           </UCard>
 
           <div class="space-y-6">
-            <!-- <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <!-- <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -259,7 +251,7 @@ const shortcuts = computed(() =>
                   :key="branch.id"
                   :class="[
                     branch.isActive ? 'border-brass-300 bg-brass-50' : 'border-charcoal-200 bg-white/80',
-                    'rounded-[1.25rem] border px-4 py-3'
+                    'rounded-[0.875rem] border px-4 py-3'
                   ]"
                 >
                   <div class="flex items-center justify-between gap-3">
@@ -282,7 +274,7 @@ const shortcuts = computed(() =>
               </div>
             </UCard> -->
 
-            <!-- <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <!-- <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -299,10 +291,10 @@ const shortcuts = computed(() =>
                   v-for="shortcut in shortcuts"
                   :key="shortcut.to"
                   :to="shortcut.to"
-                  class="rounded-[1.35rem] border border-charcoal-200 bg-white/80 p-4 transition hover:border-brass-300 hover:bg-brass-50/50"
+                  class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4 transition hover:border-brass-300 hover:bg-brass-50/50"
                 >
                   <div class="flex items-start gap-3">
-                    <div class="flex size-10 items-center justify-center rounded-2xl bg-sand-100 text-brass-700">
+                    <div class="flex size-10 items-center justify-center rounded-xl bg-sand-100 text-brass-700">
                       <UIcon :name="shortcut.icon" class="size-5" />
                     </div>
                     <div class="space-y-1">

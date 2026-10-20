@@ -150,7 +150,7 @@ await load()
 
     <template #body>
       <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div>
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">Контент приложения</p>
@@ -158,19 +158,20 @@ await load()
             </div>
           </template>
 
-          <div v-if="pending" class="flex justify-center py-12"><ULoader size="lg" /></div>
-          <div v-else-if="!banners.length" class="rounded-2xl border border-dashed border-charcoal-300 p-10 text-center text-sm text-charcoal-600">
+          <SharedSkeletonRows v-if="pending && !banners.length" :rows="3" :columns="3" card />
+          <div v-else-if="pending" class="flex justify-center py-12"><ULoader size="lg" /></div>
+          <div v-else-if="!banners.length" class="rounded-xl border border-dashed border-charcoal-300 p-10 text-center text-sm text-charcoal-600">
             Баннеров пока нет. Создайте первый справа.
           </div>
           <div v-else class="space-y-3">
             <div
               v-for="item in banners"
               :key="item.id"
-              class="flex items-center gap-4 rounded-2xl border p-3"
+              class="flex items-center gap-4 rounded-xl border p-3"
               :class="selectedId === String(item.id) ? 'border-[#C4A26F] bg-[#C4A26F]/10' : 'border-charcoal-200 bg-white'"
             >
-              <img v-if="item.media?.url" :src="item.media.url" class="h-20 w-32 rounded-xl object-cover" alt="">
-              <div v-else class="h-20 w-32 rounded-xl bg-charcoal-100" />
+              <img v-if="item.media?.url" :src="item.media.url" class="h-20 w-32 rounded-lg object-cover" alt="">
+              <div v-else class="h-20 w-32 rounded-lg bg-charcoal-100" />
               <div class="min-w-0 flex-1">
                 <p class="truncate font-semibold text-charcoal-900">{{ localized(item, 'title', 'ru') || localized(item, 'title', 'en') || 'Без заголовка' }}</p>
                 <p class="mt-1 truncate text-sm text-charcoal-600">{{ localized(item, 'description', 'ru') || 'Без описания' }}</p>
@@ -186,7 +187,7 @@ await load()
           </div>
         </UCard>
 
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">{{ selected ? 'Редактирование' : 'Новый баннер' }}</p>
           </template>
