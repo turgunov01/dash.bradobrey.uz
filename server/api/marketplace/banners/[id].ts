@@ -1,5 +1,5 @@
 import { proxyBackend } from '~~/server/utils/backend'
 
 export default defineEventHandler(async (event): Promise<unknown> => {
-  return proxyBackend<unknown>(event, `/api/marketplace/banners/${event.context.params?.id}`, 'none')
+  return proxyBackend<unknown>(event, `/api/marketplace/banners/${event.context.params?.id}`, 'required')
 })
