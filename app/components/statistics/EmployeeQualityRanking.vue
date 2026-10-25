@@ -105,7 +105,13 @@ const hasDataQualityWarnings = computed(() => {
 // Keep the SSR markup and the first client render identical. Starting a
 // client-only request during hydration changes UButton loading state and the
 // empty/skeleton branches before Vue has attached to the server DOM.
+// Until mount the request has not started yet, so show the skeleton (on both
+// server and client) instead of the "no scope" empty state.
+const isMounted = ref(false)
+const isInitialLoading = computed(() => (pending.value || !isMounted.value) && !data.value)
+
 onMounted(() => {
+  isMounted.value = true
   void refresh()
 })
 
@@ -168,7 +174,7 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+  <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
     <template #header>
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="space-y-2">
@@ -189,7 +195,7 @@ defineExpose({ refresh })
     </template>
 
     <div class="space-y-5">
-      <details class="rounded-2xl border border-charcoal-200 bg-charcoal-50/60 px-4 py-3 text-sm text-charcoal-700">
+      <details class="rounded-xl border border-charcoal-200 bg-charcoal-50/60 px-4 py-3 text-sm text-charcoal-700">
         <summary class="cursor-pointer font-semibold text-charcoal-950">Как считается рейтинг</summary>
         <ol class="mt-3 list-decimal space-y-1 pl-5 leading-6">
           <li>Сначала сотрудники без подозрительных заказов.</li>
@@ -208,8 +214,8 @@ defineExpose({ refresh })
         <p class="mt-1 text-charcoal-500">Неявка клиента, опоздание клиента и нейтральные отмены место не снижают.</p>
       </details>
 
-      <div v-if="pending && !data" class="space-y-3" aria-live="polite">
-        <USkeleton v-for="index in 4" :key="index" class="h-16 w-full rounded-2xl" />
+      <div v-if="isInitialLoading" class="space-y-3" aria-live="polite">
+        <USkeleton v-for="index in 4" :key="index" class="h-16 w-full rounded-xl" />
       </div>
 
       <UAlert
@@ -242,7 +248,7 @@ defineExpose({ refresh })
           variant="soft"
         />
 
-        <div v-if="sections.eligible.length" class="overflow-x-auto rounded-2xl border border-charcoal-200">
+        <div v-if="sections.eligible.length" class="overflow-x-auto rounded-xl border border-charcoal-200">
           <table class="min-w-[1040px] w-full text-left text-sm">
             <thead class="bg-charcoal-50 text-[11px] uppercase tracking-[0.14em] text-charcoal-500">
               <tr>
@@ -310,7 +316,7 @@ defineExpose({ refresh })
             <p class="text-sm text-charcoal-500">Эти сотрудники отображаются без места и не смешиваются с официальным рейтингом.</p>
           </div>
           <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <div v-for="entry in sections.insufficient" :key="entry.employee.id" class="rounded-2xl border border-charcoal-200 bg-white/80 p-4">
+            <div v-for="entry in sections.insufficient" :key="entry.employee.id" class="rounded-xl border border-charcoal-200 bg-white/80 p-4">
               <div class="flex items-start justify-between gap-3">
                 <p class="font-semibold text-charcoal-950">{{ entry.employee.name }}</p>
                 <UBadge color="neutral" variant="soft">Без места</UBadge>

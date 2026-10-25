@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useStorage } from '@vueuse/core'
+import { useIntersectionObserver, useStorage } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
 
 import {
@@ -9,6 +9,7 @@ import {
   normalizeBranchText
 } from '~/utils/branchDisplay'
 import { currentPeriodKey, formatCount, formatDateTime, formatMoney } from '~/utils/format'
+import type { EmployeeCardData } from '~/components/employees/EmployeeCard.vue'
 import { resolveApiMediaUrl } from '~/utils/mediaUrl'
 import { flattenServicesPayload } from '~/utils/services'
 import type { VerifixSchedule } from '~/composables/useVerifixApi'
@@ -589,6 +590,39 @@ const pageSize = 10
 const searchLogin = ref('')
 const roleFilter = ref<'all' | EmployeeRole>('all')
 const archiveView = ref<'active' | 'only'>('active')
+// Filters live in a collapsible row; the filter button shows how many are active.
+const filtersOpen = ref(false)
+const activeFilterCount = computed(() =>
+  [searchLogin.value.trim() !== '', roleFilter.value !== 'all', archiveView.value !== 'active'].filter(Boolean).length
+)
+
+function resetFilters() {
+  searchLogin.value = ''
+  roleFilter.value = 'all'
+  archiveView.value = 'active'
+}
+
+// Cards view: infinite scroll over the already-loaded list, one batch at a time.
+const CARDS_BATCH_SIZE = 12
+const cardsVisibleCount = ref(CARDS_BATCH_SIZE)
+const cardsSentinel = ref<HTMLElement | null>(null)
+
+// Table or card layout; a cookie keeps the choice across reloads and SSR.
+const viewMode = useCookie<'table' | 'cards'>('employees-view', { default: () => 'table', maxAge: 60 * 60 * 24 * 365 })
+
+function toEmployeeCard(row: EmployeeRow): EmployeeCardData {
+  return {
+    branch: row.branch,
+    id: row.id,
+    is_archived: row.is_archived,
+    login: row.login,
+    name: row.name,
+    phone: row.phone,
+    photoUrl: row.photo_url ? getEmployeePhotoUrl(row.photo_url) : null,
+    roleLabel: getEmployeeRoleLabel(row.role),
+    specialization: row.specialization
+  }
+}
 
 const { data, pending, refresh } = await useAsyncData('employees-directory', async () => {
   const selectedBranchId = branchStore.activeBranchId ? String(branchStore.activeBranchId) : ''
@@ -640,6 +674,7 @@ const { data, pending, refresh } = await useAsyncData('employees-directory', asy
 
   return { rows }
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId, archiveView]
 })
 
@@ -667,6 +702,7 @@ const { data: insightsData, pending: insightsPending, refresh: refreshInsights }
     services: servicesResult.status === 'fulfilled' ? flattenServicesPayload(servicesResult.value) : []
   }
 }, {
+  lazy: true,
   server: false,
   watch: [() => branchStore.activeBranchId]
 })
@@ -722,10 +758,12 @@ const { data: reportData, pending: reportPending } = await useAsyncData('employe
 
   return { items }
 }, {
+  lazy: true,
   server: false,
   watch: [reportEmployeeId, reportFrom, reportTo, () => branchStore.activeBranchId]
 })
 
+const isDirectoryInitialLoading = computed(() => pending.value && !data.value)
 const employeeRows = computed<EmployeeRow[]>(() => data.value?.rows || [])
 const filteredRows = computed<EmployeeRow[]>(() => {
   const loginNeedle = searchLogin.value.trim().toLowerCase()
@@ -741,6 +779,36 @@ const pageCount = computed(() => Math.max(1, Math.ceil(filteredRows.value.length
 const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize
   return filteredRows.value.slice(start, start + pageSize)
+})
+
+const visibleCardRows = computed(() => filteredRows.value.slice(0, cardsVisibleCount.value))
+const hasMoreCards = computed(() => cardsVisibleCount.value < filteredRows.value.length)
+// Cards show monthly stats, so they stay fully skeletoned until stats arrive too.
+const isCardsLoading = computed(() => isDirectoryInitialLoading.value || (insightsPending.value && !insightsData.value))
+
+// A new filter result starts again from the first batch.
+watch(filteredRows, () => {
+  cardsVisibleCount.value = CARDS_BATCH_SIZE
+})
+
+const CARDS_PRELOAD_MARGIN_PX = 400
+
+function revealMoreCards() {
+  if (hasMoreCards.value) {
+    cardsVisibleCount.value += CARDS_BATCH_SIZE
+  }
+}
+
+useIntersectionObserver(cardsSentinel, ([entry]) => {
+  if (entry?.isIntersecting) revealMoreCards()
+}, { rootMargin: `${CARDS_PRELOAD_MARGIN_PX}px 0px` })
+
+// The observer only fires on visibility changes; on tall screens the sentinel
+// can stay visible after a batch, so keep filling until it leaves the viewport.
+watch(cardsVisibleCount, async () => {
+  await nextTick()
+  const rect = cardsSentinel.value?.getBoundingClientRect()
+  if (rect && rect.top < window.innerHeight + CARDS_PRELOAD_MARGIN_PX) revealMoreCards()
 })
 const servicePriceMap = computed(() =>
   new Map(
@@ -1360,57 +1428,157 @@ onBeforeUnmount(() => {
     </template>
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <div class="flex flex-wrap items-center justify-between gap-3 pb-2">
             <div class="flex items-center gap-2">
-              <UBadge :color="archiveView === 'only' ? 'warning' : 'neutral'" size="lg" variant="soft">
+              <USkeleton v-if="isDirectoryInitialLoading" class="h-7 w-32 rounded-md" />
+              <UBadge v-else :color="archiveView === 'only' ? 'warning' : 'neutral'" size="lg" variant="soft">
                 {{ filteredRows.length }} {{ archiveView === 'only' ? 'в архиве' : 'сотрудников' }}
               </UBadge>
             </div>
             <div class="flex items-center gap-2">
-              <UButton color="primary" icon="i-lucide-user-plus" @click="openCreateModal">
-                Добавить сотрудника
-              </UButton>
-              <UButton color="neutral" icon="i-lucide-refresh-cw" :loading="pending || insightsPending" variant="outline" @click="refreshDirectory()">
-                Обновить список
-              </UButton>
+              <div class="flex rounded-md bg-charcoal-100/70 p-0.5" role="group" aria-label="Вид списка">
+                <UTooltip text="Таблица">
+                  <UButton
+                    aria-label="Показать таблицей"
+                    :aria-pressed="viewMode === 'table'"
+                    color="neutral"
+                    :variant="viewMode === 'table' ? 'solid' : 'ghost'"
+                    :class="viewMode === 'table' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                    icon="i-lucide-table-2"
+                    size="sm"
+                    square
+                    @click="viewMode = 'table'"
+                  />
+                </UTooltip>
+                <UTooltip text="Карточки">
+                  <UButton
+                    aria-label="Показать карточками"
+                    :aria-pressed="viewMode === 'cards'"
+                    color="neutral"
+                    :variant="viewMode === 'cards' ? 'solid' : 'ghost'"
+                    :class="viewMode === 'cards' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                    icon="i-lucide-layout-grid"
+                    size="sm"
+                    square
+                    @click="viewMode = 'cards'"
+                  />
+                </UTooltip>
+              </div>
+
+              <!-- Floating filter panel: opens over the content, so nothing shifts. -->
+              <UPopover v-model:open="filtersOpen" :content="{ align: 'end', sideOffset: 8 }">
+                <UChip :show="activeFilterCount > 0" :text="activeFilterCount" size="3xl" color="primary">
+                  <UButton
+                    aria-label="Фильтры"
+                    color="neutral"
+                    :variant="filtersOpen ? 'soft' : 'ghost'"
+                    icon="i-lucide-sliders-horizontal"
+                    square
+                  />
+                </UChip>
+
+                <template #content>
+                  <div class="w-72 space-y-3 p-3">
+                    <div class="flex items-center justify-between">
+                      <p class="text-sm font-semibold text-charcoal-950">Фильтры</p>
+                      <UButton v-if="activeFilterCount > 0" color="neutral" size="xs" variant="link" @click="resetFilters">
+                        Сбросить
+                      </UButton>
+                    </div>
+                    <UInput
+                      v-model="searchLogin"
+                      class="w-full"
+                      icon="i-lucide-search"
+                      placeholder="Поиск по логину"
+                      size="sm"
+                      variant="soft"
+                    />
+                    <USelectMenu
+                      v-model="roleFilter"
+                      class="w-full"
+                      :items="roleFilterOptions"
+                      value-key="value"
+                      placeholder="Все роли"
+                      size="sm"
+                      variant="soft"
+                      portal="body"
+                    />
+                    <div class="flex rounded-md bg-charcoal-100/70 p-0.5" role="group" aria-label="Статус сотрудников">
+                      <UButton
+                        class="flex-1 justify-center"
+                        color="neutral"
+                        :variant="archiveView === 'active' ? 'solid' : 'ghost'"
+                        :class="archiveView === 'active' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                        size="sm"
+                        @click="archiveView = 'active'"
+                      >
+                        Активные
+                      </UButton>
+                      <UButton
+                        class="flex-1 justify-center"
+                        color="neutral"
+                        :variant="archiveView === 'only' ? 'solid' : 'ghost'"
+                        :class="archiveView === 'only' && 'bg-white text-charcoal-950 shadow-sm hover:bg-white'"
+                        size="sm"
+                        @click="archiveView = 'only'"
+                      >
+                        Архив
+                      </UButton>
+                    </div>
+                  </div>
+                </template>
+              </UPopover>
+
+              <span class="mx-1 h-6 w-px bg-charcoal-200" aria-hidden="true" />
+
+              <UTooltip text="Обновить список">
+                <UButton
+                  aria-label="Обновить список"
+                  color="neutral"
+                  icon="i-lucide-refresh-cw"
+                  :loading="pending || insightsPending"
+                  square
+                  variant="outline"
+                  @click="refreshDirectory()"
+                />
+              </UTooltip>
+              <UTooltip text="Добавить сотрудника">
+                <UButton aria-label="Добавить сотрудника" color="primary" icon="i-lucide-user-plus" square @click="openCreateModal" />
+              </UTooltip>
             </div>
           </div>
 
-          <div class="grid gap-3 pb-4 md:grid-cols-3">
-            <UInput
-              v-model="searchLogin"
-              icon="i-lucide-search"
-              placeholder="Поиск по логину"
-            />
-            <USelectMenu
-              v-model="roleFilter"
-              :items="roleFilterOptions"
-              value-key="value"
-              placeholder="Все роли" portal="body" />
-            <div class="flex w-full rounded-xl border border-charcoal-200 bg-charcoal-50/60 p-1">
-              <UButton
-                class="flex-1"
-                :color="archiveView === 'active' ? 'primary' : 'neutral'"
-                :variant="archiveView === 'active' ? 'solid' : 'outline'"
-                icon="i-lucide-users"
-                @click="archiveView = 'active'"
-              >
-                Активные
-              </UButton>
-              <UButton
-                class="flex-1"
-                :color="archiveView === 'only' ? 'warning' : 'neutral'"
-                :variant="archiveView === 'only' ? 'solid' : 'outline'"
-                icon="i-lucide-archive"
-                @click="archiveView = 'only'"
-              >
-                Архив
-              </UButton>
-            </div>
-          </div>
 
-          <div v-if="filteredRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <div v-if="viewMode === 'cards' && isCardsLoading" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <EmployeesEmployeeCardSkeleton v-for="index in CARDS_BATCH_SIZE / 2" :key="index" />
+          </div>
+          <SharedSkeletonRows v-else-if="isDirectoryInitialLoading" :rows="6" :columns="6" />
+          <div v-else-if="filteredRows.length && viewMode === 'cards'" class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <EmployeesEmployeeCard
+                v-for="row in visibleCardRows"
+                :key="row.id"
+                :employee="toEmployeeCard(row)"
+                :stats="employeeInsightMap.get(row.id)"
+                :removing="removingId === row.id"
+                :can-view-branch-statistics="canViewBranchStatistics"
+                @report="openEmployeeReport(row)"
+                @edit="startEdit(row)"
+                @fire="fireEmployee(row)"
+                @restore="restoreEmployee(row)"
+              />
+              <template v-if="hasMoreCards">
+                <EmployeesEmployeeCardSkeleton v-for="index in 3" :key="`more-${index}`" />
+              </template>
+            </div>
+            <!-- Infinite scroll: reaching this sentinel reveals the next batch. -->
+            <div ref="cardsSentinel" class="h-px" aria-hidden="true" />
+            <p class="text-center text-xs text-charcoal-500">
+              {{ hasMoreCards ? `Показано ${visibleCardRows.length} из ${filteredRows.length}` : `Показаны все ${filteredRows.length}` }}
+            </p>
+          </div>
+          <div v-else-if="filteredRows.length" class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <div class="max-h-[80vh] overflow-auto">
               <UTable
                 :columns="columns"
@@ -1436,7 +1604,7 @@ onBeforeUnmount(() => {
                     type="button"
                     @click="openEmployeeReport(row.original)"
                   >
-                    <div class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-charcoal-200 bg-charcoal-100">
+                    <div class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-100">
                       <img
                         v-if="row.original.photo_url"
                         :alt="row.original.name"
@@ -1574,7 +1742,7 @@ onBeforeUnmount(() => {
   >
     <template #body>
       <div class="space-y-4">
-        <div class="grid gap-3 rounded-[1.25rem] border border-charcoal-200 bg-white/85 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+        <div class="grid gap-3 rounded-[0.875rem] border border-charcoal-200 bg-white/85 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <UFormField label="От">
             <UInput v-model="reportFrom" class="w-full" type="date" />
           </UFormField>
@@ -1592,34 +1760,36 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="grid gap-3 sm:grid-cols-5">
-          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+          <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Записей</p>
-            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatCount(reportSummary.count) }}</p>
+            <USkeleton v-if="reportPending" class="mt-1 h-6 w-20 rounded" />
+            <p v-else class="mt-1 text-base font-semibold text-charcoal-950">{{ formatCount(reportSummary.count) }}</p>
           </div>
-          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+          <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Наличные</p>
-            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.cash) }}</p>
+            <USkeleton v-if="reportPending" class="mt-1 h-6 w-20 rounded" />
+            <p v-else class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.cash) }}</p>
           </div>
-          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+          <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Безнал</p>
-            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.card) }}</p>
+            <USkeleton v-if="reportPending" class="mt-1 h-6 w-20 rounded" />
+            <p v-else class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.card) }}</p>
           </div>
-          <div class="rounded-xl border border-charcoal-200 bg-white/90 px-4 py-3">
+          <div class="rounded-lg border border-charcoal-200 bg-white/90 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Сертификат</p>
-            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.certificate) }}</p>
+            <USkeleton v-if="reportPending" class="mt-1 h-6 w-20 rounded" />
+            <p v-else class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.certificate) }}</p>
           </div>
-          <div class="rounded-xl border border-primary-200 bg-primary-50/70 px-4 py-3">
+          <div class="rounded-lg border border-primary-200 bg-primary-50/70 px-4 py-3">
             <p class="text-xs uppercase tracking-[0.14em] text-charcoal-500">Всего</p>
-            <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.total) }}</p>
+            <USkeleton v-if="reportPending" class="mt-1 h-6 w-20 rounded" />
+            <p v-else class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(reportSummary.total) }}</p>
           </div>
         </div>
 
-        <div v-if="reportPending" class="flex items-center justify-center rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-10 text-sm text-charcoal-500">
-          <UIcon class="mr-2 animate-spin text-lg" name="i-lucide-loader-circle" />
-          Загрузка записей…
-        </div>
+        <SharedSkeletonRows v-if="reportPending" :rows="6" :columns="6" />
 
-        <div v-else-if="reportRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <div v-else-if="reportRows.length" class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
           <div class="max-h-[55vh] overflow-auto">
             <table class="w-full min-w-[64rem] border-collapse text-sm">
               <thead class="sticky top-0 z-10 bg-charcoal-50/95">
@@ -1697,7 +1867,7 @@ onBeforeUnmount(() => {
     <template #body>
       <form class="flex flex-col gap-6" @submit.prevent="submitEmployee">
         <div class="space-y-6">
-          <div class="rounded-[1.5rem] border border-charcoal-200 bg-charcoal-50/50 p-5">
+          <div class="rounded-[1rem] border border-charcoal-200 bg-charcoal-50/50 p-5">
             <div class="space-y-1 pb-4">
               <h3 class="barbershop-heading text-xl text-charcoal-950">
                 Основные данные
@@ -1708,9 +1878,9 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="flex flex-col gap-4">
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center">
-                  <div class="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.5rem] border border-charcoal-200 bg-charcoal-100">
+                  <div class="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] border border-charcoal-200 bg-charcoal-100">
                     <img
                       v-if="avatarPreviewUrl"
                       :alt="form.name || form.login || 'Аватар сотрудника'"
@@ -1796,7 +1966,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
+          <div class="rounded-[1rem] border border-charcoal-200 bg-white p-5">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="space-y-1">
                 <h3 class="barbershop-heading text-xl text-charcoal-950">График работы</h3>
@@ -1807,17 +1977,17 @@ onBeforeUnmount(() => {
               <USwitch v-model="personalScheduleEnabled" label="Индивидуальный график" :disabled="personalScheduleLoading || !personalScheduleLoaded" />
             </div>
 
-            <div v-if="personalScheduleLoading" class="mt-4 rounded-xl bg-charcoal-50 px-4 py-3 text-sm text-charcoal-500">
+            <div v-if="personalScheduleLoading" class="mt-4 rounded-lg bg-charcoal-50 px-4 py-3 text-sm text-charcoal-500">
               Загружаю текущий график сотрудника…
             </div>
-            <div v-else-if="personalScheduleLoadError" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div v-else-if="personalScheduleLoadError" class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Не удалось загрузить текущий график. Повторите попытку перед сохранением.
               <UButton size="xs" color="error" variant="outline" @click="loadPersonalSchedule(editingId)">Повторить</UButton>
             </div>
 
             <div v-else-if="personalScheduleEnabled" class="mt-4 space-y-4">
               <div class="grid gap-2">
-                <div v-for="day in personalScheduleDays" :key="day.day_of_week" class="grid gap-3 rounded-xl border border-charcoal-200 bg-charcoal-50/40 p-3 sm:grid-cols-[minmax(9rem,1.1fr)_repeat(3,minmax(6rem,1fr))] sm:items-center">
+                <div v-for="day in personalScheduleDays" :key="day.day_of_week" class="grid gap-3 rounded-lg border border-charcoal-200 bg-charcoal-50/40 p-3 sm:grid-cols-[minmax(9rem,1.1fr)_repeat(3,minmax(6rem,1fr))] sm:items-center">
                   <UCheckbox v-model="day.enabled" :label="workWeekDays.find(item => item.value === day.day_of_week)?.label" />
                   <UFormField label="Начало">
                     <UInput v-model="day.start_time" type="time" :disabled="!day.enabled" />
@@ -1833,7 +2003,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
+          <div class="rounded-[1rem] border border-charcoal-200 bg-white p-5">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="space-y-1">
                 <h3 class="barbershop-heading text-xl text-charcoal-950">
@@ -1848,7 +2018,7 @@ onBeforeUnmount(() => {
               </UButton>
             </div>
 
-            <div class="mt-4 rounded-[1.25rem] border border-primary-200 bg-primary-50/60 p-4">
+            <div class="mt-4 rounded-[0.875rem] border border-primary-200 bg-primary-50/60 p-4">
               <div class="flex flex-wrap items-center gap-2">
                 <UBadge color="primary" variant="soft">
                   {{ employeeRoleLabels[form.role] }}
@@ -1867,7 +2037,7 @@ onBeforeUnmount(() => {
               <div
                 v-for="section in employeePermissionSections"
                 :key="section.key"
-                class="rounded-[1.25rem] border border-charcoal-200 bg-charcoal-50/40 p-4"
+                class="rounded-[0.875rem] border border-charcoal-200 bg-charcoal-50/40 p-4"
               >
                 <div class="pb-3">
                   <h4 class="text-sm font-semibold uppercase tracking-[0.16em] text-charcoal-500">
@@ -1900,7 +2070,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="space-y-6">
-          <div class="rounded-[1.5rem] border border-charcoal-200 bg-white p-5">
+          <div class="rounded-[1rem] border border-charcoal-200 bg-white p-5">
             <div class="space-y-1">
               <h3 class="barbershop-heading text-xl text-charcoal-950">
                 Предпросмотр доступа
@@ -1911,7 +2081,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="mt-4 space-y-3">
-              <div class="rounded-2xl border border-primary-200 bg-primary-50/60 p-4">
+              <div class="rounded-xl border border-primary-200 bg-primary-50/60 p-4">
                 <p class="text-xs uppercase tracking-[0.18em] text-primary-700">
                   Роль
                 </p>
@@ -1920,7 +2090,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
 
-              <div class="rounded-2xl border border-charcoal-200 bg-charcoal-50/40 p-4">
+              <div class="rounded-xl border border-charcoal-200 bg-charcoal-50/40 p-4">
                 <p class="text-xs uppercase tracking-[0.18em] text-charcoal-500">
                   Филиал
                 </p>
@@ -1929,7 +2099,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
 
-              <div class="rounded-2xl border border-charcoal-200 bg-charcoal-50/40 p-4">
+              <div class="rounded-xl border border-charcoal-200 bg-charcoal-50/40 p-4">
                 <p class="text-xs uppercase tracking-[0.18em] text-charcoal-500">
                   Набор прав
                 </p>

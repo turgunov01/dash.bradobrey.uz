@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { NavigationMenuItem } from '@nuxt/ui'
 import BranchSelector from '~/components/app/BranchSelector.vue'
 
 const open = ref(false)
@@ -6,7 +7,7 @@ const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
 const notifications = useNotifications()
 
-const { primaryLinks, searchGroups, supportLinks } = useDashboardNavigation()
+const { flatLinks, primaryLinks, searchGroups, supportLinks } = useDashboardNavigation()
 
 await Promise.all([
   branchStore.ensureLoaded(),
@@ -22,18 +23,29 @@ function closeSidebar() {
   open.value = false
 }
 
-const mainLinks = computed(() =>
-  (primaryLinks.value[0] || []).map(item => ({
-    ...item,
-    onSelect: closeSidebar
-  }))
-)
+function withCloseOnSelect(item: NavigationMenuItem): NavigationMenuItem {
+  return Array.isArray(item.children)
+    ? { ...item, children: item.children.map(withCloseOnSelect) }
+    : { ...item, onSelect: closeSidebar }
+}
+
+const mainLinks = computed(() => (primaryLinks.value[0] || []).map(withCloseOnSelect))
+const collapsedLinks = computed(() => flatLinks.value.map(withCloseOnSelect))
 
 const utilityLinks = computed(() =>
   (supportLinks[0] || []).map(item => ({
     onSelect: closeSidebar
   }))
 )
+
+// Children render flush with their section header (no indent/border) so every
+// icon sits on the same vertical line as the search icon.
+const navigationUi = {
+  link: 'py-1.5 before:rounded-md',
+  linkLeadingIcon: 'size-[18px]',
+  childList: 'ms-0 border-s-0 ps-0',
+  childItem: 'ms-0 ps-0'
+}
 </script>
 
 <template>
@@ -43,26 +55,34 @@ const utilityLinks = computed(() =>
       v-model:open="open"
       collapsible
       resizable
+      :default-size="16"
+      :min-size="14"
+      :max-size="22"
       class="bg-white/70 backdrop-blur-xl"
       :ui="{
         footer: 'lg:border-t lg:border-default/70',
-        header: 'border-b border-default/70'
+        header: 'h-auto py-3'
       }"
     >
       <template #header="{ collapsed }">
-        <div class="w-full space-y-4">
-          <BranchSelector :collapsed="collapsed" />
-        </div>
+        <AppSidebarBrand :collapsed="collapsed" />
       </template>
 
       <template #default="{ collapsed }">
-        <UDashboardSearchButton :collapsed="collapsed" class="bg-transparent ring-default" />
-        <!-- <AppCalculatorModal :collapsed="collapsed" :show-modal="false" /> -->
+        <UDashboardSearchButton
+          :collapsed="collapsed"
+          :kbds="['/']"
+          label="Найти раздел"
+          class="bg-elevated/60 ring-default"
+        />
+
+        <BranchSelector v-if="!collapsed" :collapsed="collapsed" />
 
         <UNavigationMenu
           :collapsed="collapsed"
-          :items="mainLinks"
-          class="mt-0"
+          :items="collapsed ? collapsedLinks : mainLinks"
+          :ui="navigationUi"
+          class="sidebar-nav"
           orientation="vertical"
           tooltip
         />
@@ -83,6 +103,7 @@ const utilityLinks = computed(() =>
 
     <UDashboardSearch
       :groups="searchGroups"
+      shortcut="/"
       description="Быстрый переход по разделам и действиям панели."
       title="Поиск по панели"
     />

@@ -116,26 +116,28 @@ function openEdit(row: BarberRow) {
 
 const { data, pending, refresh } = await useAsyncData('merchant-barbers', async () => {
   return await merchantApi.barbers(true)
-})
+}, { lazy: true })
 
 const { data: servicesData, pending: servicesPending, refresh: refreshServices } = await useAsyncData('merchant-barbers-services', async () => {
   return await merchantApi.services(true)
-})
+}, { lazy: true })
 
 const { data: branchesData, pending: branchesPending, refresh: refreshBranches } = await useAsyncData('merchant-barbers-branches', async () => {
   return await merchantApi.branches()
-})
+}, { lazy: true })
 
 const { data: merchantBarbershopData, refresh: refreshMerchantBarbershop } = await useAsyncData('merchant-barbers-barbershop', async () => {
   const dashboard = await merchantApi.dashboard()
-  const barbershop = await $fetch(`/api/marketplace/catalog/barbershops/${dashboard.barbershop_id}`).catch(() => null)
+  const barbershop = await enqueueRequest(() => $fetch(`/api/marketplace/catalog/barbershops/${dashboard.barbershop_id}`)).catch(() => null)
   const entry = (barbershop as any)?.item ?? (barbershop as any)?.entry ?? barbershop
 
   return {
     id: normalizeText(dashboard.barbershop_id),
     name: normalizeText((entry as any)?.name)
   }
-})
+}, { lazy: true })
+
+const isBarbersInitialLoading = computed(() => pending.value && !data.value)
 
 type ServiceOption = { label: string, value: string }
 type BranchOption = { label: string, value: string }
@@ -363,15 +365,18 @@ async function confirmDelete() {
                 </p>
               </div>
 
-              <UBadge color="neutral" size="lg" variant="soft">
+              <USkeleton v-if="isBarbersInitialLoading" class="h-7 w-14 rounded-md" />
+              <UBadge v-else color="neutral" size="lg" variant="soft">
                 {{ rows.length }} шт.
               </UBadge>
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isBarbersInitialLoading" :rows="5" :columns="6" />
+
           <div
-            v-if="rows.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="rows.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
             <UTable :columns="columns" :data="rows">
               <template #phone-cell="{ row }">
@@ -468,8 +473,8 @@ async function confirmDelete() {
                 value-key="value" portal="body" />
             </UFormField>
 
-            <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">
-              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+            <div class="flex items-center gap-4 rounded-lg border border-charcoal-200 bg-charcoal-50/70 p-3">
+              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-charcoal-200 bg-white">
                 <img
                   v-if="photoPreviewSrc"
                   :alt="form.name || 'Фото барбера'"
@@ -546,8 +551,8 @@ async function confirmDelete() {
                 value-key="value" portal="body" />
             </UFormField>
 
-            <div class="flex items-center gap-4 rounded-xl border border-charcoal-200 bg-charcoal-50/70 p-3">
-              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-charcoal-200 bg-white">
+            <div class="flex items-center gap-4 rounded-lg border border-charcoal-200 bg-charcoal-50/70 p-3">
+              <div class="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-charcoal-200 bg-white">
                 <img
                   v-if="photoPreviewSrc"
                   :alt="form.name || 'Фото барбера'"
@@ -596,7 +601,7 @@ async function confirmDelete() {
       >
         <template #body>
           <div class="space-y-4">
-            <div class="flex items-start gap-3 rounded-xl border p-3" :class="deleteHard ? 'border-error-300 bg-error-50/60' : 'border-charcoal-200 bg-charcoal-50/70'">
+            <div class="flex items-start gap-3 rounded-lg border p-3" :class="deleteHard ? 'border-error-300 bg-error-50/60' : 'border-charcoal-200 bg-charcoal-50/70'">
               <USwitch v-model="deleteHard" color="error" />
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-charcoal-950">

@@ -7,9 +7,9 @@ defineProps<{
 </script>
 
 <template>
-  <UCard class="warm-card rounded-[1.75rem] border border-dashed border-charcoal-200">
+  <UCard class="warm-card rounded-[1rem] border border-dashed border-charcoal-200">
     <div class="flex flex-col items-start gap-4">
-      <div class="flex size-12 items-center justify-center rounded-2xl bg-sand-100 text-brass-700">
+      <div class="flex size-12 items-center justify-center rounded-xl bg-sand-100 text-brass-700">
         <UIcon :name="icon || 'i-lucide-package-open'" class="size-6" />
       </div>
 

@@ -89,7 +89,7 @@ const store = useDashboardMarketplaceStore()
 
 const branchId = computed(() => String(route.params.id || ''))
 
-const { pending, refresh } = await useAsyncData(
+const { data: branchLoaded, pending, refresh } = await useAsyncData(
   () => `dashboard-marketplace-branch-${branchId.value}`,
   async () => {
     const id = branchId.value
@@ -102,8 +102,10 @@ const { pending, refresh } = await useAsyncData(
     await store.fetchBranch(id)
     return true
   },
-  { watch: [branchId] }
+  { lazy: true, watch: [branchId] }
 )
+
+const isInitialLoading = computed(() => pending.value && !branchLoaded.value)
 
 const details = computed<any>(() => store.selectedBranch as any)
 const branch = computed<any>(() => details.value?.branch ?? null)
@@ -193,6 +195,10 @@ function clearAvailability() {
   <UDashboardPanel id="marketplace-branch">
     <template #header>
       <UDashboardNavbar :title="branch?.name || 'Филиал'" :ui="{ right: 'gap-3' }">
+        <template v-if="isInitialLoading" #title>
+          <USkeleton class="h-5 w-40" />
+        </template>
+
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -218,7 +224,8 @@ function clearAvailability() {
         <UCard class="warm-card">
           <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div class="space-y-2">
-              <h2 class="barbershop-heading text-2xl text-charcoal-950">
+              <USkeleton v-if="isInitialLoading" class="h-8 w-56" />
+              <h2 v-else class="barbershop-heading text-2xl text-charcoal-950">
                 {{ branch?.name || 'Филиал' }}
               </h2>
               <p class="text-sm text-charcoal-500">
@@ -226,7 +233,11 @@ function clearAvailability() {
               </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
+            <div v-if="isInitialLoading" class="flex flex-wrap items-center gap-2">
+              <USkeleton class="h-7 w-24" />
+              <USkeleton class="h-7 w-20" />
+            </div>
+            <div v-else class="flex flex-wrap items-center gap-2">
               <UBadge color="neutral" size="lg" variant="soft">
                 {{ barbers.length }} барберов
               </UBadge>
@@ -237,21 +248,23 @@ function clearAvailability() {
           </div>
 
           <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">
                 Город
               </p>
-              <p class="text-sm font-medium text-charcoal-950">
+              <USkeleton v-if="isInitialLoading" class="mt-1 h-4 w-28" />
+              <p v-else class="text-sm font-medium text-charcoal-950">
                 {{ branch?.city || '—' }}
               </p>
             </div>
 
-            <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">
                 Адрес
               </p>
+              <USkeleton v-if="isInitialLoading" class="mt-1 h-4 w-48" />
               <UButton
-                v-if="getExternalAddressUrl(branch?.address)"
+                v-else-if="getExternalAddressUrl(branch?.address)"
                 color="neutral"
                 icon="i-lucide-map-pinned"
                 :to="getExternalAddressUrl(branch?.address) || undefined"
@@ -280,11 +293,13 @@ function clearAvailability() {
             </div>
           </template>
 
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="4" />
+
           <div
-            v-if="barbers.length"
-            class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+            v-else-if="barbers.length"
+            class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
           >
-            <UTable :columns="barberColumns" :data="barbers">
+            <UTable :columns="barberColumns" :data="barbers" :loading="pending">
               <template #name-cell="{ row }">
                 <div class="space-y-1">
                   <span class="font-medium text-charcoal-950">{{ row.original.name }}</span>
@@ -343,11 +358,13 @@ function clearAvailability() {
             </div>
           </template>
 
-          <div v-if="barbers.length && services.length" class="space-y-4">
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="3" :columns="1" card />
+
+          <div v-else-if="barbers.length && services.length" class="space-y-4">
             <UAccordion :items="barberAccordionItems">
               <template #body>
                 <div
-                  class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+                  class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
                 >
                   <UTable :columns="serviceColumns" :data="services">
                     <template #name-cell="{ row }">
@@ -381,7 +398,7 @@ function clearAvailability() {
               </template>
             </UAccordion>
 
-            <div v-if="categories.length" class="rounded-2xl border border-charcoal-200 bg-white/70 p-4">
+            <div v-if="categories.length" class="rounded-xl border border-charcoal-200 bg-white/70 p-4">
               <p class="text-xs text-charcoal-500">
                 Категории
               </p>
@@ -488,7 +505,7 @@ function clearAvailability() {
 
             <div
               v-if="availabilitySlots.length"
-              class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90"
+              class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90"
             >
               <UTable :columns="slotColumns" :data="availabilitySlots">
                 <template #starts_at-cell="{ row }">

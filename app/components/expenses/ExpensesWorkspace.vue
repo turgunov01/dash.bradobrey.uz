@@ -92,7 +92,8 @@ const form = reactive({
 })
 
 const { data: categoryData } = await useAsyncData('warehouse-categories-options', () => warehouseApi.categories(), {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 const { data, pending, refresh } = await useAsyncData('expenses-list', () => {
   const query: Record<string, unknown> = {}
@@ -103,6 +104,7 @@ const { data, pending, refresh } = await useAsyncData('expenses-list', () => {
   return expensesApi.list(query)
 }, {
   default: () => ({ items: [] }),
+  lazy: true,
   watch: [period, categoryFilter, branchFilter]
 })
 
@@ -144,6 +146,8 @@ const rows = computed<ExpenseRow[]>(() => extractItems(data.value).map((item, in
     name: text(item.name || item.title) || 'Расход'
   }
 }))
+
+const isExpensesInitialLoading = computed(() => pending.value && !rows.value.length)
 
 const columns: TableColumn<ExpenseRow>[] = [
   { accessorKey: 'created_at', header: 'Дата' },
@@ -274,7 +278,8 @@ async function remove(row: ExpenseRow) {
         </UCard>
 
         <UCard class="warm-card">
-          <div class="overflow-x-auto rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isExpensesInitialLoading" :rows="6" :columns="6" />
+          <div v-else class="overflow-x-auto rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable
               :columns="columns"
               :data="rows"

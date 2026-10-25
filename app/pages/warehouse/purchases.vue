@@ -106,13 +106,15 @@ const statusOptions = [
 const { data: positionsData } = await useAsyncData('warehouse-positions', () => {
   return warehouseApi.positions()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const { data: purchasesData, pending: purchasesPending, refresh: refreshPurchases } = await useAsyncData('warehouse-purchases', () => {
   return warehouseApi.purchases({ period: period.value })
 }, {
   default: () => ({ items: [] }),
+  lazy: true,
   watch: [period]
 })
 
@@ -163,6 +165,8 @@ const purchaseRows = computed<PurchaseRow[]>(() =>
     }
   })
 )
+
+const isInitialLoading = computed(() => purchasesPending.value && !purchaseRows.value.length)
 
 const purchaseColumns: TableColumn<PurchaseRow>[] = [
   { accessorKey: 'position', header: 'Позиция' },
@@ -337,7 +341,9 @@ async function deletePurchase(row: PurchaseRow) {
             </div>
           </template>
 
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="6" :columns="6" />
+
+          <div v-else class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="purchaseColumns" :data="purchaseRows" :loading="purchasesPending">
               <template #quantity-cell="{ row }">
                 {{ formatCount(row.original.quantity) }}

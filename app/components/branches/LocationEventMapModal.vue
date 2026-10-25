@@ -117,20 +117,20 @@ function destroyMap() {
   <UModal v-model:open="open" class="sm:max-w-4xl" title="Место входа сотрудника" :description="event ? `${event.barber_name || event.barber_id} · ${formatDateTime(eventDate(event))}` : ''" @after:enter="initializeMap" @after:leave="destroyMap">
     <template #body>
       <div v-if="event" class="space-y-4">
-        <div v-if="!hasEventCoordinates" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div v-if="!hasEventCoordinates" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p class="font-semibold">Координаты события отсутствуют</p>
           <p class="mt-1">Для этого входа карта и метка недоступны: в данных события нет корректного местоположения сотрудника.</p>
         </div>
-        <div v-else class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-xl border border-charcoal-200 bg-charcoal-50">
+        <div v-else class="relative h-[min(55vh,30rem)] min-h-80 overflow-hidden rounded-lg border border-charcoal-200 bg-charcoal-50">
           <div ref="mapElement" class="absolute inset-0" />
           <div v-if="mapLoading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/70"><ULoader size="lg" /></div>
         </div>
         <div class="grid gap-3 text-sm sm:grid-cols-3">
-          <div class="rounded-xl bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ event.barber_name || event.barber_id }}</p></div>
-          <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(eventDate(event)) }}</p></div>
-          <div class="rounded-xl bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ statusLabel(event) }}</p></div>
+          <div class="rounded-lg bg-primary/5 p-3"><p class="font-semibold text-charcoal-950">Сотрудник</p><p class="text-charcoal-600">{{ event.barber_name || event.barber_id }}</p></div>
+          <div class="rounded-lg bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Дата и время</p><p class="text-charcoal-600">{{ formatDateTime(eventDate(event)) }}</p></div>
+          <div class="rounded-lg bg-charcoal-50 p-3"><p class="font-semibold text-charcoal-950">Геоконтроль</p><p class="text-charcoal-600">{{ statusLabel(event) }}</p></div>
         </div>
-        <div v-if="!hasBranchLocation" class="rounded-xl border border-charcoal-200 bg-charcoal-50 p-3 text-sm text-charcoal-700">
+        <div v-if="!hasBranchLocation" class="rounded-lg border border-charcoal-200 bg-charcoal-50 p-3 text-sm text-charcoal-700">
           <p class="font-semibold text-charcoal-950">Точка филиала не настроена</p>
           <p class="mt-1">Контрольная точка и окружность разрешённого радиуса появятся после сохранения корректных координат филиала.</p>
         </div>
@@ -138,7 +138,7 @@ function destroyMap() {
       </div>
       <div v-else-if="loading" class="flex justify-center py-10"><ULoader size="lg" /></div>
       <UAlert v-else-if="error" color="error" variant="soft" icon="i-lucide-triangle-alert" title="Не удалось загрузить событие" :description="error" />
-      <div v-if="!event && !loading && fallbackDate" class="mt-3 rounded-xl bg-charcoal-50 p-3 text-sm">
+      <div v-if="!event && !loading && fallbackDate" class="mt-3 rounded-lg bg-charcoal-50 p-3 text-sm">
         <p class="font-semibold text-charcoal-950">Дата уведомления</p>
         <p class="text-charcoal-600">{{ formatDateTime(fallbackDate) }}</p>
         <p class="mt-1 text-xs text-charcoal-500">Это время создания уведомления. Данные события входа сейчас недоступны.</p>

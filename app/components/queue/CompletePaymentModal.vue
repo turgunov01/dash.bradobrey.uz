@@ -69,7 +69,7 @@ function submit() {
   <UModal :open="props.open" :title="props.title || 'Завершить заказ'" description="Укажите, как клиент закрыл оплату." @update:open="emit('update:open', $event)">
     <template #body>
       <div class="space-y-4">
-        <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/90 px-4 py-3">
+        <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 px-4 py-3">
           <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Итого</p>
           <p class="mt-1 text-xl font-semibold text-charcoal-950">
             {{ hasKnownTotal ? formatMoney(total) : 'Сумма не рассчитана' }}
@@ -94,7 +94,7 @@ function submit() {
           variant="soft"
         />
 
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] bg-charcoal-50/70 px-4 py-3">
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-[0.875rem] bg-charcoal-50/70 px-4 py-3">
           <div>
             <p class="text-xs uppercase tracking-[0.16em] text-charcoal-500">Внесено</p>
             <p class="mt-1 text-base font-semibold text-charcoal-950">{{ formatMoney(paidTotal) }}</p>

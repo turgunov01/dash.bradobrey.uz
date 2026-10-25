@@ -82,13 +82,15 @@ const positionForm = reactive({
 const { data: positionsData, pending: positionsPending, refresh: refreshPositions } = await useAsyncData('warehouse-positions', () => {
   return warehouseApi.positions()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const { data: categoriesData, refresh: refreshCategories } = await useAsyncData('warehouse-categories-options', () => {
   return warehouseApi.categories()
 }, {
-  default: () => ({ items: [] })
+  default: () => ({ items: [] }),
+  lazy: true
 })
 
 const positionRows = computed<PositionRow[]>(() =>
@@ -101,6 +103,8 @@ const positionRows = computed<PositionRow[]>(() =>
     unit: normalizeText(item.unit || item.measure)
   }))
 )
+
+const isInitialLoading = computed(() => positionsPending.value && !positionRows.value.length)
 
 const categoryRows = computed<CategoryRow[]>(() =>
   extractItems(categoriesData.value).map((item, index) => ({
@@ -248,7 +252,9 @@ async function deletePosition(row: PositionRow) {
             </div>
           </template>
 
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isInitialLoading" :rows="6" :columns="6" />
+
+          <div v-else class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable :columns="positionColumns" :data="positionRows" :loading="positionsPending">
               <template #category-cell="{ row }">
                 <UBadge v-if="row.original.category" color="neutral" size="xs" variant="soft">

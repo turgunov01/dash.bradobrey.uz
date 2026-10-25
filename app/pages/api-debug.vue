@@ -87,7 +87,7 @@ async function executeRequest() {
     <template #body>
       <div class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div class="space-y-6">
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="space-y-2">
                 <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -132,7 +132,7 @@ async function executeRequest() {
           <SharedJsonBlock v-if="result" label="Последний ответ" :value="result" />
         </div>
 
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="space-y-2">
               <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -148,7 +148,7 @@ async function executeRequest() {
             <div
               v-for="entry in uiStore.apiDebugEntries"
               :key="`${entry.at}-${entry.url}`"
-              class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 p-4"
+              class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 p-4"
             >
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>

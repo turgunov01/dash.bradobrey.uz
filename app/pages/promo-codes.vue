@@ -167,8 +167,11 @@ const { data, pending, refresh } = await useAsyncData('promo-dashboard', async (
     items
   }
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
+
+const isPromoInitialLoading = computed(() => pending.value && !data.value)
 
 const promoRows = computed<PromoRow[]>(() => data.value?.items || [])
 const activePromoRows = computed<PromoRow[]>(() => promoRows.value.filter(isPromoActive))
@@ -331,7 +334,7 @@ async function removePromo(row: PromoRow) {
 
     <template #body>
       <div class="space-y-6">
-        <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+        <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
           <template #header>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="space-y-2">
@@ -349,13 +352,16 @@ async function removePromo(row: PromoRow) {
                 </UButton>
 
                 <UBadge color="neutral" size="lg" variant="soft">
-                  {{ activePromoRows.length }} действующих
+                  <USkeleton v-if="isPromoInitialLoading" class="h-4 w-6 rounded" />
+                  <template v-else>{{ activePromoRows.length }}</template>
+                  действующих
                 </UBadge>
               </div>
             </div>
           </template>
 
-          <div v-if="activePromoRows.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+          <SharedSkeletonRows v-if="isPromoInitialLoading" :rows="6" :columns="6" />
+          <div v-else-if="activePromoRows.length" class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable
               :columns="promoColumns"
               :data="activePromoRows"

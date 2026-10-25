@@ -266,9 +266,11 @@ const { data, pending, refresh } = await useAsyncData('barber-history-directory'
     rows
   }
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
 
+const isBarbersInitialLoading = computed(() => pending.value && !data.value)
 const barberRows = computed(() => data.value?.rows || [])
 const failedBranches = computed(() => data.value?.failedBranches || [])
 
@@ -431,7 +433,7 @@ async function openDetails(barber: BarberRow) {
     </template>
 
     <template #body>
-      <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+      <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
         <template #header>
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-2">
@@ -457,7 +459,8 @@ async function openDetails(barber: BarberRow) {
           </div>
 
           <div class="mt-4 flex flex-wrap items-center gap-3">
-            <UBadge color="neutral" size="lg" variant="soft">
+            <USkeleton v-if="isBarbersInitialLoading" class="h-7 w-28 rounded-md" />
+            <UBadge v-else color="neutral" size="lg" variant="soft">
               {{ barberRows.length }} барберов
             </UBadge>
             <UBadge color="neutral" variant="outline">
@@ -469,8 +472,10 @@ async function openDetails(barber: BarberRow) {
           </div>
         </template>
 
-        <div v-if="barberRows.length" class="space-y-4">
-          <div class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+        <SharedSkeletonRows v-if="isBarbersInitialLoading" :rows="8" :columns="6" />
+
+        <div v-else-if="barberRows.length" class="space-y-4">
+          <div class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
             <UTable
               :columns="columns"
               :data="paginatedBarbers"
@@ -559,7 +564,7 @@ async function openDetails(barber: BarberRow) {
 
         <div
           v-else
-          class="rounded-[1.25rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6"
+          class="rounded-[0.875rem] border border-dashed border-charcoal-200 bg-white/70 px-5 py-6"
         >
           <p class="text-base font-semibold text-charcoal-950">
             Барберы не найдены
@@ -582,7 +587,7 @@ async function openDetails(barber: BarberRow) {
               <div
                 v-for="metric in detailMetrics"
                 :key="metric.label"
-                class="rounded-[1.25rem] border border-charcoal-200 bg-white/90 p-4"
+                class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 p-4"
               >
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                   {{ metric.label }}
@@ -596,16 +601,16 @@ async function openDetails(barber: BarberRow) {
               </div>
             </div>
 
-            <div v-if="detailError" class="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div v-if="detailError" class="rounded-[0.875rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {{ detailError }}
             </div>
 
-            <div v-if="detailPending" class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-5 text-sm text-charcoal-500">
+            <div v-if="detailPending" class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-5 text-sm text-charcoal-500">
               Загружаю детальную статистику барбера...
             </div>
 
             <div class="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/90 p-5">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 p-5">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                   Профиль
                 </p>
@@ -621,7 +626,7 @@ async function openDetails(barber: BarberRow) {
                 </div>
               </div>
 
-              <div class="rounded-[1.25rem] border border-charcoal-200 bg-white/90 p-5">
+              <div class="rounded-[0.875rem] border border-charcoal-200 bg-white/90 p-5">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">
                   Дополнительные метрики
                 </p>
@@ -630,7 +635,7 @@ async function openDetails(barber: BarberRow) {
                   <div
                     v-for="[key, value] in extraDetailRows"
                     :key="key"
-                    class="rounded-[1rem] border border-charcoal-100 bg-charcoal-50/60 px-4 py-3"
+                    class="rounded-[0.75rem] border border-charcoal-100 bg-charcoal-50/60 px-4 py-3"
                   >
                     <div class="flex items-center justify-between gap-4">
                       <span class="text-sm font-medium text-charcoal-700">{{ toKeyLabel(key) }}</span>

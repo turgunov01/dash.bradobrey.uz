@@ -130,10 +130,13 @@ const { data, pending, refresh } = await useAsyncData('certificates-dashboard', 
       : []
   }
 }, {
+  lazy: true,
   watch: [() => branchStore.activeBranchId]
 })
 
-const services = computed(() => data.value?.services || [])
+const isCertificatesInitialLoading = computed(() => pending.value && !data.value)
+
+const services =computed(() => data.value?.services || [])
 const activeCertificates = computed(() => data.value?.certificates || [])
 
 const serviceNameMap = computed(() =>
@@ -247,7 +250,9 @@ async function lookupCertificate() {
     <template #body>
       <div class="flex flex-wrap items-center justify-between gap-3 pb-4">
         <UBadge color="neutral" size="lg" variant="soft">
-          {{ activeCertificates.length }} активных
+          <USkeleton v-if="isCertificatesInitialLoading" class="h-4 w-6 rounded" />
+          <template v-else>{{ activeCertificates.length }}</template>
+          активных
         </UBadge>
         <div class="flex flex-wrap items-center justify-end gap-2">
           <UButton color="primary" icon="i-lucide-plus" @click="openCreateModal()">
@@ -262,7 +267,8 @@ async function lookupCertificate() {
         </div>
       </div>
 
-      <div v-if="activeCertificates.length" class="overflow-hidden rounded-[1.25rem] border border-charcoal-200 bg-white/90">
+      <SharedSkeletonRows v-if="isCertificatesInitialLoading" :rows="6" :columns="6" />
+      <div v-else-if="activeCertificates.length" class="overflow-hidden rounded-[0.875rem] border border-charcoal-200 bg-white/90">
         <div class="max-h-[80vh] overflow-auto">
           <UTable
             :columns="certificateColumns"

@@ -30,12 +30,15 @@ const columns: TableColumn<MobileUser>[] = [
   { id: 'actions', header: '' }
 ]
 
-const { data, pending, refresh } = await useAsyncData('marketplace-mobile-users', () => api.fetchMobileUsers({
+const { data, pending, status, refresh } = await useAsyncData('marketplace-mobile-users', () => api.fetchMobileUsers({
   q: search.value.trim() || undefined,
   active: active.value === 'all' ? undefined : active.value === 'active',
   limit: pageSize,
   offset: (page.value - 1) * pageSize
-}), { server: false, watch: [page, active] })
+}), { server: false, lazy: true, watch: [page, active] })
+
+// server: false starts in "idle" during hydration, so treat it as loading too.
+const isInitialLoading = computed(() => (pending.value || status.value === 'idle') && !data.value)
 
 const rows = computed(() => (data.value?.items || []) as MobileUser[])
 const total = computed(() => Number(data.value?.count || 0))
@@ -70,7 +73,7 @@ async function sendTestNotification(user: MobileUser) {
     <template #body>
       <div class="space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <p class="text-sm text-charcoal-500">Зарегистрированные через мобильное приложение: {{ total }}</p>
+          <p class="flex items-center gap-1 text-sm text-charcoal-500">Зарегистрированные через мобильное приложение: <USkeleton v-if="isInitialLoading" class="h-4 w-8" /><template v-else>{{ total }}</template></p>
           <UButton icon="i-lucide-refresh-cw" color="neutral" variant="outline" :loading="pending" @click="refresh()">Обновить</UButton>
         </div>
         <div class="flex flex-wrap gap-3">
@@ -78,7 +81,8 @@ async function sendTestNotification(user: MobileUser) {
           <USelect v-model="active" :items="[{ label: 'Все пользователи', value: 'all' }, { label: 'Активные', value: 'active' }, { label: 'Отключённые', value: 'inactive' }]" class="w-48" />
           <UButton color="primary" @click="submitSearch">Найти</UButton>
         </div>
-        <UTable :columns="columns" :data="rows" :loading="pending">
+        <SharedSkeletonRows v-if="isInitialLoading" :rows="8" :columns="7" />
+        <UTable v-else :columns="columns" :data="rows" :loading="pending">
           <template #actions-cell="{ row }">
             <div class="flex justify-end">
               <UButton

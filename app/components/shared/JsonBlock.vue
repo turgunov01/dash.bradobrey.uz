@@ -6,7 +6,7 @@ defineProps<{
 </script>
 
 <template>
-  <UCard class="warm-card rounded-[1.5rem] border border-charcoal-200">
+  <UCard class="warm-card rounded-[1rem] border border-charcoal-200">
     <template v-if="label" #header>
       <p class="text-xs font-semibold uppercase tracking-[0.22em] text-charcoal-500">
         {{ label }}

@@ -34,6 +34,14 @@ const {
   topBranches,
   topServices
 } = useStatisticsAnalytics()
+
+// Statistics load client-side after mount; until the first response arrives,
+// render skeletons instead of zero values and empty states.
+const isMounted = ref(false)
+onMounted(() => {
+  isMounted.value = true
+})
+const isInitialLoading = computed(() => isFirstLoad(pending.value, hasData.value, isMounted.value))
 </script>
 
 <template>
@@ -60,6 +68,7 @@ const {
           :barber-options="barberOptions"
           :context-label="scopeContextLabel"
           :count="filteredHistory.length"
+          :loading="isInitialLoading"
           :range-error="rangeError"
           :scope-options="scopeOptions"
           subtitle="Выручка считается по сумме заказа или оплате, а если сумма недоступна — по прайсу услуг. Начальный период — текущий месяц."
@@ -74,7 +83,7 @@ const {
         />
 
         <SharedEmptyState
-          v-else-if="needsBarberSelection"
+          v-else-if="needsBarberSelection && !isInitialLoading"
           description="Не найдено ни одного барбера для построения персональной статистики."
           icon="i-lucide-user-round-search"
           title="Барбер не выбран"
@@ -82,11 +91,8 @@ const {
 
         <template v-else>
           <UAlert v-if="dataError" color="error" icon="i-lucide-triangle-alert" title="Статистика загружена не полностью" :description="dataError" variant="soft" />
-          <div v-if="pending && !hasData" class="grid gap-4 xl:grid-cols-4 md:grid-cols-2" aria-live="polite">
-            <USkeleton v-for="index in 4" :key="index" class="h-24 rounded-2xl" />
-          </div>
           <div class="grid gap-4 md:grid-cols-2">
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <div class="flex flex-col gap-6">
                 <div class="space-y-3">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -95,7 +101,11 @@ const {
                   <h2 class="barbershop-heading text-3xl text-charcoal-950">
                     Завершение заказов
                   </h2>
-                  <div class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
+                  <div v-if="isInitialLoading" class="flex flex-wrap items-center gap-2">
+                    <USkeleton class="h-6 w-24" />
+                    <USkeleton class="h-6 w-28" />
+                  </div>
+                  <div v-else class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
                     <UBadge color="neutral" variant="soft">
                       Всего {{ formatCount(mainMetrics.orders) }}
                     </UBadge>
@@ -109,7 +119,9 @@ const {
                 </div>
 
                 <div class="flex w-full justify-center lg:w-auto">
+                  <USkeleton v-if="isInitialLoading" class="size-48 rounded-full" />
                   <ChartDoughnut
+                    v-else
                     :dataset="mainStatusChartData.dataset"
                     :labels="mainStatusChartData.labels"
                     :tooltip-labels="mainStatusChartData.tooltipLabels"
@@ -119,7 +131,7 @@ const {
               </div>
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <div class="flex flex-col gap-6">
                 <div class="space-y-3">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -128,7 +140,11 @@ const {
                   <h2 class="barbershop-heading text-3xl text-charcoal-950">
                     Новые / повторные и completion
                   </h2>
-                  <div class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
+                  <div v-if="isInitialLoading" class="flex flex-wrap items-center gap-2">
+                    <USkeleton class="h-6 w-24" />
+                    <USkeleton class="h-6 w-28" />
+                  </div>
+                  <div v-else class="flex flex-wrap items-center gap-2 text-sm text-charcoal-600">
                     <UBadge color="neutral" variant="soft">
                       Всего {{ formatCount(clientMetrics.uniqueClients) }}
                     </UBadge>
@@ -139,7 +155,9 @@ const {
                 </div>
 
                 <div class="flex w-full justify-center lg:w-auto">
+                  <USkeleton v-if="isInitialLoading" class="size-48 rounded-full" />
                   <ChartDoughnut
+                    v-else
                     :dataset="clientChartData.dataset"
                     :labels="clientChartData.labels"
                     :tooltip-labels="clientChartData.tooltipLabels"
@@ -157,11 +175,12 @@ const {
               :description="card.description"
               :icon="card.icon"
               :label="card.label"
+              :loading="isInitialLoading"
               :value="card.value"
             />
           </div>
 
-          <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
             <template #header>
               <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div class="space-y-2">
@@ -189,7 +208,8 @@ const {
               </div>
             </template>
 
-            <div v-if="filteredHistory.length" class="grid gap-6 xl:grid-cols-[0.55fr_0.45fr] items-center">
+            <SharedSkeletonRows v-if="isInitialLoading" :rows="5" :columns="2" card />
+            <div v-else-if="filteredHistory.length" class="grid gap-6 xl:grid-cols-[0.55fr_0.45fr] items-center">
               <SharedPieChart
                 :items="statusPieItems"
                 empty-label="За выбранный диапазон нет записей."
@@ -200,7 +220,7 @@ const {
                 <div
                   v-for="point in timelineRows"
                   :key="point.dateKey"
-                  class="flex items-center justify-between gap-4 rounded-[1.25rem] border border-charcoal-200 bg-white/90 px-4 py-3"
+                  class="flex items-center justify-between gap-4 rounded-[0.875rem] border border-charcoal-200 bg-white/90 px-4 py-3"
                   :title="`${point.label}: ${formatCount(point.completed)} завершено, ${formatCount(point.cancelled)} отказов`"
                 >
                   <div class="flex items-center gap-2 text-sm text-charcoal-700">
@@ -224,7 +244,7 @@ const {
           </UCard>
 
           <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -236,7 +256,8 @@ const {
                 </div>
               </template>
 
-              <div v-if="branchBreakdown.length" class="space-y-6">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="branchBreakdown.length" class="space-y-6">
                 <div class="flex justify-center">
                   <SharedPieChart
                     :items="branchPieItems"
@@ -249,7 +270,7 @@ const {
                   <div
                     v-for="row in branchBreakdown"
                     :key="row.id"
-                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                    class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3"
                   >
                     <div class="flex items-start justify-between gap-4">
                       <div class="space-y-1">
@@ -280,7 +301,7 @@ const {
               />
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -292,7 +313,8 @@ const {
                 </div>
               </template>
 
-              <div v-if="serviceBreakdown.length" class="flex justify-center">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="serviceBreakdown.length" class="flex justify-center">
                 <ChartDoughnut
                   :dataset="serviceChartData.dataset"
                   :labels="serviceChartData.labels"
@@ -307,7 +329,7 @@ const {
               />
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -319,7 +341,8 @@ const {
                 </div>
               </template>
 
-              <div v-if="paymentBreakdown.length" class="space-y-6">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="3" :columns="2" card />
+              <div v-else-if="paymentBreakdown.length" class="space-y-6">
                 <div class="flex justify-center">
                   <SharedPieChart
                     :items="paymentPieItems"
@@ -332,7 +355,7 @@ const {
                   <div
                     v-for="row in paymentBreakdown"
                     :key="row.key"
-                    class="rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                    class="rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3"
                   >
                     <div class="flex items-start justify-between gap-4">
                       <div class="space-y-1">
@@ -362,7 +385,7 @@ const {
           </div>
 
           <div class="grid gap-6 xl:grid-cols-2">
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -374,14 +397,15 @@ const {
                 </div>
               </template>
 
-              <div v-if="topBranches.length" class="space-y-3">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="topBranches.length" class="space-y-3">
                 <div
                   v-for="(row, index) in topBranches"
                   :key="row.id"
-                  class="flex items-center justify-between gap-4 rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                  class="flex items-center justify-between gap-4 rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3"
                 >
                   <div class="flex items-center gap-3">
-                    <div class="flex size-9 items-center justify-center rounded-2xl bg-brass-100 font-semibold text-brass-800">
+                    <div class="flex size-9 items-center justify-center rounded-xl bg-brass-100 font-semibold text-brass-800">
                       {{ index + 1 }}
                     </div>
                     <div class="space-y-1">
@@ -406,7 +430,7 @@ const {
               />
             </UCard>
 
-            <UCard class="warm-card rounded-[1.9rem] border border-charcoal-200">
+            <UCard class="warm-card rounded-[1.25rem] border border-charcoal-200">
               <template #header>
                 <div class="space-y-2">
                   <p class="text-xs font-semibold uppercase tracking-[0.24em] text-charcoal-500">
@@ -418,14 +442,15 @@ const {
                 </div>
               </template>
 
-              <div v-if="topServices.length" class="space-y-3">
+              <SharedSkeletonRows v-if="isInitialLoading" :rows="4" :columns="2" card />
+              <div v-else-if="topServices.length" class="space-y-3">
                 <div
                   v-for="(row, index) in topServices"
                   :key="row.id"
-                  class="flex items-center justify-between gap-4 rounded-[1.25rem] border border-charcoal-200 bg-white/80 px-4 py-3"
+                  class="flex items-center justify-between gap-4 rounded-[0.875rem] border border-charcoal-200 bg-white/80 px-4 py-3"
                 >
                   <div class="flex items-center gap-3">
-                    <div class="flex size-9 items-center justify-center rounded-2xl bg-charcoal-100 font-semibold text-charcoal-900">
+                    <div class="flex size-9 items-center justify-center rounded-xl bg-charcoal-100 font-semibold text-charcoal-900">
                       {{ index + 1 }}
                     </div>
                     <div class="space-y-1">

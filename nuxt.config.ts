@@ -52,6 +52,21 @@ const fullServerDepsToInline = [
   '@vue/reactivity'
 ]
 const serverDepsToInline = inlineAllServerDeps ? fullServerDepsToInline : minimalServerDepsToInline
+const isProduction = env.NODE_ENV === 'production'
+
+// Baseline security headers for every route. geolocation=(self) is required by
+// the login location audit and the Branches map picker. A Content-Security-Policy
+// is intentionally not set yet: Nuxt inline payload scripts and OSM tiles need a
+// tested policy first.
+const securityHeaders: Record<string, string> = {
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(self)',
+  ...(isProduction
+    ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' }
+    : {})
+}
 
 async function stripRouteBlockPlugin(directory: string, fileName: string) {
   const filePath = resolve(directory, fileName)
@@ -125,7 +140,19 @@ export default defineNuxtConfig({
   ],
 
   devtools: {
-    enabled: true
+    enabled: !isProduction
+  },
+
+  routeRules: {
+    '/**': {
+      headers: securityHeaders
+    },
+    // Uploaded media is served same-origin through the dashboard: the API sends
+    // `Cross-Origin-Resource-Policy: same-site`, which blocks images whenever the
+    // panel runs on another site (localhost, preview hosts).
+    '/uploads/**': {
+      proxy: `${apiBase}/uploads/**`
+    }
   },
 
   app: {

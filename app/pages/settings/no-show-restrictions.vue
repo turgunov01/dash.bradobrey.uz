@@ -67,7 +67,8 @@ const updatedAt = ref<string | null>(null)
 const submitting = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
-const { data, pending, error, refresh } = await useAsyncData('settings-no-show-restrictions', async () => await api.getSettings())
+const { data, pending, error, refresh } = await useAsyncData('settings-no-show-restrictions', async () => await api.getSettings(), { lazy: true })
+const isInitialLoading = computed(() => pending.value && !data.value)
 
 function inferUnit(minutes: number): DurationUnit {
   if (minutes >= 1440 && minutes % 1440 === 0) return 'days'
@@ -217,23 +218,23 @@ onBeforeRouteLeave(() => {
           <h1 class="barbershop-heading text-3xl text-charcoal-950 sm:text-4xl">Ограничения за неявку</h1>
           <p class="max-w-2xl text-sm leading-6 text-charcoal-600">Управляйте временными ограничениями для клиентов, которые не пришли на подтверждённую запись.</p>
         </div>
-        <div class="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+        <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
           <UIcon name="i-lucide-info" class="mt-0.5 size-5 shrink-0 text-sky-700" />
           <p>Ограничивается только создание новых записей. Вход, каталог и история остаются доступными.</p>
         </div>
 
         <div v-if="pending" class="space-y-4" aria-label="Загрузка настроек">
-          <USkeleton class="h-48 w-full rounded-[1.5rem]" />
-          <USkeleton class="h-72 w-full rounded-[1.5rem]" />
+          <USkeleton class="h-48 w-full rounded-[1rem]" />
+          <USkeleton class="h-72 w-full rounded-[1rem]" />
         </div>
-        <div v-else-if="error || !data" class="rounded-[1.5rem] border border-red-200 bg-red-50 p-6 text-sm text-red-800">
+        <div v-else-if="error || !data" class="rounded-[1rem] border border-red-200 bg-red-50 p-6 text-sm text-red-800">
           <p class="font-semibold">Не удалось загрузить настройки.</p>
           <p class="mt-1">Проверьте соединение и попробуйте ещё раз.</p>
           <UButton class="mt-4" color="neutral" variant="outline" @click="refresh()">Повторить</UButton>
         </div>
 
         <div v-else class="space-y-6">
-          <UCard class="warm-card rounded-[1.5rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1rem] border border-charcoal-200">
             <template #header>
               <div class="flex items-start justify-between gap-4">
                 <div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Общие параметры</p><h2 class="barbershop-heading mt-1 text-2xl text-charcoal-950">Состояние механизма</h2></div>
@@ -241,16 +242,16 @@ onBeforeRouteLeave(() => {
               </div>
             </template>
             <div class="grid gap-4 md:grid-cols-2">
-              <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4"><div class="flex items-center justify-between gap-4"><div><p class="font-semibold text-charcoal-950">Механизм включён</p><p class="mt-1 text-sm leading-5 text-charcoal-600">Правила учитываются при проверке новых записей.</p></div><USwitch v-model="form.enabled" aria-label="Механизм включён" /></div></div>
-              <div class="rounded-2xl border border-charcoal-200 bg-white/70 p-4"><div class="flex items-center justify-between gap-4"><div><p class="font-semibold text-charcoal-950">Автоматически применять блокировку</p><p class="mt-1 text-sm leading-5 text-charcoal-600">Блокировать клиента сразу после подтверждённой неявки.</p></div><USwitch v-model="form.automatic" aria-label="Автоматически применять блокировку" /></div></div>
+              <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4"><div class="flex items-center justify-between gap-4"><div><p class="font-semibold text-charcoal-950">Механизм включён</p><p class="mt-1 text-sm leading-5 text-charcoal-600">Правила учитываются при проверке новых записей.</p></div><USwitch v-model="form.enabled" aria-label="Механизм включён" /></div></div>
+              <div class="rounded-xl border border-charcoal-200 bg-white/70 p-4"><div class="flex items-center justify-between gap-4"><div><p class="font-semibold text-charcoal-950">Автоматически применять блокировку</p><p class="mt-1 text-sm leading-5 text-charcoal-600">Блокировать клиента сразу после подтверждённой неявки.</p></div><USwitch v-model="form.automatic" aria-label="Автоматически применять блокировку" /></div></div>
             </div>
           </UCard>
 
-          <UCard class="warm-card rounded-[1.5rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1rem] border border-charcoal-200">
             <template #header><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Правила блокировки</p><h2 class="barbershop-heading mt-1 text-2xl text-charcoal-950">Длительность ограничений</h2><p class="mt-2 text-sm text-charcoal-600">Значения сохраняются в Backend в минутах. Единицы ниже влияют только на отображение.</p></div></template>
             <div class="grid gap-4 xl:grid-cols-3">
-              <div v-for="field in durationFields" :key="field.key" class="rounded-2xl border border-charcoal-200 bg-white p-4 text-charcoal-950 shadow-sm">
-                <div class="flex items-start gap-3"><span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-charcoal-950 text-xs font-bold text-white">{{ field.level }}</span><div><h3 class="font-semibold text-charcoal-950">{{ field.title }}</h3><p class="mt-1 min-h-10 text-sm leading-5 text-charcoal-600">{{ field.description }}</p></div></div>
+              <div v-for="field in durationFields" :key="field.key" class="rounded-xl border border-charcoal-200 bg-white p-4 text-charcoal-950 shadow-sm">
+                <div class="flex items-start gap-3"><span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-charcoal-950 text-xs font-bold text-white">{{ field.level }}</span><div><h3 class="font-semibold text-charcoal-950">{{ field.title }}</h3><p class="mt-1 min-h-10 text-sm leading-5 text-charcoal-600">{{ field.description }}</p></div></div>
                 <div class="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
                   <label class="min-w-0"><span class="mb-1 block text-xs font-medium text-charcoal-500">Значение</span><UInput :model-value="durationInputs[field.key]" type="number" inputmode="numeric" min="1" :max="Math.floor(MAX_DURATION_MINUTES / unitFactors[durationUnits[field.key]])" step="1" :aria-label="`${field.title}: значение`" @update:model-value="onDurationInput(field.key, $event)" /></label>
                   <label class="min-w-0"><span class="mb-1 block text-xs font-medium text-charcoal-500">Единица</span><USelect v-model="durationUnits[field.key]" :items="unitItems" :aria-label="`${field.title}: единица измерения`" @update:model-value="setDurationUnit(field.key, $event)" /></label>
@@ -261,19 +262,23 @@ onBeforeRouteLeave(() => {
             </div>
           </UCard>
 
-          <UCard class="warm-card rounded-[1.5rem] border border-charcoal-200">
+          <UCard class="warm-card rounded-[1rem] border border-charcoal-200">
             <template #header><div><p class="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-500">Период учёта</p><h2 class="barbershop-heading mt-1 text-2xl text-charcoal-950">Сколько времени учитывать нарушения</h2></div></template>
             <div class="max-w-md"><UFormField label="Период учёта нарушений" help="Нарушения за пределами выбранного периода не учитываются при определении уровня блокировки."><div class="flex items-center gap-3"><UInput v-model.number="form.lookback_days" type="number" inputmode="numeric" min="1" max="3650" step="1" class="max-w-40" /><span class="text-sm font-medium text-charcoal-600">дней</span></div></UFormField></div>
           </UCard>
 
-          <div class="sticky bottom-4 z-10 rounded-2xl border border-charcoal-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+          <div class="sticky bottom-4 z-10 rounded-xl border border-charcoal-200 bg-white/95 p-4 shadow-lg backdrop-blur">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div class="flex items-center gap-2 text-sm"><span class="size-2 rounded-full" :class="hasChanges ? 'bg-amber-500' : 'bg-emerald-500'" /><span class="text-charcoal-700">{{ hasChanges ? 'Есть несохранённые изменения' : 'Все изменения сохранены' }}</span></div><div class="flex flex-wrap gap-3"><UButton color="neutral" variant="outline" :disabled="!hasChanges || submitting" @click="resetChanges">Сбросить изменения</UButton><UButton :disabled="!canSave" :loading="submitting" @click="submit">Сохранить изменения</UButton></div></div>
             <p v-if="validationErrors.length" class="mt-3 text-sm text-red-700">Проверьте значения: {{ validationErrors.join(' · ') }}</p>
             <p v-if="successMessage" role="status" class="mt-3 text-sm text-emerald-700">{{ successMessage }}</p>
             <p v-if="errorMessage" role="alert" class="mt-3 text-sm text-red-700">{{ errorMessage }}</p>
           </div>
         </div>
-        <p class="text-xs text-charcoal-500">Последнее обновление: {{ formatUpdatedAt(updatedAt) }}</p>
+        <p class="flex items-center gap-1 text-xs text-charcoal-500">
+          Последнее обновление:
+          <USkeleton v-if="isInitialLoading" class="h-3 w-28 rounded" />
+          <template v-else>{{ formatUpdatedAt(updatedAt) }}</template>
+        </p>
       </div>
     </template>
   </UDashboardPanel>
