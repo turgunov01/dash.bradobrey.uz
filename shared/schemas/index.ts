@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { employeePermissions, employeeRoles } from '../auth/employees'
+import { COMPANY_CODE_PATTERN } from '../auth/tenancy'
 
 const identifierSchema = z.union([z.string(), z.number()]).transform(value => String(value))
 const optionalTextSchema = z.string().trim().optional().nullable()
@@ -49,6 +50,8 @@ export const branchUpdateSchema = branchFormSchema.partial().passthrough()
 
 export const barberUserSchema = z.object({
   branch_id: identifierSchema.optional().nullable(),
+  company_code: optionalTextSchema,
+  company_id: identifierSchema.optional().nullable(),
   id: identifierSchema.optional(),
   login: optionalTextSchema,
   marketplace_barbershop_id: optionalTextSchema,
@@ -186,7 +189,17 @@ export const loginLocationSchema = z.object({
   measured_at: z.string().datetime().optional().nullable()
 }).passthrough()
 
+// Company code (MULTI_TENANCY D2): optional while the platform has exactly
+// one active company; the backend answers 400 COMPANY_CODE_REQUIRED otherwise.
+export const companyCodeSchema = z.preprocess(
+  value => typeof value === 'string' ? value.trim().toUpperCase() || undefined : value ?? undefined,
+  z.string()
+    .regex(COMPANY_CODE_PATTERN, 'Код компании: 2–32 символа — латинские буквы, цифры, «_» или «-».')
+    .optional()
+)
+
 export const loginSchema = z.object({
+  company_code: companyCodeSchema,
   login: z.string().trim().min(1, 'Введите логин'),
   password: z.string().min(1, 'Введите пароль'),
   branch_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),

@@ -4,6 +4,7 @@ import type { ZodIssue } from 'zod'
 import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
 import { loginSchema, type LoginLocation } from '~~/shared/schemas'
 import { firstAllowedPath } from '~/utils/access'
+import { describeLoginError, getApiErrorBody, sessionEndMessage } from '~~/shared/auth/tenancy'
 
 const apiClient = useApiClient()
 
@@ -14,9 +15,16 @@ definePageMeta({
 
 const branchStore = useBranchStore()
 const sessionStore = useSessionStore()
+const companyContext = useCompanyContext()
+const companiesApi = useCompaniesApi()
+const route = useRoute()
+
+// Why the previous session ended (TOKEN_ROLE_STALE, COMPANY_SUSPENDED, ...).
+const sessionEndNotice = computed(() => sessionEndMessage(route.query.reason))
 
 const form = reactive({
   branch_id: undefined as string | undefined,
+  company_code: '',
   login: '',
   password: ''
 })
@@ -24,9 +32,38 @@ const form = reactive({
 const branchOptions = ref<Array<{ id: string; name: string }>>([])
 
 const fieldErrors = reactive({
+  company_code: '',
   login: '',
   password: ''
 })
+
+onMounted(() => {
+  if (!form.company_code) form.company_code = companyContext.readLastCode()
+})
+
+// The backend login returns only company_id; the name comes from the public
+// company lookup. Best effort: the header falls back to the code.
+async function rememberCompany(code: string | undefined) {
+  companyContext.rememberCode(code || '')
+  const companyId = String(sessionStore.user?.company_id || '').trim()
+
+  if (!code || !companyId) {
+    companyContext.setCompany(null)
+    return
+  }
+
+  companyContext.setCompany({ code, id: companyId, name: null })
+
+  try {
+    const { company } = await companiesApi.resolve(code)
+    if (String(company?.id) === companyId) {
+      companyContext.setCompany({ code: company.code || code, id: companyId, name: company.name || null })
+    }
+  }
+  catch {
+    // Rate limit or network: the code alone is still shown.
+  }
+}
 
 const loading = ref(false)
 
@@ -51,6 +88,7 @@ function getLoginLocation(): Promise<LoginLocation | null> {
 }
 
 function resetFieldErrors() {
+  fieldErrors.company_code = ''
   fieldErrors.login = ''
   fieldErrors.password = ''
 }
@@ -96,7 +134,7 @@ function applyFieldErrors(issues: ZodIssue[]) {
   for (const issue of issues) {
     const field = String(issue.path[0] || '')
 
-    if ((field === 'login' || field === 'password') && !fieldErrors[field]) {
+    if ((field === 'company_code' || field === 'login' || field === 'password') && !fieldErrors[field]) {
       fieldErrors[field] = issue.message
     }
   }
@@ -136,6 +174,8 @@ async function submit() {
 
     const response = await sessionStore.login({ ...parsed.data, location })
 
+    await rememberCompany(parsed.data.company_code)
+
     const sessionBranchId = sessionStore.barber?.branch_id || sessionStore.user?.branch_id || parsed.data.branch_id || null
 
     if (sessionBranchId) {
@@ -173,19 +213,15 @@ async function submit() {
       statusMessage: error?.statusMessage || error?.response?.statusText || null
     })
 
-    const errorBody = error?.data || error?.response?._data
+    const errorBody = getApiErrorBody(error) as Record<string, any> | null
     if (errorBody?.code === 'BRANCH_SELECTION_REQUIRED' && Array.isArray(errorBody.branches)) {
       branchOptions.value = errorBody.branches.filter((branch: any) => branch?.id && branch?.name)
       fieldErrors.password = 'Выберите филиал, в котором вы сегодня работаете.'
       if (!form.branch_id && branchOptions.value.length === 1) form.branch_id = String(branchOptions.value[0]?.id)
       return
     }
-    const apiError = errorBody?.data?.error || errorBody?.error || errorBody?.message
-    fieldErrors.password = apiError === 'Employee access has been revoked'
-      ? 'Доступ сотрудника отозван. Обратитесь к администратору для восстановления.'
-      : apiError === 'Invalid credentials'
-        ? 'Неверный логин или пароль.'
-        : apiError || error?.message || 'Не удалось войти. Повторите попытку.'
+    const loginError = describeLoginError(error)
+    fieldErrors[loginError.field] = loginError.message
   } finally {
     loading.value = false
   }
@@ -201,6 +237,29 @@ async function submit() {
           Вход
         </h1>
       </div>
+
+      <UAlert
+        v-if="sessionEndNotice"
+        color="warning"
+        variant="soft"
+        icon="i-lucide-log-out"
+        title="Сессия завершена"
+        :description="sessionEndNotice" />
+
+      <UFormField
+        label="Код компании"
+        name="company_code"
+        :error="fieldErrors.company_code"
+        help="Выдаётся владельцем платформы. Запоминается на этом устройстве.">
+        <UInput
+          v-model="form.company_code"
+          autocapitalize="characters"
+          autocomplete="organization"
+          class="w-full"
+          placeholder="Например, BRADOBREY"
+          spellcheck="false"
+          :ui="{ base: 'uppercase tracking-wide' }" />
+      </UFormField>
 
       <UFormField label="Логин" name="login" :error="fieldErrors.login">
         <UInput v-model="form.login" autocomplete="username" autofocus class="w-full" placeholder="Введите логин" />
@@ -225,6 +284,12 @@ async function submit() {
           Войти
         </UButton>
       </div>
+
+      <p class="text-center text-xs text-charcoal-500">
+        <NuxtLink to="/platform/login" class="underline-offset-4 hover:text-charcoal-800 hover:underline">
+          Вход для владельца платформы
+        </NuxtLink>
+      </p>
     </form>
   </UCard>
 </template>

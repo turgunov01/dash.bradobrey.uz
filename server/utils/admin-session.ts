@@ -9,6 +9,8 @@ import { shouldUseSecureCookie } from './cookie-security'
 
 const adminSessionSchema = z.object({
   branch_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
+  company_code: z.string().trim().max(32).optional().nullable(),
+  company_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
   id: z.string().trim().min(1),
   login: z.string().trim().min(1),
   marketplace_barbershop_id: z.union([z.string(), z.number()]).transform(value => String(value)).optional().nullable(),
@@ -73,9 +75,14 @@ export function clearAdminBackendToken(event: H3Event) {
   })
 }
 
-export function getAdminSession(event: H3Event): AdminSession | null {
-  const rawCookie = getCookie(event, getAdminSessionCookieName(event))
+/** HMAC-signed `base64url(json).signature` cookie value (admin and platform sessions). */
+export function encodeSignedCookieValue(event: H3Event, payload: unknown) {
+  const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+  return `${encodedPayload}.${signValue(encodedPayload, getAdminSessionSecret(event))}`
+}
 
+/** Parsed JSON of a signed cookie value, or null when missing/tampered. */
+export function decodeSignedCookieValue(event: H3Event, rawCookie: string | null | undefined): unknown {
   if (!rawCookie) {
     return null
   }
@@ -86,26 +93,31 @@ export function getAdminSession(event: H3Event): AdminSession | null {
     return null
   }
 
-  const expectedSignature = signValue(payload, getAdminSessionSecret(event))
-
-  if (!safeCompare(signature, expectedSignature)) {
+  if (!safeCompare(signature, signValue(payload, getAdminSessionSecret(event)))) {
     return null
   }
 
   try {
-    const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    const parsedSession = adminSessionSchema.safeParse(decodedPayload)
-
-    return parsedSession.success ? parsedSession.data : null
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
   }
   catch {
     return null
   }
 }
 
+export function getAdminSession(event: H3Event): AdminSession | null {
+  const decodedPayload = decodeSignedCookieValue(event, getCookie(event, getAdminSessionCookieName(event)))
+
+  if (!decodedPayload) {
+    return null
+  }
+
+  const parsedSession = adminSessionSchema.safeParse(decodedPayload)
+  return parsedSession.success ? parsedSession.data : null
+}
+
 export function setAdminSession(event: H3Event, payload: AdminSession) {
-  const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
-  const signedPayload = `${encodedPayload}.${signValue(encodedPayload, getAdminSessionSecret(event))}`
+  const signedPayload = encodeSignedCookieValue(event, payload)
 
   setCookie(event, getAdminSessionCookieName(event), signedPayload, {
     httpOnly: true,
@@ -118,6 +130,18 @@ export function setAdminSession(event: H3Event, payload: AdminSession) {
 
 export function clearAdminSession(event: H3Event) {
   deleteCookie(event, getAdminSessionCookieName(event), {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    secure: shouldUseSecureCookie(event)
+  })
+}
+
+/** Drops every tenant (company) session cookie: signed session, backend token and barber token. */
+export function clearTenantSessionCookies(event: H3Event) {
+  clearAdminSession(event)
+  clearAdminBackendToken(event)
+  deleteCookie(event, String(useRuntimeConfig(event).barberTokenCookieName), {
     httpOnly: true,
     path: '/',
     sameSite: 'lax',

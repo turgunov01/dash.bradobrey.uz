@@ -2,6 +2,9 @@ import { useCalculatorModal } from "#imports";
 import type { NavigationMenuItem } from "@nuxt/ui";
 import { getEffectiveEmployeePermissions } from "~~/shared/auth/employees";
 import { canAccessPath } from "~/utils/access";
+import { canManagePlatformOwners } from "~~/shared/auth/tenancy";
+
+const PLATFORM_OWNERS_PATH = "/settings/platform-owners";
 
 interface NavigationSection {
   label?: string;
@@ -96,6 +99,7 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
       { icon: "i-lucide-monitor-play", label: "Реклама киоска", to: "/settings/kiosk-ads" },
       { icon: "i-lucide-panels-top-left", label: "Баннеры приложения", to: "/settings/banners" },
       { icon: "i-lucide-bell-ring", label: "Настройки уведомлений", to: "/settings/notifications" },
+      { icon: "i-lucide-shield-user", label: "Владельцы платформы", to: PLATFORM_OWNERS_PATH },
     ],
   },
 ];
@@ -110,9 +114,11 @@ export function useDashboardNavigation() {
   const visibleSections = computed(() =>
     NAVIGATION_SECTIONS.map((section) => ({
       ...section,
-      items: section.items.filter((item) =>
-        typeof item.to !== "string" || canAccessPath(permissions.value, item.to),
-      ),
+      items: section.items.filter((item) => {
+        if (typeof item.to !== "string") return true;
+        if (item.to === PLATFORM_OWNERS_PATH && !canManagePlatformOwners(sessionStore.user?.role)) return false;
+        return canAccessPath(permissions.value, item.to);
+      }),
     })).filter((section) => section.items.length > 0),
   );
 

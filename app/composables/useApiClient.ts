@@ -1,4 +1,5 @@
 import { useBranchStore } from "~/stores/branch";
+import { getSessionEndReason, isPlatformAreaPath, sessionEndMessage } from "~~/shared/auth/tenancy";
 
 type RequestOptions<TBody = unknown> = {
   body?: TBody;
@@ -159,6 +160,7 @@ function buildRequestHeaders(
 }
 
 export function useApiClient() {
+  const nuxtApp = useNuxtApp();
   const toast = useToast();
   const uiStore = useUiStore();
   const branchStore = useBranchStore();
@@ -187,6 +189,30 @@ export function useApiClient() {
         title: "Ошибка запроса",
       });
     }
+  }
+
+  // 401 TOKEN_ROLE_STALE / 403 COMPANY_SUSPENDED etc.: the BFF already dropped
+  // the session cookies; log out locally once and explain why on /login.
+  function handleSessionEnd(error: unknown) {
+    if (!import.meta.client) return false;
+
+    const reason = getSessionEndReason(error);
+    if (!reason) return false;
+
+    void nuxtApp.runWithContext(async () => {
+      const route = useRoute();
+      if (route.path === "/login" || isPlatformAreaPath(route.path)) return;
+
+      const sessionStore = useSessionStore();
+      // Parallel requests fail together: only the first one logs out.
+      if (sessionStore.status === "loaded" && !sessionStore.user) return;
+
+      sessionStore.endSession(reason);
+      toast.add({ color: "warning", description: sessionEndMessage(reason) || undefined, title: "Сессия завершена" });
+      await navigateTo({ path: "/login", query: { reason } });
+    });
+
+    return true;
   }
 
   async function request<TResponse, TBody = unknown>(
@@ -248,7 +274,7 @@ export function useApiClient() {
         });
       }
 
-      if (!options.silent) {
+      if (!handleSessionEnd(error) && !options.silent) {
         notifyError(error);
       }
 
@@ -304,7 +330,7 @@ export function useApiClient() {
         });
       }
 
-      if (!options.silent) {
+      if (!handleSessionEnd(error) && !options.silent) {
         notifyError(error);
       }
 

@@ -78,8 +78,11 @@ export function toDashboardUser(accessUser: AccessUser) {
   const login = accessUser.login ? String(accessUser.login).trim() : null
   const marketplaceBarbershopId = accessUser.marketplace_barbershop_id ?? accessUser.marketplaceBarbershopId ?? null
 
+  const companyId = (accessUser as Record<string, unknown>).company_id
+
   return {
     branch_id: accessUser.branch_id ?? null,
+    company_id: companyId === undefined || companyId === null ? null : String(companyId),
     id: String(accessUser.id),
     login,
     marketplace_barbershop_id: marketplaceBarbershopId,

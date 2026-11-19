@@ -64,3 +64,15 @@ Last updated: 2026-10-04
 - [ ] Explicitly provision `statistics.read.*`, `history.read.*`, and `statistics.quality.review`; the migration intentionally performs no role-based auto-grant.
 - [ ] Configure a non-owner runtime database role with reviewed `GRANT/REVOKE` for audit tables and functions.
 - [ ] Run a shadow/pilot rollout before making the quality ranking authoritative.
+
+## MULTI-COMPANY — dash (branch `feat/multi-company`, 2026-11-19, not committed/deployed)
+
+- [x] Company code on login (`company_code` in direct and BFF login), remembered locally; clear errors for `COMPANY_CODE_REQUIRED`, `COMPANY_NOT_FOUND`, `COMPANY_SUSPENDED`.
+- [x] Platform-owner area: `/platform/login`, companies (create/edit/suspend/activate, kiosk enrollment code set/rotate/clear, first company admin), platform owners; `409 MULTI_COMPANY_PRECONDITIONS` explained in Russian.
+- [x] `/settings/platform-owners` (admin_network) → `GET/POST /api/platform/owners` — **backend endpoint is being added in parallel; verify the contract once it lands.**
+- [x] Kiosk enrollment-code rotation on `/settings/kiosks` (`PUT /api/kiosk/enrollment-code`, network roles).
+- [x] Hide «Проверить заказы» for roles not allowed by `check-today`.
+- [x] Log out on `TOKEN_ROLE_STALE` / `COMPANY_SUSPENDED` / `TOKEN_COMPANY_MISMATCH` (BFF clears cookies, client and socket redirect to `/login?reason=...`).
+- [ ] Smoke against a local API with migrations 001–008: company login, platform owner flows, suspend → forced logout.
+- [ ] Decide whether `/settings/platform-owners` should also be shown to `admin` of the default company (needs `is_default` in `/api/barbers/me`).
+- [ ] Optional: expose company name/code in `/api/barbers/me` to drop the `/api/companies/resolve` call after login.

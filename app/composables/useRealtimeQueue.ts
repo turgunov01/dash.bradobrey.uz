@@ -1,6 +1,8 @@
 import type { Socket } from 'socket.io-client'
 import { io } from 'socket.io-client'
 
+import { isSessionEndCode } from '~~/shared/auth/tenancy'
+
 const REFRESH_KEYS = [
   'overview-dashboard',
   'barber-workspace',
@@ -64,6 +66,22 @@ export function useRealtimeQueue() {
 
     socket.on('disconnect', () => {
       isConnected.value = false
+    })
+
+    // The API rejects a socket whose token role or company is no longer valid
+    // (data.code = TOKEN_ROLE_STALE etc.): stop reconnecting and log out.
+    socket.on('connect_error', (error: Error & { data?: { code?: string } }) => {
+      const reason = error?.data?.code
+      if (!isSessionEndCode(reason)) return
+
+      socket.disconnect()
+      socketRef.value = null
+      void nuxtApp.runWithContext(async () => {
+        // The socket talks to the API directly, so the BFF cookies are still set.
+        await sessionStore.logout(undefined, { silent: true }).catch(() => undefined)
+        sessionStore.endSession(reason)
+        await navigateTo({ path: '/login', query: { reason } })
+      })
     })
 
     socket.on('queue:update', () => {

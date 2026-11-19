@@ -2,6 +2,13 @@ import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
 import { firstAllowedPath } from '~/utils/access'
 
 export default defineNuxtRouteMiddleware(async () => {
+  const platformSession = usePlatformSessionStore();
+  await platformSession.ensureLoaded();
+
+  if (platformSession.isAuthenticated) {
+    return navigateTo('/platform/companies');
+  }
+
   const sessionStore = useSessionStore();
 
   await sessionStore.ensureLoaded();

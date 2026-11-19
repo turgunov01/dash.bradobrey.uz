@@ -24,6 +24,8 @@ export default defineEventHandler(async (event): Promise<unknown> => {
 
       setAdminSession(event, {
         branch_id: user.branch_id,
+        company_code: adminSession.company_code ?? null,
+        company_id: user.company_id,
         id: user.id,
         login: user.login || adminSession.login,
         marketplace_barbershop_id: user.marketplace_barbershop_id,
@@ -33,7 +35,7 @@ export default defineEventHandler(async (event): Promise<unknown> => {
 
       return {
         barber: null,
-        user
+        user: { ...user, company_code: adminSession.company_code ?? null }
       }
     }
     catch (error) {

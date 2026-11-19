@@ -21,6 +21,14 @@ export function useKioskApi() {
     devices() {
       return client.request<{ entry: KioskDevice[] }>('/api/kiosk/devices')
     },
+    // Company network admins only; the code is never returned.
+    rotateEnrollmentCode(enrollmentCode: string) {
+      return client.request<{ updated: boolean }>('/api/kiosk/enrollment-code', {
+        body: { enrollment_code: enrollmentCode },
+        method: 'PUT',
+        silent: true
+      })
+    },
     removeDevice(id: string) {
       return client.request(`/api/kiosk/devices/${id}`, { method: 'DELETE', successMessage: 'Киоск удалён' })
     },

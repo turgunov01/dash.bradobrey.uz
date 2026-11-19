@@ -2,6 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 
 import type { KioskDevice } from '~/composables/useKioskApi'
+import { canRotateKioskEnrollmentCode } from '~~/shared/auth/tenancy'
 
 // Registered kiosk devices. Kiosks register themselves without a login; a
 // device that was reinstalled or moved must be removed here before it can
@@ -10,6 +11,10 @@ definePageMeta({})
 
 const kioskApi = useKioskApi()
 const branchStore = useBranchStore()
+const sessionStore = useSessionStore()
+
+// Only company network roles may rotate the kiosk enrollment code (backend 403 otherwise).
+const canRotateEnrollmentCode = computed(() => canRotateKioskEnrollmentCode(sessionStore.user?.role))
 
 const removingId = ref<string | null>(null)
 
@@ -85,7 +90,7 @@ async function removeDevice(device: KioskDevice) {
     <template #body>
       <div class="space-y-4">
         <p class="max-w-3xl text-sm text-charcoal-600">
-          Киоск подключается сам: на устройстве выбирают филиал и нажимают «Зарегистрировать устройство».
+          Киоск подключается сам: на устройстве вводят код компании, выбирают филиал и нажимают «Зарегистрировать устройство».
           Если киоск переустановили или перенесли в другой филиал, удалите его здесь — после этого он сможет
           зарегистрироваться заново.
         </p>
@@ -150,6 +155,8 @@ async function removeDevice(device: KioskDevice) {
           icon="i-lucide-tablet-smartphone"
           title="Киосков пока нет"
         />
+
+        <SettingsKioskEnrollmentCodeCard v-if="canRotateEnrollmentCode" />
       </div>
     </template>
   </UDashboardPanel>

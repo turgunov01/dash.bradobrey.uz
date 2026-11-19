@@ -18,6 +18,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const sessionStore = useSessionStore()
 const branchStore = useBranchStore()
+const companyContext = useCompanyContext()
 const { isConnected } = useRealtimeQueue()
 
 const role = computed(() => String(sessionStore.user?.role || '').trim().toLowerCase())
@@ -31,11 +32,18 @@ const accountLabel = computed(() => {
 
 const roleLabel = computed(() => ROLE_LABELS[role.value] || 'Сотрудник')
 const initial = computed(() => accountLabel.value.trim().charAt(0).toUpperCase() || '?')
+// Which company this admin works in (name from /api/companies/resolve, code typed at login).
+const companyLabel = computed(() => {
+  const company = companyContext.current.value
+  if (!company) return ''
+  return company.name ? `${company.name} · ${company.code}` : `Компания ${company.code}`
+})
 const syncLabel = computed(() => isConnected.value ? 'Онлайн-синхронизация активна' : 'Онлайн-синхронизация недоступна')
 
 const collapsedItems = computed<DropdownMenuItem[][]>(() => [
   [{ type: 'label', label: `${accountLabel.value} · ${roleLabel.value}` }],
   [
+    ...(companyLabel.value ? [{ label: companyLabel.value, icon: 'i-lucide-building-2' }] : []),
     { label: branchStore.activeBranch?.name || 'Филиал не выбран', icon: 'i-lucide-map-pinned' },
     { label: syncLabel.value, icon: isConnected.value ? 'i-lucide-radio-tower' : 'i-lucide-wifi-off' }
   ],
@@ -79,6 +87,9 @@ async function logout() {
       </p>
       <p class="truncate text-xs text-muted">
         {{ roleLabel }}
+      </p>
+      <p v-if="companyLabel" class="truncate text-xs text-muted" :title="companyLabel">
+        <UIcon name="i-lucide-building-2" class="me-0.5 size-3 align-[-2px]" />{{ companyLabel }}
       </p>
     </div>
 

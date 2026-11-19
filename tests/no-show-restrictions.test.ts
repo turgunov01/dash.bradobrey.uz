@@ -19,7 +19,7 @@ test('loads no-show settings through the supported collection endpoint', () => {
 
 test('strips the internal branch-scope control parameter from mutation URLs', () => {
   const clientSource = readFileSync(join(projectRoot, 'app/composables/useApiClient.ts'), 'utf8')
-  assert.match(clientSource, /const nextQuery: Record<string, unknown> = \{\n\s+\.\.\.\(query \|\| \{\}\)\n\s+\}/)
+  assert.match(clientSource, /const nextQuery: Record<string, unknown> = \{\r?\n\s+\.\.\.\(query \|\| \{\}\)\r?\n\s+\}/)
   assert.match(clientSource, /delete \(nextQuery as any\).__skipBranchScope/)
 })
 

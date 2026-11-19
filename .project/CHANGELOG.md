@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-19
+
+- Multi-company support (branch `feat/multi-company`): «Код компании» on login, platform-owner area (`/platform/*`: companies, company admins, kiosk enrollment codes, platform owners), «Владельцы платформы» settings page, kiosk enrollment-code rotation, company shown in the sidebar/user menu, forced logout on revoked role/company sessions, «Проверить заказы» hidden for roles without access.
+
 ## 2026-10-19
 
 - Fixed location-warning notifications that could not open their event because a historical notification's branch ID did not match the event's authoritative branch. The Dashboard now requests by exact event ID, relies on the authenticated API for branch scope, and loads branch geocontrol from the returned event. If the event is unavailable, the modal still shows the notification timestamp and clarifies it is not the event time.

@@ -90,3 +90,11 @@ The browser login path currently uses the canonical external API directly as a c
 - PostgreSQL migration, concurrent review, DB privileges and query-plan/p95 checks remain unverified because no isolated staging database was available.
 - Live retest on 2026-10-05 confirmed the quality aggregate is fail-closed with HTTP 501 until the external API migration is applied; no revenue fallback is used. Production migration and permission rollout remain pending owner/DB approval.
 - Production dependency audits still fail: Dashboard has 14 findings (13 high) and API has 25 findings (1 critical, 17 high, 6 moderate, 1 low).
+
+## Multi-company sessions (2026-11-19, branch `feat/multi-company`)
+
+- Platform-owner token lives only in the HttpOnly `brado_platform_token` cookie (never returned to browser code); platform BFF routes send only that token, and tenant routes never send it. Platform login clears company cookies; company login does not create a platform session.
+- `/platform/*` pages require the platform session (client middleware); the backend enforces `PLATFORM_OWNER_REQUIRED` / `PLATFORM_OWNER_NO_TENANT_ACCESS`.
+- The BFF drops company cookies on `TOKEN_ROLE_STALE`, `COMPANY_SUSPENDED`, `TOKEN_COMPANY_MISMATCH`, `COMPANY_REQUIRED`, `PLATFORM_OWNER_NO_TENANT_ACCESS`.
+- BFF platform/enrollment/owner proxies whitelist body fields; kiosk enrollment codes are never displayed back (only right after the user enters/generates them).
+- Remaining: the company bearer token is still stored in localStorage (existing finding); the platform session does not re-validate with the backend until the next platform API call.

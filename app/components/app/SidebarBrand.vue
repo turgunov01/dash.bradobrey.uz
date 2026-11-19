@@ -6,6 +6,10 @@ defineProps<{
 const PRODUCTION_API_HOST = 'api.bradobrey.uz'
 
 const config = useRuntimeConfig()
+const companyContext = useCompanyContext()
+
+// Company name once known (multi-company), otherwise the platform brand.
+const brandName = computed(() => companyContext.current.value?.name || 'Bradobrey')
 
 // Shows which backend this panel talks to, so a local build pointed at a
 // local api is never mistaken for production.
@@ -24,8 +28,8 @@ const environment = computed(() => {
     </div>
 
     <div v-if="!collapsed" class="min-w-0 flex-1">
-      <p class="truncate text-sm font-semibold text-highlighted">
-        Bradobrey
+      <p class="truncate text-sm font-semibold text-highlighted" :title="brandName">
+        {{ brandName }}
       </p>
       <div class="flex items-center gap-1.5">
         <span class="truncate text-xs text-muted">Админ-панель</span>

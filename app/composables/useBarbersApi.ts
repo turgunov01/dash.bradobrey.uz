@@ -92,6 +92,7 @@ export function useBarbersApi() {
         ...(isLocalDashboard ? {} : { baseURL }),
         body: {
           ...(payload.branch_id ? { branch_id: payload.branch_id } : {}),
+          ...(payload.company_code ? { company_code: payload.company_code } : {}),
           ...(payload.location ? { location: payload.location } : {}),
           login: payload.login,
           password: payload.password,

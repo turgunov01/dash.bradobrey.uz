@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import type { BranchLocation, LocationEvent } from '~/composables/useBranchesApi'
 import { findLocationWarningEvent, getLocationWarningReference } from '~/utils/locationNotifications'
+import { canCheckTodayOrders, getApiErrorStatus } from '~~/shared/auth/tenancy'
 
 const { items, unreadCount, refresh, markAllRead, checkToday, open, openDetails, enablePush, sendTestPush, refreshPushState, pushPermission, pushEnabled, pushSupported, pushServiceAvailable, pushSupportReason, pushStatusMessage, pushChecking, deviceKind, deviceLabel, deviceResolved } = useNotifications()
 const branchesApi = useBranchesApi()
+const sessionStore = useSessionStore()
+// POST /api/notifications/check-today: admin_network, admin, admin_branch, super-manager only.
+const canCheckToday = computed(() => canCheckTodayOrders(sessionStore.user?.role))
 const checking = ref(false)
 const checkMessage = ref('')
 const enablingPush = ref(false)
@@ -93,8 +97,10 @@ async function runTodayCheck() {
   try {
     const result = await checkToday()
     checkMessage.value = `Проверено заказов: ${result.checked_count || 0}. Подозрительных найдено: ${result.suspicious_count || 0}.`
-  } catch {
-    checkMessage.value = 'Не удалось проверить заказы. Проверьте подключение к API.'
+  } catch (error) {
+    checkMessage.value = getApiErrorStatus(error) === 403
+      ? 'Проверка заказов доступна только администраторам.'
+      : 'Не удалось проверить заказы. Проверьте подключение к API.'
   } finally {
     checking.value = false
   }
@@ -231,7 +237,7 @@ async function openNotification(item: (typeof items.value)[number]) {
             <UTooltip text="Прочитать все">
               <UButton aria-label="Прочитать все" color="neutral" icon="i-lucide-check-check" :disabled="!unreadCount" square variant="outline" @click="markAllRead" />
             </UTooltip>
-            <UTooltip text="Проверить заказы за сегодня">
+            <UTooltip v-if="canCheckToday" text="Проверить заказы за сегодня">
               <UButton aria-label="Проверить заказы" color="primary" icon="i-lucide-search-check" :loading="checking" square @click="runTodayCheck" />
             </UTooltip>
           </div>

@@ -10,8 +10,10 @@ import {
   type H3Event
 } from 'h3'
 
+import { getSessionEndReason } from '~~/shared/auth/tenancy'
+
 import { getBarberToken } from './session'
-import { getAdminBackendToken } from './admin-session'
+import { clearTenantSessionCookies, getAdminBackendToken } from './admin-session'
 
 type AuthMode = 'none' | 'optional' | 'required'
 type BackendMethod = 'DELETE' | 'GET' | 'HEAD' | 'OPTIONS' | 'PATCH' | 'POST' | 'PUT'
@@ -29,6 +31,12 @@ type BackendRequestOptions = {
   body?: BackendBody
   auth?: AuthMode
   headers?: HeadersInit
+  /**
+   * Tenant requests (default) drop the company session cookies when the
+   * backend revokes the session (TOKEN_ROLE_STALE, COMPANY_SUSPENDED, ...).
+   * Platform-owner requests manage their own cookies.
+   */
+  session?: 'tenant' | 'platform'
 }
 
 const backendMethods = new Set<BackendMethod>(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'])
@@ -149,6 +157,10 @@ export async function backendRequest<T>(event: H3Event, options: BackendRequestO
   catch (error: any) {
     const statusCode = error?.response?.status || 500
     const message = getUpstreamErrorMessage(error, method, options.path)
+
+    if ((options.session ?? 'tenant') === 'tenant' && getSessionEndReason({ data: error?.response?._data })) {
+      clearTenantSessionCookies(event)
+    }
 
     throw createError({
       data: isHtmlResponse(error?.response?._data) ? undefined : error?.response?._data,

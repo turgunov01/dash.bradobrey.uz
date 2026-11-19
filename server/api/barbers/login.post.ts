@@ -2,6 +2,7 @@ import { createError, readBody, type H3Event } from 'h3'
 
 import { getEffectiveEmployeePermissions, marketplaceMerchantRoles } from '~~/shared/auth/employees'
 import { loginSchema, type LoginPayload } from '~~/shared/schemas'
+import { normalizeCompanyCode } from '~~/shared/auth/tenancy'
 
 import { assertDashboardAccessUser } from '~~/server/utils/admin-access'
 import {
@@ -65,6 +66,7 @@ function getBackendUrl(event: H3Event, path: string) {
 function getLoginDebugBody(payload: LoginPayload) {
   return {
     branch_id: normalizeOptionalId(payload.branch_id),
+    company_code: normalizeCompanyCode(payload.company_code) || null,
     login: payload.login,
     password: '[redacted]',
     passwordLength: String(payload.password || '').length
@@ -76,6 +78,7 @@ function getUserDebugPayload(user: Record<string, any> | null | undefined) {
 
   return {
     branch_id: normalizeOptionalId(user.branch_id),
+    company_id: normalizeOptionalId(user.company_id),
     id: normalizeText(user.id),
     login: normalizeText(user.login),
     marketplace_barbershop_id: normalizeOptionalId(user.marketplace_barbershop_id),
@@ -157,7 +160,8 @@ function assertBackendLoginResponse(data: LegacyLoginResponse) {
 function buildDashboardLoginUser(
   rawUser: Record<string, any>,
   accessUser: Record<string, any>,
-  fallbackLogin: string
+  fallbackLogin: string,
+  companyCode: string
 ) {
   const login = normalizeText(rawUser.login) || normalizeText(accessUser.login) || fallbackLogin
   const role = normalizeText(accessUser.role || rawUser.role).toLowerCase()
@@ -165,6 +169,8 @@ function buildDashboardLoginUser(
   return {
     ...rawUser,
     branch_id: normalizeOptionalId(accessUser.branch_id ?? rawUser.branch_id),
+    company_code: companyCode || null,
+    company_id: normalizeOptionalId(rawUser.company_id ?? accessUser.company_id),
     id: normalizeText(rawUser.id || accessUser.id),
     login,
     marketplace_barbershop_id: normalizeOptionalId(
@@ -190,6 +196,8 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
   // without leaving a valid upstream token in the browser's cookie jar.
   setAdminSession(event, {
     branch_id: user.branch_id,
+    company_code: user.company_code,
+    company_id: user.company_id,
     id: user.id,
     login: user.login,
     marketplace_barbershop_id: user.marketplace_barbershop_id,
@@ -201,12 +209,16 @@ function setDashboardLoginSession(event: H3Event, token: string, user: Record<st
 
 async function loginBackend(event: H3Event, payload: LoginPayload): Promise<LoginResult> {
   const path = '/api/barbers/login'
+  const companyCode = normalizeCompanyCode(payload.company_code)
   const body = {
     login: payload.login,
     password: payload.password,
     ...(payload.location ? { location: payload.location } : {})
   }
   if (payload.branch_id) Object.assign(body, { branch_id: payload.branch_id })
+  // MULTI_TENANCY 9.7/9.10 M4: without company_code the backend accepts the
+  // login only while exactly one active company exists.
+  if (companyCode) Object.assign(body, { company_code: companyCode })
 
   logBackendLoginRequest(event, path, payload, 'primary')
 
@@ -234,7 +246,7 @@ async function loginBackend(event: H3Event, payload: LoginPayload): Promise<Logi
   const backendData = response.data || {}
   const { token, rawUser } = assertBackendLoginResponse(backendData)
   const accessUser = assertDashboardAccessUser(rawUser)
-  const user = buildDashboardLoginUser(rawUser, accessUser, payload.login)
+  const user = buildDashboardLoginUser(rawUser, accessUser, payload.login, companyCode)
   const role = normalizeText(user.role).toLowerCase()
 
   if (!dashboardLoginRoles.has(role)) {
