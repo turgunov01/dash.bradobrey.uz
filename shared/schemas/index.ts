@@ -50,8 +50,11 @@ export const branchUpdateSchema = branchFormSchema.partial().passthrough()
 
 export const barberUserSchema = z.object({
   branch_id: identifierSchema.optional().nullable(),
+  // MULTI_TENANCY 12: main-company network admin flags (absent on older APIs).
+  can_manage_platform: z.boolean().optional(),
   company_code: optionalTextSchema,
   company_id: identifierSchema.optional().nullable(),
+  company_is_default: z.boolean().optional(),
   id: identifierSchema.optional(),
   login: optionalTextSchema,
   marketplace_barbershop_id: optionalTextSchema,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Default company's network admins create platform-owner accounts (the
 // backend allows admin_network/admin of the default company only; the route
-// is offered to admin_network, see shared/auth/tenancy.ts).
+// is offered per canManagePlatform, see shared/auth/tenancy.ts).
 definePageMeta({})
 useHead({ title: 'Владельцы платформы' })
 </script>

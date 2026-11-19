@@ -74,6 +74,9 @@ export async function getCurrentBackendAccessUser(event: H3Event) {
   return assertDashboardAccessUser(response.data?.user)
 }
 
+// /api/barbers/me platform flags (MULTI_TENANCY 12); undefined on an older API.
+const optionalFlag = (value: unknown) => typeof value === 'boolean' ? value : undefined
+
 export function toDashboardUser(accessUser: AccessUser) {
   const login = accessUser.login ? String(accessUser.login).trim() : null
   const marketplaceBarbershopId = accessUser.marketplace_barbershop_id ?? accessUser.marketplaceBarbershopId ?? null
@@ -82,6 +85,8 @@ export function toDashboardUser(accessUser: AccessUser) {
 
   return {
     branch_id: accessUser.branch_id ?? null,
+    can_manage_platform: optionalFlag(accessUser.can_manage_platform),
+    company_is_default: optionalFlag(accessUser.company_is_default),
     company_id: companyId === undefined || companyId === null ? null : String(companyId),
     id: String(accessUser.id),
     login,

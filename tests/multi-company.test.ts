@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 
 import {
   canCheckTodayOrders,
+  canManagePlatform,
   canManagePlatformOwners,
   canRotateKioskEnrollmentCode,
   describeLoginError,
@@ -96,6 +97,14 @@ test('limits role-gated actions to the roles the backend allows', () => {
 
   assert.equal(canManagePlatformOwners('admin_network'), true)
   assert.equal(canManagePlatformOwners('admin'), false)
+
+  // /api/barbers/me can_manage_platform (MULTI_TENANCY 12) decides; older API
+  // without the flag falls back to the admin_network role (backend 403 rules).
+  assert.equal(canManagePlatform({ role: 'admin', can_manage_platform: true }), true)
+  assert.equal(canManagePlatform({ role: 'admin_network', can_manage_platform: false }), false)
+  assert.equal(canManagePlatform({ role: 'admin_network' }), true)
+  assert.equal(canManagePlatform({ role: 'admin_branch' }), false)
+  assert.equal(canManagePlatform(null), false)
   assert.equal(isPlatformOwnerRole(' Platform_Owner '), true)
   assert.equal(isPlatformAreaPath('/platform/companies'), true)
   assert.equal(isPlatformAreaPath('/platformer'), false)
@@ -113,6 +122,7 @@ test('explains multi-company preconditions and platform errors in Russian', () =
   assert.equal(describePlatformError(viaBff(409, { code: 'COMPANY_CODE_TAKEN' })), 'Этот код компании уже занят.')
   assert.equal(describePlatformError(viaBff(409, { code: 'DEFAULT_COMPANY_SUSPEND_FORBIDDEN' })), 'Основную компанию приостановить нельзя.')
   assert.equal(describePlatformError(viaBff(403, { error: 'nope' })), 'Недостаточно прав для этого действия.')
+  assert.match(describePlatformError(viaBff(403, { code: 'DEFAULT_COMPANY_ADMIN_FORBIDDEN' })), /Сотрудники/)
 })
 
 // --- company form helpers ----------------------------------------------------
@@ -175,8 +185,42 @@ test('keeps the platform token server-side and separate from company sessions', 
 test('confines platform owners to the platform area and hides it from company users', () => {
   assert.match(authMiddlewareSource, /if \(isPlatformAreaPath\(to\.path\)\) \{\n\s+return platformSession\.isAuthenticated \? undefined : navigateTo\("\/platform\/login"\)/)
   assert.match(authMiddlewareSource, /if \(platformSession\.isAuthenticated\) \{\n\s+return navigateTo\(PLATFORM_HOME\)/)
-  assert.match(authMiddlewareSource, /canManagePlatformOwners\(role\)/)
-  assert.match(navigationSource, /canManagePlatformOwners\(sessionStore\.user\?\.role\)/)
+  assert.match(authMiddlewareSource, /PLATFORM_MANAGEMENT_PATHS\.includes\(to\.path\) && !canManagePlatform\(sessionStore\.user\)/)
+  assert.match(navigationSource, /isPlatformManagementPath\(item\.to\) && !showPlatform\.value/)
+})
+
+test('main-company admins manage companies through company-token BFF routes', () => {
+  const routes = {
+    list: read('server/api/settings/platform-companies/index.get.ts'),
+    create: read('server/api/settings/platform-companies/index.post.ts'),
+    patch: read('server/api/settings/platform-companies/[id].patch.ts'),
+    admins: read('server/api/settings/platform-companies/[id]/admins.post.ts')
+  }
+
+  for (const [name, source] of Object.entries(routes)) {
+    // Company token (auth: 'required'), never the platform cookie.
+    assert.match(source, /auth: 'required'/, name)
+    assert.doesNotMatch(source, /proxyPlatformBackend|getPlatformToken/, name)
+  }
+  assert.match(routes.list, /path: '\/api\/platform\/companies'/)
+  assert.match(routes.patch, /requirePlatformCompanyId\(event\)/)
+  assert.match(routes.patch, /'kiosk_enrollment_code'/)
+  assert.match(routes.admins, /pickFields\(.*, \['login', 'password'\]\)/)
+
+  const platformApiSource = read('app/composables/usePlatformApi.ts')
+  assert.match(platformApiSource, /\/api\/settings\/platform-companies/)
+
+  // The platform-owner area keeps its own session routes.
+  assert.match(read('app/pages/platform/companies/index.vue'), /<PlatformCompaniesPanel source="platform"/)
+  assert.match(read('app/pages/settings/platform-companies.vue'), /<PlatformCompaniesPanel source="tenant"/)
+  assert.match(navigationSource, /label: "Платформа"/)
+})
+
+test('/me flags survive the dashboard session user mapping', () => {
+  const accessSource = read('server/utils/admin-access.ts')
+  // Absent on an older API -> undefined, so canManagePlatform falls back to the role.
+  assert.match(accessSource, /can_manage_platform: optionalFlag\(accessUser\.can_manage_platform\)/)
+  assert.match(accessSource, /company_is_default: optionalFlag\(accessUser\.company_is_default\)/)
 })
 
 test('requires a staff token for kiosk enrollment-code rotation and hides check-today for other roles', () => {

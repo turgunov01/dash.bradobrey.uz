@@ -2,9 +2,14 @@ import { useCalculatorModal } from "#imports";
 import type { NavigationMenuItem } from "@nuxt/ui";
 import { getEffectiveEmployeePermissions } from "~~/shared/auth/employees";
 import { canAccessPath } from "~/utils/access";
-import { canManagePlatformOwners } from "~~/shared/auth/tenancy";
+import { canManagePlatform } from "~~/shared/auth/tenancy";
 
+// Main-company network admins only (MULTI_TENANCY 12); see canManagePlatform.
+const PLATFORM_COMPANIES_PATH = "/settings/platform-companies";
 const PLATFORM_OWNERS_PATH = "/settings/platform-owners";
+const PLATFORM_MANAGEMENT_PATHS = [PLATFORM_COMPANIES_PATH, PLATFORM_OWNERS_PATH];
+
+const isPlatformManagementPath = (path: string) => PLATFORM_MANAGEMENT_PATHS.includes(path);
 
 interface NavigationSection {
   label?: string;
@@ -99,6 +104,12 @@ const NAVIGATION_SECTIONS: NavigationSection[] = [
       { icon: "i-lucide-monitor-play", label: "Реклама киоска", to: "/settings/kiosk-ads" },
       { icon: "i-lucide-panels-top-left", label: "Баннеры приложения", to: "/settings/banners" },
       { icon: "i-lucide-bell-ring", label: "Настройки уведомлений", to: "/settings/notifications" },
+    ],
+  },
+  {
+    label: "Платформа",
+    items: [
+      { icon: "i-lucide-building-2", label: "Компании", to: PLATFORM_COMPANIES_PATH },
       { icon: "i-lucide-shield-user", label: "Владельцы платформы", to: PLATFORM_OWNERS_PATH },
     ],
   },
@@ -108,7 +119,12 @@ export function useDashboardNavigation() {
   const sessionStore = useSessionStore();
   const { openCalculator } = useCalculatorModal();
 
+  const platformDeniedUser = usePlatformManagementDenied();
+
   const permissions = computed(() => new Set(getEffectiveEmployeePermissions(sessionStore.user)));
+  // Hidden again after the backend answered 403 for this user.
+  const showPlatform = computed(() => canManagePlatform(sessionStore.user)
+    && platformDeniedUser.value !== String(sessionStore.user?.id ?? ""));
 
   // Sections keep only links the current user may open; empty sections vanish.
   const visibleSections = computed(() =>
@@ -116,7 +132,7 @@ export function useDashboardNavigation() {
       ...section,
       items: section.items.filter((item) => {
         if (typeof item.to !== "string") return true;
-        if (item.to === PLATFORM_OWNERS_PATH && !canManagePlatformOwners(sessionStore.user?.role)) return false;
+        if (isPlatformManagementPath(item.to) && !showPlatform.value) return false;
         return canAccessPath(permissions.value, item.to);
       }),
     })).filter((section) => section.items.length > 0),

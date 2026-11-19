@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { PlatformCompany } from '~/composables/usePlatformApi'
+import type { PlatformApiSource, PlatformCompany } from '~/composables/usePlatformApi'
 import { buildCompanyPayload, emptyCompanyForm, validateCompanyForm, type CompanyFormState } from '~/utils/platformCompany'
 import { describePlatformError, getApiErrorBody, getApiErrorCode } from '~~/shared/auth/tenancy'
 
 // Create (company = null) or edit a company's name, code and branding.
-const props = defineProps<{ open: boolean, company: PlatformCompany | null }>()
+const props = defineProps<{ open: boolean, company: PlatformCompany | null, source?: PlatformApiSource }>()
 const emit = defineEmits<{ 'update:open': [boolean], saved: [PlatformCompany] }>()
 
-const platformApi = usePlatformApi()
+const platformApi = usePlatformApi(props.source ?? 'platform')
 
 const form = reactive<CompanyFormState>(emptyCompanyForm())
 const errors = ref<Partial<Record<keyof CompanyFormState, string>>>({})

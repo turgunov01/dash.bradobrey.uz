@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { PlatformCompany } from '~/composables/usePlatformApi'
+import type { PlatformApiSource, PlatformCompany } from '~/composables/usePlatformApi'
 import { generateEnrollmentCode, validateEnrollmentCode } from '~/utils/platformCompany'
 import { describePlatformError } from '~~/shared/auth/tenancy'
 
 // Kiosk enrollment code of a company: set/rotate or clear. The API stores a
 // hash and never returns the code, so it is shown only right after saving.
-const props = defineProps<{ open: boolean, company: PlatformCompany | null }>()
+const props = defineProps<{ open: boolean, company: PlatformCompany | null, source?: PlatformApiSource }>()
 const emit = defineEmits<{ 'update:open': [boolean], saved: [PlatformCompany] }>()
 
-const platformApi = usePlatformApi()
+const platformApi = usePlatformApi(props.source ?? 'platform')
 
 const code = ref('')
 const error = ref('')

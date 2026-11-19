@@ -3,6 +3,7 @@
 ## 2026-11-19
 
 - Multi-company support (branch `feat/multi-company`): «Код компании» on login, platform-owner area (`/platform/*`: companies, company admins, kiosk enrollment codes, platform owners), «Владельцы платформы» settings page, kiosk enrollment-code rotation, company shown in the sidebar/user menu, forced logout on revoked role/company sessions, «Проверить заказы» hidden for roles without access.
+- Branch `feat/bradobrey-platform-admin` (api MULTI_TENANCY 12): main-company (`is_default`) `admin_network`/`admin` get a «Платформа» sidebar section (`/settings/platform-companies` + `/settings/platform-owners`) with the same company UI as `/platform/companies` (shared `PlatformCompaniesPanel`, modals take `source: 'platform' | 'tenant'`). Tenant mode goes through BFF `server/api/settings/platform-companies/*` with the company token (never the platform cookie). Visibility: `user.can_manage_platform` from `/api/barbers/me` (fallback to `admin_network` role on an older API); a 403 hides the section for that user. «Создать администратора» is hidden for the main company in tenant mode (API: `403 DEFAULT_COMPANY_ADMIN_FORBIDDEN`). Server build: run `npx nuxi prepare` before `npm run build`.
 
 ## 2026-10-19
 

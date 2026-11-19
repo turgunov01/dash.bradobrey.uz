@@ -1,9 +1,10 @@
 import { getEffectiveEmployeePermissions } from '~~/shared/auth/employees'
 import { canAccessPath, firstAllowedPath, requiredForPath } from '~/utils/access'
-import { canManagePlatformOwners, isPlatformAreaPath } from '~~/shared/auth/tenancy'
+import { canManagePlatform, isPlatformAreaPath } from '~~/shared/auth/tenancy'
 
 const PLATFORM_HOME = '/platform/companies'
-const PLATFORM_OWNERS_SETTINGS_PATH = '/settings/platform-owners'
+// Company-session platform management (MULTI_TENANCY 12); the API re-checks.
+const PLATFORM_MANAGEMENT_PATHS = ['/settings/platform-companies', '/settings/platform-owners']
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path === "/login" || to.path === "/platform/login") {
@@ -56,7 +57,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo("/");
   }
 
-  if (to.path === PLATFORM_OWNERS_SETTINGS_PATH && !canManagePlatformOwners(role)) {
+  if (PLATFORM_MANAGEMENT_PATHS.includes(to.path) && !canManagePlatform(sessionStore.user)) {
     return navigateTo(firstAllowedPath(new Set(getEffectiveEmployeePermissions(sessionStore.user))) || "/");
   }
 

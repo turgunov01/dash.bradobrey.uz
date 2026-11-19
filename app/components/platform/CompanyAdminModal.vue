@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { PlatformCompany } from '~/composables/usePlatformApi'
+import type { PlatformApiSource, PlatformCompany } from '~/composables/usePlatformApi'
 import { describePlatformError, getApiErrorCode, PLATFORM_PASSWORD_MAX_LENGTH, PLATFORM_PASSWORD_MIN_LENGTH } from '~~/shared/auth/tenancy'
 
 // First administrator of a company (role admin): POST /api/platform/companies/:id/admins.
-const props = defineProps<{ open: boolean, company: PlatformCompany | null }>()
+const props = defineProps<{ open: boolean, company: PlatformCompany | null, source?: PlatformApiSource }>()
 const emit = defineEmits<{ 'update:open': [boolean], created: [string] }>()
 
-const platformApi = usePlatformApi()
+const platformApi = usePlatformApi(props.source ?? 'platform')
 
 const form = reactive({ login: '', password: '', confirm: '' })
 const errors = reactive({ login: '', password: '', confirm: '' })

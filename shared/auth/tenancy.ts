@@ -9,9 +9,9 @@ export const PLATFORM_OWNER_ROLE = 'platform_owner'
 export const kioskEnrollmentRoles = ['admin_network', 'admin', 'super-manager'] as const
 // POST /api/notifications/check-today (MULTI_TENANCY 11.2).
 export const checkTodayOrdersRoles = ['admin_network', 'admin', 'admin_branch', 'super-manager'] as const
-// Platform-owner accounts are created from the default company's admin panel.
-// /api/barbers/me does not expose companies.is_default, so the panel offers it
-// to admin_network only; the backend is the authority (403 for everyone else).
+// Fallback for an API that predates /api/barbers/me `can_manage_platform`
+// (MULTI_TENANCY 12): offer the "Платформа" section to admin_network only;
+// the backend is the authority (403 for everyone else).
 export const platformOwnerManagerRoles = ['admin_network'] as const
 
 export const COMPANY_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/
@@ -44,6 +44,19 @@ export function canCheckTodayOrders(role: unknown) {
 
 export function canManagePlatformOwners(role: unknown) {
   return (platformOwnerManagerRoles as readonly string[]).includes(normalizeRole(role))
+}
+
+export type PlatformManagerUser = { role?: unknown, can_manage_platform?: unknown } | null | undefined
+
+/**
+ * Shows the company-session "Платформа" section (companies + platform owners):
+ * the backend flag from /api/barbers/me (admin_network/admin of the active
+ * main company), else the role fallback. UI hint only — the API re-checks.
+ */
+export function canManagePlatform(user: PlatformManagerUser) {
+  if (!user) return false
+  if (typeof user.can_manage_platform === 'boolean') return user.can_manage_platform
+  return canManagePlatformOwners(user.role)
 }
 
 export function isPlatformAreaPath(path: string) {
@@ -163,6 +176,8 @@ export function describePlatformError(error: unknown): string {
       return 'Основную компанию приостановить нельзя.'
     case 'PLATFORM_OWNER_REQUIRED':
       return 'Действие доступно только владельцу платформы.'
+    case 'DEFAULT_COMPANY_ADMIN_FORBIDDEN':
+      return 'Администраторов основной компании создавайте в разделе «Сотрудники».'
   }
 
   if (getApiErrorStatus(error) === 403) return 'Недостаточно прав для этого действия.'

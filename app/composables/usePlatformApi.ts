@@ -43,10 +43,53 @@ export type PlatformOwnersSource = 'platform' | 'tenant'
 type Method = 'GET' | 'PATCH' | 'POST'
 
 /**
- * Platform-owner API (BFF /api/platform/*). Requests never carry the company
- * bearer token. A rejected platform session sends the owner back to /platform/login.
+ * Id of the company user the backend refused platform management to (403 in
+ * tenant mode). The "Платформа" navigation hides itself for that user only,
+ * so another login in the same tab starts clean.
  */
-export function usePlatformApi() {
+export function usePlatformManagementDenied() {
+  return useState<string | null>('platform-management-denied-user', () => null)
+}
+
+/** 'platform' = platform-owner session; 'tenant' = main-company admin session. */
+export type PlatformApiSource = PlatformOwnersSource
+
+type CompanyResponse = { company: PlatformCompany }
+type CompanyAdminResponse = { user: { id: string, login: string, role: string, company_id: string } }
+
+/**
+ * Company management. `platform`: BFF /api/platform/* with the platform-owner
+ * session — never the company bearer token; a rejected session sends the owner
+ * back to /platform/login. `tenant`: BFF /api/settings/platform-companies with
+ * the main-company admin's own session (MULTI_TENANCY 12); errors are left to
+ * the caller (a 403 hides the section).
+ */
+export function usePlatformApi(source: PlatformApiSource = 'platform') {
+  return source === 'tenant' ? useTenantPlatformCompaniesApi() : useOwnerPlatformCompaniesApi()
+}
+
+function useTenantPlatformCompaniesApi() {
+  const client = useApiClient()
+  const base = '/api/settings/platform-companies'
+  const companyUrl = (id: string) => `${base}/${encodeURIComponent(id)}`
+
+  return {
+    listCompanies() {
+      return client.request<{ companies: PlatformCompany[] }>(base, { query: { __skipBranchScope: true }, silent: true })
+    },
+    createCompany(payload: CompanyCreatePayload) {
+      return client.request<CompanyResponse>(base, { body: payload, method: 'POST', silent: true })
+    },
+    updateCompany(id: string, payload: CompanyUpdatePayload) {
+      return client.request<CompanyResponse>(companyUrl(id), { body: payload, method: 'PATCH', silent: true })
+    },
+    createCompanyAdmin(id: string, payload: { login: string, password: string }) {
+      return client.request<CompanyAdminResponse>(`${companyUrl(id)}/admins`, { body: payload, method: 'POST', silent: true })
+    }
+  }
+}
+
+function useOwnerPlatformCompaniesApi() {
   const nuxtApp = useNuxtApp()
   const toast = useToast()
   const requestFetch = useRequestFetch()
@@ -78,15 +121,13 @@ export function usePlatformApi() {
       return call<{ companies: PlatformCompany[] }>('/api/platform/companies')
     },
     createCompany(payload: CompanyCreatePayload) {
-      return call<{ company: PlatformCompany }>('/api/platform/companies', 'POST', payload, { silent: true })
+      return call<CompanyResponse>('/api/platform/companies', 'POST', payload, { silent: true })
     },
     updateCompany(id: string, payload: CompanyUpdatePayload) {
-      return call<{ company: PlatformCompany }>(`/api/platform/companies/${encodeURIComponent(id)}`, 'PATCH', payload, { silent: true })
+      return call<CompanyResponse>(`/api/platform/companies/${encodeURIComponent(id)}`, 'PATCH', payload, { silent: true })
     },
     createCompanyAdmin(id: string, payload: { login: string, password: string }) {
-      return call<{ user: { id: string, login: string, role: string, company_id: string } }>(
-        `/api/platform/companies/${encodeURIComponent(id)}/admins`, 'POST', payload, { silent: true }
-      )
+      return call<CompanyAdminResponse>(`/api/platform/companies/${encodeURIComponent(id)}/admins`, 'POST', payload, { silent: true })
     }
   }
 }
